@@ -1,0 +1,62 @@
+[
+  {
+    "id": "nutrition",
+    "label": "Nutrition & Dietary Pattern",
+    "icon": "leaf",
+    "knownLimitation": null
+  },
+  {
+    "id": "gut-microbiome",
+    "label": "Gut Microbiome & Metabolic Byproducts",
+    "icon": "atom",
+    "knownLimitation": null
+  },
+  {
+    "id": "purpose",
+    "label": "Sense of Purpose & Social Connection",
+    "icon": "hands",
+    "knownLimitation": null
+  },
+  {
+    "id": "sleep",
+    "label": "Sleep Quality & Circadian Health",
+    "icon": "moon",
+    "knownLimitation": "This topic has no dedicated adult sleep-science source in the current library — it borrows two sleep-adjacent findings from the Purpose document. Flagged to the user as a gap to fill with a real sleep/circadian research doc."
+  },
+  {
+    "id": "activity",
+    "label": "Physical Activity & Movement",
+    "icon": "walk",
+    "knownLimitation": "This topic has no dedicated adult exercise-science source in the current library — it borrows one behavioral finding from the Purpose document. Flagged to the user as a gap to fill with a real physical-activity research doc."
+  },
+  {
+    "id": "metabolic-cv",
+    "label": "Metabolic & Cardiovascular Risk",
+    "icon": "heartpulse",
+    "knownLimitation": null
+  },
+  {
+    "id": "micronutrient",
+    "label": "Micronutrient & Vitamin Status",
+    "icon": "droplet",
+    "knownLimitation": null
+  },
+  {
+    "id": "cognitive",
+    "label": "Cognitive Health & Neuroprotection",
+    "icon": "brain",
+    "knownLimitation": null
+  },
+  {
+    "id": "energy-mitochondrial",
+    "label": "Energy & Mitochondrial Function",
+    "icon": "bolt",
+    "knownLimitation": null
+  },
+  {
+    "id": "weight",
+    "label": "Weight Management & Body Composition",
+    "icon": "scale",
+    "knownLimitation": null
+  }
+]
