@@ -80,11 +80,31 @@ GPT — those aren't addressable via the API. Two real options if you want that:
   other topics receive the data but have no genetic source to ground it in, so
   they correctly ignore it rather than fabricate a connection.
 - **Settings tab**: theme (System/Light/Dark, persisted, no flash on reload),
-  "always show full plan detail" (overrides the default collapse-after-first-view
-  behavior), and "reset all local data."
+  units (metric/imperial — profile is always stored internally in kg/cm, only
+  the displayed number and label convert), "always show full plan detail"
+  (overrides the default collapse-after-first-view behavior), a JSON
+  export/import of everything stored locally, and "reset all local data."
 - **Plan card headline**: Stage 2 (Claude) now also produces a short, punchy
   headline that's a compression of `do_this` — never a new claim — so each
   topic's card leads with something memorable instead of a plain label/value row.
+- **No free-text profile fields**: diet pattern and primary goal are selects
+  (with an "Other" option that reveals a small text box) rather than open text,
+  so a plan request never hinges on the model parsing an arbitrary sentence.
+- **"Mark done" is wired straight into the tracker**: the button inside the
+  deliverable box marks the next incomplete day directly — no need to scroll
+  down to the dot row separately, though it's still there for correcting a
+  specific day.
+
+## Verifying the live two-stage pipeline
+
+Once `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are set on Netlify and deployed,
+open any topic and click "Get today's plan." A **real** response has no
+"[MOCK...]" text anywhere in the card and the yellow "Mock response" banner is
+gone. If you get an error instead of a plan, it's almost always one of:
+key not actually saved before the last deploy (env vars only apply to the
+*next* build — redeploy after adding them), a typo in the key, or a billing/quota
+issue on the OpenAI or Anthropic account. The error message shown in the UI
+includes the HTTP status from whichever API failed, which narrows it down fast.
 
 ## Known gaps in the research library (flagged, not hidden)
 

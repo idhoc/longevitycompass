@@ -9,20 +9,25 @@
   };
 
   // Only variants that actually appear in data/sources/micronutrient.md — keeping this list
-  // tied to the source library means the checkbox options never imply coverage the coach
-  // doesn't actually have.
+  // tied to the source library means the options never imply coverage the coach doesn't
+  // actually have. Grouped + plain-language described so the checklist reads as a health
+  // question, not a genetics exam.
   const GENETIC_VARIANTS = [
-    'MTHFR C677T (folate metabolism)',
-    'VDR (vitamin D receptor)',
-    'APOE4 allele',
-    'HFE (iron overload)',
-    'TRPM6 (magnesium absorption)',
-    'FADS1 / ELOVL2 (omega-3 conversion)',
-    'PEMT (choline)',
-    'BCMO1 (beta-carotene conversion)',
-    'GPX1 (selenium / antioxidant defense)',
-    'Zinc transporter gene variant',
+    { label: 'MTHFR C677T', desc: 'How your body processes folate (vitamin B9)', icon: 'droplet', category: 'Vitamins & minerals' },
+    { label: 'VDR variant', desc: 'How sensitive you are to vitamin D', icon: 'sun', category: 'Vitamins & minerals' },
+    { label: 'TRPM6 variant', desc: 'How well you absorb magnesium', icon: 'droplet', category: 'Vitamins & minerals' },
+    { label: 'BCMO1 variant', desc: 'Converting beta-carotene into usable vitamin A', icon: 'droplet', category: 'Vitamins & minerals' },
+    { label: 'GPX1 variant', desc: 'Selenium use and antioxidant defense', icon: 'droplet', category: 'Vitamins & minerals' },
+    { label: 'Zinc transporter variant', desc: 'How well you absorb zinc', icon: 'droplet', category: 'Vitamins & minerals' },
+    { label: 'APOE4 allele', desc: 'Fat metabolism and long-term brain/heart aging', icon: 'brain', category: 'Heart & brain' },
+    { label: 'FADS1 / ELOVL2 variant', desc: 'How efficiently you convert plant omega-3s', icon: 'brain', category: 'Heart & brain' },
+    { label: 'PEMT variant', desc: 'Your dietary choline requirement', icon: 'heartpulse', category: 'Heart & brain' },
+    { label: 'HFE mutation', desc: 'Iron absorption and overload risk', icon: 'droplet', category: 'Iron regulation' },
   ];
+  const GENETIC_CATEGORIES = ['Vitamins & minerals', 'Heart & brain', 'Iron regulation'];
+
+  const DIET_OPTIONS = ['', 'Standard / omnivore', 'Mediterranean', 'Plant-based / vegetarian', 'Vegan', 'Low-carb / keto', 'Paleo', 'DASH', 'Other'];
+  const GOAL_OPTIONS = ['', 'More energy', 'Better sleep', 'Weight management', 'Reduce stress', 'Sharper focus / cognition', 'Healthy aging / longevity', 'Heart health', 'Build strength / muscle', 'Other'];
 
   let TOPICS = [];
 
@@ -34,7 +39,7 @@
   function setProfile(p) { localStorage.setItem(STORAGE.profile, JSON.stringify(p)); }
 
   function getSettings() {
-    const defaults = { theme: 'system', alwaysExpandPlans: false };
+    const defaults = { theme: 'system', alwaysExpandPlans: false, units: 'metric' };
     try { return { ...defaults, ...(JSON.parse(localStorage.getItem(STORAGE.settings)) || {}) }; }
     catch { return defaults; }
   }
@@ -120,7 +125,7 @@
     for (const t of TOPICS) {
       const active = route.view === 'topic' && route.id === t.id ? 'active' : '';
       const pct = scoreForTopic(t.id);
-      html += `<a class="nav-link ${active}" href="#/topic/${t.id}">${lcIcon(t.icon, 18)}<span class="nav-label">${t.label}</span><span class="nav-pct">${pct}%</span></a>`;
+      html += `<a class="nav-link ${active}" href="#/topic/${t.id}">${lcIcon(t.icon, 18)}<span class="nav-label">${t.label}</span>${renderMiniRing(pct, 20)}</a>`;
     }
     html += '</div>';
     el.innerHTML = html;
@@ -137,8 +142,8 @@
     main.innerHTML = `
       <h1>Your longevity radar</h1>
       <p class="subtitle">Fills in as you complete each topic's daily action.</p>
-      <div class="grid-2">
-        <div class="card radar-wrap"><svg id="radar-svg" style="max-width:360px"></svg></div>
+      <div class="grid-radar">
+        <div class="card radar-wrap"><div id="radar-svg" class="radar-chart-host"></div></div>
         <div class="card">
           <h2>Focus today</h2>
           <p class="subtitle" style="margin-bottom:0">Your three lowest-adherence topics right now.</p>
@@ -147,7 +152,7 @@
       </div>
     `;
 
-    renderRadar(document.getElementById('radar-svg'), TOPICS, scores, { size: 360 });
+    renderRadar(document.getElementById('radar-svg'), TOPICS, scores, { size: 480 });
 
     const focusList = document.getElementById('focus-list');
     focusList.innerHTML = focusOrder.map(({ t, score }) => `
@@ -169,43 +174,91 @@
   }
 
   // ---------- profile ----------
+  // Every field is a select or a number — no free-text boxes, so a plan request never hinges
+  // on the LLM parsing an arbitrary sentence out of the profile. "Other" options reveal a
+  // small companion text box rather than forcing a pick that doesn't fit.
   const PROFILE_FIELDS = [
     { key: 'age', label: 'Age', type: 'number' },
     { key: 'sex', label: 'Sex', type: 'select', options: ['', 'female', 'male', 'other'] },
-    { key: 'weightKg', label: 'Weight (kg)', type: 'number' },
-    { key: 'heightCm', label: 'Height (cm)', type: 'number' },
+    { key: 'weightKg', label: 'Weight', type: 'weight' },
+    { key: 'heightCm', label: 'Height', type: 'height' },
     { key: 'sleepHours', label: 'Typical sleep (hrs/night)', type: 'number', step: '0.5' },
-    { key: 'dietPattern', label: 'Current diet pattern', type: 'text' },
+    { key: 'dietPattern', label: 'Current diet pattern', type: 'select-other', options: DIET_OPTIONS },
     { key: 'activityLevel', label: 'Activity level', type: 'select', options: ['', 'sedentary', 'light', 'moderate', 'active'] },
     { key: 'stressLevel', label: 'Typical stress level', type: 'select', options: ['', 'low', 'moderate', 'high'] },
-    { key: 'primaryGoal', label: 'Your main goal right now', type: 'text' },
+    { key: 'primaryGoal', label: 'Your main goal right now', type: 'select-other', options: GOAL_OPTIONS },
     { key: 'restingHeartRate', label: 'Resting heart rate (bpm, optional)', type: 'number' },
     { key: 'systolicBP', label: 'Systolic BP (optional)', type: 'number' },
     { key: 'diastolicBP', label: 'Diastolic BP (optional)', type: 'number' },
   ];
 
+  function kgToLb(kg) { return Math.round(kg * 2.20462 * 10) / 10; }
+  function lbToKg(lb) { return Math.round((lb / 2.20462) * 10) / 10; }
+  function cmToIn(cm) { return Math.round(cm / 2.54); }
+  function inToCm(inches) { return Math.round(inches * 2.54); }
+
   function buildProfileFieldsHtml(profile, idPrefix) {
     const gv = profile.geneticVariants || [];
+    const units = getSettings().units || 'metric';
+
     const fieldsHtml = PROFILE_FIELDS.map((f) => {
       const val = profile[f.key] ?? '';
+
+      if (f.type === 'weight') {
+        const isImperial = units === 'imperial';
+        const display = val === '' ? '' : (isImperial ? kgToLb(Number(val)) : val);
+        return `<div class="field"><label>Weight (${isImperial ? 'lbs' : 'kg'})</label><input name="${f.key}" type="number" step="0.1" value="${display}"/></div>`;
+      }
+      if (f.type === 'height') {
+        const isImperial = units === 'imperial';
+        const display = val === '' ? '' : (isImperial ? cmToIn(Number(val)) : val);
+        return `<div class="field"><label>Height (${isImperial ? 'in' : 'cm'})</label><input name="${f.key}" type="number" step="1" value="${display}"/></div>`;
+      }
       if (f.type === 'select') {
         return `<div class="field"><label>${f.label}</label><select name="${f.key}">${f.options.map((o) => `<option value="${o}" ${o === val ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select></div>`;
+      }
+      if (f.type === 'select-other') {
+        const isOther = val && !f.options.includes(val);
+        const selectVal = isOther ? 'Other' : val;
+        return `
+          <div class="field">
+            <label>${f.label}</label>
+            <select name="${f.key}" data-other-toggle="${f.key}-other-row">${f.options.map((o) => `<option value="${o}" ${o === selectVal ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select>
+          </div>
+          <div class="field" id="${idPrefix}-${f.key}-other-row" style="${selectVal === 'Other' ? '' : 'display:none'}">
+            <label>${f.label} (please specify)</label>
+            <input name="${f.key}Other" type="text" value="${isOther ? escapeHtml(val) : ''}"/>
+          </div>
+        `;
       }
       return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${val}"/></div>`;
     }).join('');
 
-    const geneticHtml = `
-      <fieldset class="genetic-fieldset form-grid" style="grid-column:1/-1">
-        <legend>Genetic profile (optional)</legend>
-        <p class="genetic-hint" style="grid-column:1/-1">If a consumer genetic test (23andMe, clinical panel, etc.) has told you that you carry any of these, check them. Skip anything you're unsure of — this is never used to diagnose, only to point to the matching general-population research.</p>
-        <div class="genetic-grid" style="grid-column:1/-1">
-          ${GENETIC_VARIANTS.map((v, i) => `
-            <label class="genetic-option">
-              <input type="checkbox" name="geneticVariants" value="${escapeHtml(v)}" id="${idPrefix}-gv-${i}" ${gv.includes(v) ? 'checked' : ''}/>
-              ${escapeHtml(v)}
-            </label>
-          `).join('')}
+    const genericHtml = `
+      <fieldset class="genetic-fieldset" style="grid-column:1/-1">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <legend>${lcIcon('dna', 16)} Genetic profile (optional)</legend>
+          <button type="button" class="btn-text-clear" data-clear-genetics>Clear all</button>
         </div>
+        <p class="genetic-hint">If a consumer genetic test (23andMe, clinical panel, etc.) has told you that you carry any of these, select them. This is never used to diagnose — only to point to the matching general-population research for that trait.</p>
+        ${GENETIC_CATEGORIES.map((cat) => `
+          <div class="genetic-category">
+            <div class="genetic-category-label">${cat}</div>
+            <div class="genetic-grid">
+              ${GENETIC_VARIANTS.filter((v) => v.category === cat).map((v, i) => `
+                <label class="genetic-chip ${gv.includes(v.label) ? 'active' : ''}">
+                  <input type="checkbox" name="geneticVariants" value="${escapeHtml(v.label)}" id="${idPrefix}-gv-${cat}-${i}" ${gv.includes(v.label) ? 'checked' : ''}/>
+                  <span class="genetic-chip-icon">${lcIcon(v.icon, 16)}</span>
+                  <span class="genetic-chip-text">
+                    <span class="genetic-chip-title">${escapeHtml(v.label)}</span>
+                    <span class="genetic-chip-desc">${escapeHtml(v.desc)}</span>
+                  </span>
+                  <span class="genetic-chip-check">${lcIcon('check', 13)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
       </fieldset>
     `;
 
@@ -214,13 +267,49 @@
       <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="suicidalIdeation" id="${idPrefix}-suicidalIdeation" ${profile.suicidalIdeation ? 'checked' : ''}/><label for="${idPrefix}-suicidalIdeation">I'm having thoughts of harming myself</label></div>
     `;
 
-    return fieldsHtml + flagsHtml + geneticHtml;
+    return `<div class="form-grid">${fieldsHtml}${flagsHtml}</div>${genericHtml}`;
+  }
+
+  function wireProfileForm(form, idPrefix) {
+    form.querySelectorAll('[data-other-toggle]').forEach((select) => {
+      const row = document.getElementById(`${idPrefix}-${select.dataset.otherToggle}`);
+      if (!row) return;
+      select.addEventListener('change', () => {
+        row.style.display = select.value === 'Other' ? '' : 'none';
+      });
+    });
+    form.querySelectorAll('.genetic-chip input').forEach((cb) => {
+      cb.addEventListener('change', () => cb.closest('.genetic-chip').classList.toggle('active', cb.checked));
+    });
+    const clearBtn = form.querySelector('[data-clear-genetics]');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        form.querySelectorAll('.genetic-chip input').forEach((cb) => {
+          cb.checked = false;
+          cb.closest('.genetic-chip').classList.remove('active');
+        });
+      });
+    }
   }
 
   function collectProfileFromForm(form) {
     const fd = new FormData(form);
+    const units = getSettings().units || 'metric';
     const next = {};
-    for (const f of PROFILE_FIELDS) next[f.key] = fd.get(f.key) || '';
+    for (const f of PROFILE_FIELDS) {
+      if (f.type === 'weight') {
+        const raw = fd.get(f.key);
+        next[f.key] = raw === '' || raw === null ? '' : (units === 'imperial' ? lbToKg(Number(raw)) : Number(raw));
+      } else if (f.type === 'height') {
+        const raw = fd.get(f.key);
+        next[f.key] = raw === '' || raw === null ? '' : (units === 'imperial' ? inToCm(Number(raw)) : Number(raw));
+      } else if (f.type === 'select-other') {
+        const selected = fd.get(f.key) || '';
+        next[f.key] = selected === 'Other' ? (fd.get(`${f.key}Other`) || 'Other') : selected;
+      } else {
+        next[f.key] = fd.get(f.key) || '';
+      }
+    }
     next.chestPain = fd.get('chestPain') === 'on';
     next.suicidalIdeation = fd.get('suicidalIdeation') === 'on';
     next.geneticVariants = fd.getAll('geneticVariants');
@@ -234,7 +323,7 @@
       <h1>My profile</h1>
       <p class="subtitle">This feeds every topic's coaching request. Nothing here leaves your browser except when you request a plan, and it is never used to diagnose anything.</p>
       <div class="card">
-        <form id="profile-form" class="form-grid"></form>
+        <form id="profile-form"></form>
         <div class="form-actions">
           <button type="submit" form="profile-form" class="btn btn-primary">Save profile</button>
           <span class="save-note" id="save-note">Saved</span>
@@ -243,6 +332,7 @@
     `;
     const form = document.getElementById('profile-form');
     form.innerHTML = buildProfileFieldsHtml(profile, 'profile');
+    wireProfileForm(form, 'profile');
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -262,7 +352,7 @@
       <div class="modal-card">
         <h1>Welcome to Longevity Compass</h1>
         <p class="subtitle">A few details make every topic's plan specific to you instead of generic. Everything here stays in your browser, and none of it is used to diagnose anything — skip anything you'd rather not share.</p>
-        <form id="onboarding-form" class="form-grid"></form>
+        <form id="onboarding-form"></form>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="onboarding-skip">Skip for now</button>
           <button type="submit" form="onboarding-form" class="btn btn-primary">Save & continue</button>
@@ -272,6 +362,7 @@
     document.body.appendChild(overlay);
     const form = overlay.querySelector('#onboarding-form');
     form.innerHTML = buildProfileFieldsHtml(profile, 'onboard');
+    wireProfileForm(form, 'onboard');
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -301,6 +392,12 @@
           </div>
         </div>
         <div class="settings-section">
+          <div class="settings-row-label">Units</div>
+          <div class="theme-options" id="units-options">
+            ${['metric', 'imperial'].map((u) => `<div class="theme-option ${settings.units === u ? 'active' : ''}" data-units-choice="${u}">${u === 'metric' ? 'Metric (kg / cm)' : 'Imperial (lbs / in)'}</div>`).join('')}
+          </div>
+        </div>
+        <div class="settings-section">
           <div class="settings-row">
             <div>
               <div class="settings-row-label">Always show full plan detail</div>
@@ -313,7 +410,16 @@
           </div>
         </div>
         <div class="settings-section">
-          <div class="settings-row-label">Data</div>
+          <div class="settings-row-label">Backup</div>
+          <div class="settings-row-desc" style="margin-bottom:10px">Download everything stored in this browser (profile, genetic markers, topic progress, settings) as a file, or restore from one.</div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-secondary" id="export-data-btn">Download my data</button>
+            <button class="btn btn-secondary" id="import-data-btn">Restore from file</button>
+            <input type="file" accept="application/json" id="import-file-input" style="display:none"/>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row-label">Reset</div>
           <div class="settings-row-desc" style="margin-bottom:10px">Clears your profile, genetic markers, and all topic progress from this browser. Cannot be undone.</div>
           <button class="btn btn-danger" id="reset-data-btn">Reset all local data</button>
         </div>
@@ -329,10 +435,55 @@
         renderSettings();
       });
     });
+    main.querySelectorAll('[data-units-choice]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const s = getSettings();
+        s.units = el.dataset.unitsChoice;
+        setSettings(s);
+        renderSettings();
+      });
+    });
     main.querySelector('#always-expand-toggle').addEventListener('change', (e) => {
       const s = getSettings();
       s.alwaysExpandPlans = e.target.checked;
       setSettings(s);
+    });
+    main.querySelector('#export-data-btn').addEventListener('click', () => {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        profile: getProfile(),
+        topics: getAllTopicState(),
+        settings: getSettings(),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'longevity-compass-backup.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    const importInput = main.querySelector('#import-file-input');
+    main.querySelector('#import-data-btn').addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', () => {
+      const file = importInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (data.profile) setProfile(data.profile);
+          if (data.topics) localStorage.setItem(STORAGE.topics, JSON.stringify(data.topics));
+          if (data.settings) setSettings(data.settings);
+          setOnboarded();
+          alert('Data restored.');
+          applyTheme();
+          render();
+        } catch {
+          alert('That file could not be read as a Longevity Compass backup.');
+        }
+      };
+      reader.readAsText(file);
     });
     main.querySelector('#reset-data-btn').addEventListener('click', () => {
       if (!confirm('Reset all local data? This clears your profile, genetic markers, and topic progress on this device.')) return;
@@ -365,8 +516,11 @@
         <button class="btn btn-secondary" id="regenerate-btn">${state.lastResult ? 'Regenerate plan' : 'Get today’s plan'}</button>
       </div>
       ${topic.knownLimitation ? `<div class="limitation-note">${escapeHtml(topic.knownLimitation)}</div>` : ''}
-      <div class="tracker-row" id="tracker-row"></div>
       <div id="plan-area"></div>
+      <div class="tracker-card card">
+        <div class="tracker-card-label">This week's progress</div>
+        <div class="tracker-row" id="tracker-row"></div>
+      </div>
     `;
 
     renderTracker(topicId, state);
@@ -384,12 +538,29 @@
         const i = Number(dot.dataset.i);
         s.days[i] = !s.days[i];
         setTopicState(topicId, s);
-        renderSidebar(currentRoute());
-        renderTracker(topicId, s);
-        const scoreEl = document.querySelector('.topic-header .subtitle');
-        if (scoreEl) scoreEl.textContent = `${scoreForTopic(topicId)}% adherence this week`;
+        onTrackerChanged(topicId, s);
       });
     });
+  }
+
+  function onTrackerChanged(topicId, state) {
+    renderSidebar(currentRoute());
+    renderTracker(topicId, state);
+    const scoreEl = document.querySelector('.topic-header .subtitle');
+    if (scoreEl) scoreEl.textContent = `${scoreForTopic(topicId)}% adherence this week`;
+    const markBtn = document.getElementById('mark-done-btn');
+    if (markBtn) updateMarkDoneButton(markBtn, state);
+  }
+
+  function updateMarkDoneButton(btn, state) {
+    const nextIdx = state.days.findIndex((d) => !d);
+    if (nextIdx === -1) {
+      btn.textContent = 'This week complete ✓';
+      btn.disabled = true;
+    } else {
+      btn.textContent = `Mark day ${nextIdx + 1} done`;
+      btn.disabled = false;
+    }
   }
 
   function renderPlanArea(topicId, state) {
@@ -413,6 +584,7 @@
       area.innerHTML = buildFullCard(result, topic);
       state.hasViewedFull = true;
       setTopicState(topicId, state);
+      wirePlanCard(topicId);
     } else {
       area.innerHTML = `
         <div class="card collapsed-summary" id="collapsed-toggle">
@@ -422,8 +594,23 @@
       `;
       document.getElementById('collapsed-toggle').addEventListener('click', () => {
         area.innerHTML = buildFullCard(result, topic);
+        wirePlanCard(topicId);
       }, { once: true });
     }
+  }
+
+  function wirePlanCard(topicId) {
+    const btn = document.getElementById('mark-done-btn');
+    if (!btn) return;
+    updateMarkDoneButton(btn, getTopicState(topicId));
+    btn.addEventListener('click', () => {
+      const s = getTopicState(topicId);
+      const nextIdx = s.days.findIndex((d) => !d);
+      if (nextIdx === -1) return;
+      s.days[nextIdx] = true;
+      setTopicState(topicId, s);
+      onTrackerChanged(topicId, s);
+    });
   }
 
   function buildFullCard(result, topic) {
@@ -438,15 +625,19 @@
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
-        <div class="plan-headline-row">
-          <span class="plan-headline-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
-          <div class="plan-headline-text">
-            <p class="plan-headline">${escapeHtml(headline)}</p>
-            ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
+        <div class="deliverable-box">
+          <div class="deliverable-label">Today's deliverable</div>
+          <div class="plan-headline-row">
+            <span class="plan-headline-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
+            <div class="plan-headline-text">
+              <p class="plan-headline">${escapeHtml(headline)}</p>
+              ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
+            </div>
           </div>
+          <button class="btn btn-primary" id="mark-done-btn" style="margin-top:14px">Mark done</button>
         </div>
-        ${result.why ? `<hr class="plan-divider"/><div class="plan-why">${escapeHtml(result.why)}${chipsHtml ? `<div style="margin-top:10px">${chipsHtml}</div>` : ''}</div>` : ''}
-        ${result.watchFor ? `<div class="plan-watchfor">⚑ ${escapeHtml(result.watchFor)}</div>` : ''}
+        ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}${chipsHtml ? `<div style="margin-top:10px">${chipsHtml}</div>` : ''}</div>` : ''}
+        ${result.watchFor ? `<div class="plan-section-label">Heads up</div><div class="plan-watchfor">${lcIcon('chevron', 12)} ${escapeHtml(result.watchFor)}</div>` : ''}
       </div>
     `;
   }
