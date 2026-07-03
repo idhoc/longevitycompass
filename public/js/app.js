@@ -132,16 +132,39 @@
   }
 
   // ---------- dashboard ----------
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 5) return 'Still up';
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   function renderDashboard() {
     const main = document.getElementById('main');
+    const profile = getProfile();
     const scores = TOPICS.map((t) => scoreForTopic(t.id));
     const focusOrder = TOPICS.map((t, i) => ({ t, score: scores[i] }))
       .sort((a, b) => a.score - b.score)
       .slice(0, 3);
 
+    const onTrack = scores.filter((s) => s >= 50).length;
+    const notStarted = scores.filter((s) => s === 0).length;
+    const bestIdx = scores.reduce((best, s, i) => (s > scores[best] ? i : best), 0);
+    const bestLabel = scores[bestIdx] > 0 ? shortLabel(TOPICS[bestIdx]) : '—';
+
+    const subline = profile.primaryGoal
+      ? `Here's where things stand with your goal: ${escapeHtml(profile.primaryGoal)}.`
+      : `Fills in as you complete each topic's daily action.`;
+
     main.innerHTML = `
-      <h1>Your longevity radar</h1>
-      <p class="subtitle">Fills in as you complete each topic's daily action.</p>
+      <h1>${greeting()}</h1>
+      <p class="subtitle">${subline}</p>
+      <div class="stat-row">
+        <div class="stat-tile"><div class="stat-value">${onTrack}<span class="stat-of">/${TOPICS.length}</span></div><div class="stat-label">Topics on track</div></div>
+        <div class="stat-tile"><div class="stat-value">${notStarted}</div><div class="stat-label">Not started this week</div></div>
+        <div class="stat-tile"><div class="stat-value stat-value-text">${escapeHtml(bestLabel)}</div><div class="stat-label">Strongest topic</div></div>
+      </div>
       <div class="grid-radar">
         <div class="card radar-wrap"><div id="radar-svg" class="radar-chart-host"></div></div>
         <div class="card">
@@ -197,8 +220,7 @@
   function cmToIn(cm) { return Math.round(cm / 2.54); }
   function inToCm(inches) { return Math.round(inches * 2.54); }
 
-  function buildProfileFieldsHtml(profile, idPrefix) {
-    const gv = profile.geneticVariants || [];
+  function buildBasicFieldsHtml(profile, idPrefix) {
     const units = getSettings().units || 'metric';
 
     const fieldsHtml = PROFILE_FIELDS.map((f) => {
@@ -234,8 +256,18 @@
       return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${val}"/></div>`;
     }).join('');
 
-    const genericHtml = `
-      <fieldset class="genetic-fieldset" style="grid-column:1/-1">
+    const flagsHtml = `
+      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="chestPain" id="${idPrefix}-chestPain" ${profile.chestPain ? 'checked' : ''}/><label for="${idPrefix}-chestPain">I'm currently experiencing chest pain</label></div>
+      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="suicidalIdeation" id="${idPrefix}-suicidalIdeation" ${profile.suicidalIdeation ? 'checked' : ''}/><label for="${idPrefix}-suicidalIdeation">I'm having thoughts of harming myself</label></div>
+    `;
+
+    return `<div class="form-grid">${fieldsHtml}${flagsHtml}</div>`;
+  }
+
+  function buildGeneticFieldsHtml(profile, idPrefix) {
+    const gv = profile.geneticVariants || [];
+    return `
+      <fieldset class="genetic-fieldset">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
           <legend>${lcIcon('dna', 16)} Genetic profile (optional)</legend>
           <button type="button" class="btn-text-clear" data-clear-genetics>Clear all</button>
@@ -261,13 +293,10 @@
         `).join('')}
       </fieldset>
     `;
+  }
 
-    const flagsHtml = `
-      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="chestPain" id="${idPrefix}-chestPain" ${profile.chestPain ? 'checked' : ''}/><label for="${idPrefix}-chestPain">I'm currently experiencing chest pain</label></div>
-      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="suicidalIdeation" id="${idPrefix}-suicidalIdeation" ${profile.suicidalIdeation ? 'checked' : ''}/><label for="${idPrefix}-suicidalIdeation">I'm having thoughts of harming myself</label></div>
-    `;
-
-    return `<div class="form-grid">${fieldsHtml}${flagsHtml}</div>${genericHtml}`;
+  function buildProfileFieldsHtml(profile, idPrefix) {
+    return buildBasicFieldsHtml(profile, idPrefix) + buildGeneticFieldsHtml(profile, idPrefix);
   }
 
   function wireProfileForm(form, idPrefix) {
@@ -344,25 +373,79 @@
   }
 
   // ---------- onboarding modal (first visit only) ----------
+  // A 3-step wizard (basics -> genetics -> review) rather than one long scrolling form —
+  // meant to read as a proper "welcome" moment, not a settings page shown too early.
+  const WIZARD_STEPS = [
+    { title: 'Welcome to Longevity Compass', desc: "A few details make every topic's plan specific to you instead of generic. Nothing here is used to diagnose anything." },
+    { title: 'Genetic profile', desc: 'Optional — only add what a real test has told you. Skip this step entirely if you have none.' },
+    { title: "You're all set", desc: 'Review what you entered, then jump into your dashboard.' },
+  ];
+
   function renderOnboardingModal() {
     const profile = getProfile();
+    let step = 1;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal-card">
-        <h1>Welcome to Longevity Compass</h1>
-        <p class="subtitle">A few details make every topic's plan specific to you instead of generic. Everything here stays in your browser, and none of it is used to diagnose anything — skip anything you'd rather not share.</p>
-        <form id="onboarding-form"></form>
+        <div class="wizard-progress">
+          ${WIZARD_STEPS.map((_, i) => `<div class="wizard-dot" data-dot="${i + 1}"></div>`).join('')}
+        </div>
+        <h1 id="wizard-title"></h1>
+        <p class="subtitle" id="wizard-desc"></p>
+        <form id="onboarding-form">
+          <div data-step-content="1">${buildBasicFieldsHtml(profile, 'onboard')}</div>
+          <div data-step-content="2" style="display:none">${buildGeneticFieldsHtml(profile, 'onboard')}</div>
+          <div data-step-content="3" style="display:none" id="wizard-review"></div>
+        </form>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="onboarding-skip">Skip for now</button>
-          <button type="submit" form="onboarding-form" class="btn btn-primary">Save & continue</button>
+          <div style="display:flex;gap:10px">
+            <button type="button" class="btn btn-secondary" id="wizard-back" style="display:none">Back</button>
+            <button type="button" class="btn btn-primary" id="wizard-next">Next</button>
+            <button type="submit" form="onboarding-form" class="btn btn-primary" id="wizard-finish" style="display:none">Get started</button>
+          </div>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
     const form = overlay.querySelector('#onboarding-form');
-    form.innerHTML = buildProfileFieldsHtml(profile, 'onboard');
     wireProfileForm(form, 'onboard');
+
+    function showStep(n) {
+      step = n;
+      overlay.querySelectorAll('[data-step-content]').forEach((el) => {
+        el.style.display = Number(el.dataset.stepContent) === n ? '' : 'none';
+      });
+      overlay.querySelectorAll('[data-dot]').forEach((dot) => {
+        dot.classList.toggle('active', Number(dot.dataset.dot) === n);
+        dot.classList.toggle('done', Number(dot.dataset.dot) < n);
+      });
+      overlay.querySelector('#wizard-title').textContent = WIZARD_STEPS[n - 1].title;
+      overlay.querySelector('#wizard-desc').textContent = WIZARD_STEPS[n - 1].desc;
+      overlay.querySelector('#wizard-back').style.display = n > 1 ? '' : 'none';
+      overlay.querySelector('#wizard-next').style.display = n < WIZARD_STEPS.length ? '' : 'none';
+      overlay.querySelector('#wizard-finish').style.display = n === WIZARD_STEPS.length ? '' : 'none';
+      if (n === 3) renderReview();
+      const activeEl = overlay.querySelector(`[data-step-content="${n}"]`);
+      activeEl.classList.remove('step-fade');
+      void activeEl.offsetWidth;
+      activeEl.classList.add('step-fade');
+    }
+
+    function renderReview() {
+      const p = collectProfileFromForm(form);
+      const rows = [
+        ['Age', p.age], ['Sex', p.sex], ['Diet pattern', p.dietPattern], ['Activity level', p.activityLevel],
+        ['Main goal', p.primaryGoal], ['Genetic markers', p.geneticVariants.length ? p.geneticVariants.join(', ') : 'None selected'],
+      ].filter(([, v]) => v);
+      overlay.querySelector('#wizard-review').innerHTML = rows.length
+        ? `<div class="review-list">${rows.map(([k, v]) => `<div class="review-row"><span class="review-key">${escapeHtml(k)}</span><span class="review-val">${escapeHtml(String(v))}</span></div>`).join('')}</div>`
+        : `<p class="subtitle">Nothing entered yet — that's fine, you can fill this in later from My Profile.</p>`;
+    }
+
+    overlay.querySelector('#wizard-next').addEventListener('click', () => showStep(Math.min(WIZARD_STEPS.length, step + 1)));
+    overlay.querySelector('#wizard-back').addEventListener('click', () => showStep(Math.max(1, step - 1)));
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -375,6 +458,8 @@
       setOnboarded();
       overlay.remove();
     });
+
+    showStep(1);
   }
 
   // ---------- settings ----------
@@ -568,7 +653,13 @@
     const topic = TOPICS.find((t) => t.id === topicId);
 
     if (!state.lastResult) {
-      area.innerHTML = '<div class="empty-state">No plan yet — click "Get today’s plan" above.</div>';
+      area.innerHTML = `
+        <div class="card empty-state">
+          <span class="empty-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
+          <div class="empty-title">No plan yet for ${topic ? escapeHtml(topic.label) : 'this topic'}</div>
+          <div class="empty-desc">Click "Get today's plan" above — it's grounded in your profile and this topic's research library, not a generic tip.</div>
+        </div>
+      `;
       return;
     }
 
@@ -671,7 +762,15 @@
     const btn = document.getElementById('regenerate-btn');
     const area = document.getElementById('plan-area');
     btn.disabled = true;
-    area.innerHTML = `<div class="empty-state"><span class="loader"></span> Building your plan…</div>`;
+    area.innerHTML = `
+      <div class="card">
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px"><span class="loader"></span> Grounding in your research library, then formatting the plan…</div>
+        <div class="skeleton-line" style="width:70%;height:20px"></div>
+        <div class="skeleton-line" style="width:95%"></div>
+        <div class="skeleton-line" style="width:88%"></div>
+        <div class="skeleton-line" style="width:40%"></div>
+      </div>
+    `;
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
@@ -702,6 +801,10 @@
   function render() {
     const route = currentRoute();
     renderSidebar(route);
+    const main = document.getElementById('main');
+    main.classList.remove('view-fade');
+    void main.offsetWidth; // force reflow so the fade-in animation restarts on every navigation
+    main.classList.add('view-fade');
     if (route.view === 'dashboard') renderDashboard();
     else if (route.view === 'profile') renderProfile();
     else if (route.view === 'settings') renderSettings();

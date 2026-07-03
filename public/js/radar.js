@@ -107,6 +107,7 @@ function renderMiniRing(pct, size) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="mini-ring"><title>${Math.round(pct)}% adherence this week</title>
     <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--gridline)" stroke-width="${stroke}"/>
     <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--accent)" stroke-width="${stroke}" stroke-linecap="round"
+      class="mini-ring-fill" style="--ring-circumference:${circumference};--ring-offset:${offset}"
       stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" transform="rotate(-90 ${c} ${c})"/>
   </svg>`;
 }
