@@ -602,10 +602,11 @@
     const state = getTopicState(topicId);
     const score = scoreForTopic(topicId);
 
+    const accent = topicAccent(topic.id);
     main.innerHTML = `
       <div class="topic-header">
         <div class="topic-title-row">
-          <span class="icon-badge" style="color:${topicAccent(topic.id)};background:${topicAccent(topic.id)}22">${lcIcon(topic.icon, 20)}</span>
+          <span class="icon-badge" style="color:${accent};background:${accent}22">${lcIcon(topic.icon, 20)}</span>
           <div>
             <h1 style="margin-bottom:2px">${topic.label}</h1>
             <p class="subtitle" style="margin-bottom:0">${score}% adherence this week</p>
@@ -613,6 +614,7 @@
         </div>
         <button class="btn btn-secondary" id="regenerate-btn">${state.lastResult ? 'Regenerate plan' : 'Get today’s plan'}</button>
       </div>
+      ${topic.description ? `<p class="topic-intro" style="--dbx-accent:${accent}">${escapeHtml(topic.description)}</p>` : ''}
       ${topic.knownLimitation ? `<div class="limitation-note">${escapeHtml(topic.knownLimitation)}</div>` : ''}
       <div id="plan-area"></div>
       <div class="tracker-card card">
@@ -750,6 +752,24 @@
     const accent = topic ? topicAccent(topic.id) : null;
     const accentStyle = accent ? ` style="--dbx-accent:${accent}"` : '';
 
+    const eat = result.eat || [];
+    const avoid = result.avoid || [];
+    const foodCol = (items, kind) => items.length ? `
+      <div class="food-guide-col food-guide-${kind}">
+        <div class="food-guide-col-label">${lcIcon(kind === 'eat' ? 'check' : 'close', 12)} ${kind === 'eat' ? 'Eat' : 'Limit'}</div>
+        ${items.map((item) => `
+          <div class="food-item">
+            <span class="food-item-name">${escapeHtml(item.food)}</span>
+            ${item.detail ? `<span class="food-item-detail">${escapeHtml(item.detail)}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+    const foodGuideHtml = (eat.length || avoid.length) ? `
+      <div class="plan-section-label">Food guide</div>
+      <div class="food-guide-grid">${foodCol(eat, 'eat')}${foodCol(avoid, 'avoid')}</div>
+    ` : '';
+
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
@@ -765,6 +785,7 @@
           <button class="btn btn-primary" id="mark-done-btn" style="margin-top:14px"></button>
         </div>
         ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}</div>${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}` : ''}
+        ${foodGuideHtml}
         ${result.watchFor ? `<div class="plan-section-label">Heads up</div><div class="plan-watchfor">${lcIcon('chevron', 12)} ${escapeHtml(result.watchFor)}</div>` : ''}
       </div>
     `;

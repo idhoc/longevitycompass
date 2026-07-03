@@ -4,6 +4,8 @@
     "label": "Nutrition & Dietary Pattern",
     "icon": "leaf",
     "sources": ["nutrition"],
+    "description": "How your overall eating pattern — not any single food — shapes cellular aging, from telomere length to mitochondrial function and gut microbiota balance.",
+    "foodRelevant": true,
     "emphasis": "Draw on the full document. Prioritize the dietary-pattern-level synthesis (Mediterranean, Plant-Based, Okinawan, DASH) over any single mechanism. If several sources support the same swap, pick ONE concrete food/action as the actual instruction and list the rest as swaps rather than presenting a menu.",
     "knownLimitation": null
   },
@@ -12,6 +14,8 @@
     "label": "Gut Microbiome & Metabolic Byproducts",
     "icon": "atom",
     "sources": ["gut-microbiome"],
+    "description": "The bacteria in your gut ferment fiber into compounds that influence inflammation, metabolism, and how well your intestinal barrier holds up as you age.",
+    "foodRelevant": true,
     "emphasis": "Draw on the full document. Prioritize SCFA production (butyrate/propionate/acetate) and fiber-fermentation guidance. Do not stack the 22-food comparison, the 25g/day study, and generic 'increase gradually' guidance into one unsignposted claim — keep it clear which finding is which if more than one is used.",
     "knownLimitation": null
   },
@@ -20,6 +24,8 @@
     "label": "Sense of Purpose & Social Connection",
     "icon": "hands",
     "sources": ["purpose"],
+    "description": "A strong sense of purpose is one of the most consistently replicated predictors of longer life across large population studies — this is the best-evidenced topic in the library.",
+    "foodRelevant": false,
     "emphasis": "Prioritize sections 1 (All-Cause Mortality), 7 (Behavioral Mechanisms incl. loneliness/social connection), and 8 (Modifiability). This is the best-evidenced topic in the library — do not pad with material from other topics' sources.",
     "knownLimitation": null
   },
@@ -28,6 +34,8 @@
     "label": "Sleep Quality & Circadian Health",
     "icon": "moon",
     "sources": ["purpose"],
+    "description": "Sleep quality and circadian regulation are foundational to recovery — though this topic currently borrows adjacent findings rather than drawing on a dedicated sleep-science source.",
+    "foodRelevant": false,
     "emphasis": "Use ONLY the two adult sleep citations in section 6 (Biological Mechanisms): the 825-adult purpose/sleep-quality cohort, and the Health & Retirement Study 16%-lower-risk finding. Do not use the early-childhood-development document for this topic under any circumstances — it is a pediatric source and citing it for an adult user is a population mismatch, not a valid support for an adult sleep habit.",
     "knownLimitation": "This topic has no dedicated adult sleep-science source in the current library — it borrows two sleep-adjacent findings from the Purpose document. Flagged to the user as a gap to fill with a real sleep/circadian research doc."
   },
@@ -36,6 +44,8 @@
     "label": "Physical Activity & Movement",
     "icon": "walk",
     "sources": ["purpose"],
+    "description": "Physical activity is one of the best-established levers for healthy aging — this topic focuses on small, sustainable ways to move more, not workout prescriptions.",
+    "foodRelevant": false,
     "emphasis": "Use ONLY the Hooker & Masters (2016) accelerometer-based purpose/movement citation in section 7 (Behavioral Mechanisms). Do not use the early-childhood-development document (its CDC guidance is written for children, not adults).",
     "knownLimitation": "This topic has no dedicated adult exercise-science source in the current library — it borrows one behavioral finding from the Purpose document. Flagged to the user as a gap to fill with a real physical-activity research doc."
   },
@@ -44,6 +54,8 @@
     "label": "Metabolic & Cardiovascular Risk",
     "icon": "heartpulse",
     "sources": ["nutrition"],
+    "description": "Blood pressure, cholesterol, and blood sugar share the same dietary levers — this topic focuses on the DASH-diet mechanisms behind all three.",
+    "foodRelevant": true,
     "emphasis": "Use ONLY the DASH Diet section of the document (eNOS optimization, insulin sensitivity / metabolic mechanisms). Do not pull from the Mediterranean, Plant-Based, or Okinawan sections for this topic — those belong to the Nutrition topic.",
     "knownLimitation": null
   },
@@ -52,6 +64,8 @@
     "label": "Micronutrient & Vitamin Status",
     "icon": "droplet",
     "sources": ["micronutrient"],
+    "description": "Vitamin and mineral status — and how genetics can shift individual needs — plays a quiet but measurable role in aging and chronic disease risk.",
+    "foodRelevant": true,
     "emphasis": "This source is written in directive clinical dosing language ('if you carry variant X, take Y'). You must never repeat that framing. Prefer the general-population, whole-food-first findings (e.g. the 390,124-person null result on daily multivitamins) as the default, and treat genotype-linked passages only as a prompt to mention that genetic variation in nutrient needs exists and is worth discussing with a clinician who can test for it — never as a personalized dose. If the user's profile lists one or more 'Genetic Variants' (e.g. MTHFR, VDR, HFE, TRPM6, FADS1/ELOVL2, PEMT, BCMO1, GPX1, zinc transporter), check whether this source has a matching passage and, if so, work it into the Why using the same non-dosing, research-population framing — never as a personalized instruction. If none of the reported variants match anything in this source, or the user reported none, proceed with the general-population guidance only; do not ask the user for genetic data they have not provided.",
     "knownLimitation": null
   },
@@ -60,6 +74,8 @@
     "label": "Cognitive Health & Neuroprotection",
     "icon": "brain",
     "sources": ["purpose", "micronutrient"],
+    "description": "Brain aging is shaped by both psychosocial factors like purpose and specific nutrients like B12, folate, and omega-3 fatty acids.",
+    "foodRelevant": true,
     "emphasis": "Check BOTH source files before answering. The purpose document's section 4 (Alzheimer's, Dementia & Cognitive Decline) covers the purpose-cognition link; the micronutrient document's B12/folate/omega-3/APOE passages cover nutrient-cognition links. Prefer whichever source most specifically matches the user's actual question — do not default to the purpose document just because it is more narratively complete. If the user's profile reports the APOE4 allele or a FADS1/ELOVL2 variant specifically, check the micronutrient document's omega-3/APOE cognitive passages first — those are the ones written for exactly this case — and use the same non-dosing, research-population framing as the Micronutrient topic. If no relevant variant is reported, proceed with the purpose/cognition evidence only.",
     "knownLimitation": null
   },
@@ -68,6 +84,8 @@
     "label": "Energy & Mitochondrial Function",
     "icon": "bolt",
     "sources": ["nutrition"],
+    "description": "Mitochondrial health depends on specific dietary compounds — polyphenols, healthy fats, fermentable fiber — that support cellular energy production.",
+    "foodRelevant": true,
     "emphasis": "Use ONLY the mitochondrial-health, AMPK-activation, and mitophagy-stimulation mechanism sections within the Mediterranean and Okinawan sections of the document. State clearly when a cited finding is from pre-clinical/animal research rather than human studies, and carry that caveat through into the sentence that states the claim, not just as an appended disclaimer.",
     "knownLimitation": null
   },
@@ -76,6 +94,8 @@
     "label": "Weight Management & Body Composition",
     "icon": "scale",
     "sources": ["gut-microbiome"],
+    "description": "Weight management here is framed around appetite-hormone signaling from fiber fermentation — not calorie counting.",
+    "foodRelevant": true,
     "emphasis": "Use ONLY the propionate/GLP-1/PYY satiety-signaling section of the gut microbiome document. Justify recommendations through this appetite-hormone mechanism specifically, not the general SCFA/inflammation framing used for the Gut Microbiome topic.",
     "knownLimitation": null
   }

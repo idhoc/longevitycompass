@@ -66,8 +66,26 @@ const FORMAT_TOOL = {
         type: ['string', 'null'],
         description: 'Only if the source text has a real caution to flag; otherwise null. Plain text, no markdown.',
       },
+      eat: {
+        type: 'array',
+        description: 'Only present if the response has an "Eat:" line, formatted as semicolon-separated items like "Food (quantity): reason". One array entry per item — "food" is the name plus any parenthetical quantity, "detail" is the reason after the colon, verbatim, no invented numbers. Empty array if there is no "Eat:" line.',
+        items: {
+          type: 'object',
+          properties: { food: { type: 'string' }, detail: { type: 'string' } },
+          required: ['food', 'detail'],
+        },
+      },
+      avoid: {
+        type: 'array',
+        description: 'Same shape and parsing as "eat", from the "Avoid:" line. Empty array if there is no "Avoid:" line, or it says "none specified".',
+        items: {
+          type: 'object',
+          properties: { food: { type: 'string' }, detail: { type: 'string' } },
+          required: ['food', 'detail'],
+        },
+      },
     },
-    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for'],
+    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for', 'eat', 'avoid'],
   },
 };
 
@@ -102,6 +120,19 @@ exports.handler = async (event) => {
     .map((id) => bundle.sources[id])
     .join('\n\n---\n\n');
 
+  const formattingRules = [
+    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    'Whenever the source library gives a specific number for the action you are recommending — grams, a percentage, a frequency, a timeframe — state that exact number. Never write "more," "some," or "a bit" when the source has already told you how much. If the source genuinely gives no number for this specific action, say so plainly rather than inventing one.',
+  ];
+
+  if (topic.foodRelevant) {
+    formattingRules.push(
+      'This topic involves specific foods. After Watch for (or after Why, if there is no Watch for), add exactly two more lines, each a single line (no line breaks within it):',
+      'Eat: 3-5 items separated by " ; ", each item formatted as "Food name (quantity or frequency if the source states one): one-line reason" — e.g. "Eat: Lentils (about 1/2 cup): ferments into propionate, which supports satiety signaling ; Oats (about 1/2 cup dry): a strong resistant-starch source for SCFA-producing bacteria." If the source gives no quantity for an item, drop the parenthetical rather than inventing one; never drop the reason.',
+      'Avoid: 2-4 items in the exact same format, but only foods the source specifically names as something to limit (e.g. refined carbohydrates, excess sodium, ultra-processed food). If the source does not call out anything to avoid for this specific topic, write exactly "Avoid: none specified" — do not invent a caution the source doesn\'t support.'
+    );
+  }
+
   const systemPrompt = [
     bundle.systemPrompt,
     '',
@@ -113,7 +144,7 @@ exports.handler = async (event) => {
     '',
     '## 11. Output Formatting for This Turn',
     '',
-    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    ...formattingRules,
     '',
     sourceText,
   ].join('\n');
@@ -122,7 +153,7 @@ exports.handler = async (event) => {
 
   let stage1Text;
   try {
-    stage1Text = await callOpenAI(systemPrompt, userMessage);
+    stage1Text = await callOpenAI(systemPrompt, userMessage, topic.foodRelevant);
   } catch (err) {
     return respond(502, { error: `Stage 1 (grounding) failed: ${err.message}` });
   }
@@ -156,6 +187,8 @@ exports.handler = async (event) => {
     why: structured.why || null,
     evidence: Array.isArray(structured.evidence) ? structured.evidence : [],
     watchFor: structured.watch_for || null,
+    eat: Array.isArray(structured.eat) ? structured.eat : [],
+    avoid: Array.isArray(structured.avoid) ? structured.avoid : [],
     raw: stage1Text,
   });
 };
@@ -225,10 +258,10 @@ function stripMarkdown(s) {
     .trim();
 }
 
-async function callOpenAI(systemPrompt, userMessage) {
+async function callOpenAI(systemPrompt, userMessage, foodRelevant) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return mockStage1(userMessage);
+    return mockStage1(userMessage, foodRelevant);
   }
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -262,6 +295,7 @@ async function callClaudeDistill(stage1Text) {
   const instruction = [
     "Restructure the coach response below by calling the format_plan tool.",
     'Do NOT add, remove, soften, or invent any fact — restructure, split, and strip markdown formatting only.',
+    'If the response has an "Eat:" and/or "Avoid:" line (semicolon-separated items like "Food (quantity): reason"), split each on " ; " then split each item on the first ":" into food vs. detail. If a line is absent, or Avoid says "none specified", return an empty array for it.',
     '',
     'Coach response to restructure:',
     '"""',
@@ -297,6 +331,9 @@ async function callClaudeDistill(stage1Text) {
 }
 
 function sanitizeStructured(input) {
+  const cleanItems = (arr) => (Array.isArray(arr)
+    ? arr.map((e) => ({ food: stripMarkdown(e.food || ''), detail: stripMarkdown(e.detail || '') })).filter((e) => e.food)
+    : []);
   return {
     headline: stripMarkdown(input.headline || ''),
     do_this: stripMarkdown(input.do_this || ''),
@@ -305,6 +342,8 @@ function sanitizeStructured(input) {
       ? input.evidence.map((e) => ({ text: stripMarkdown(e.text || ''), type: e.type === 'limitation' ? 'limitation' : 'figure' }))
       : [],
     watch_for: input.watch_for ? stripMarkdown(input.watch_for) : null,
+    eat: cleanItems(input.eat),
+    avoid: cleanItems(input.avoid),
   };
 }
 
@@ -326,12 +365,24 @@ function naiveFallbackParse(text) {
     const m = cleaned.match(re);
     return m ? m[1].trim() : null;
   };
-  const doThis = pick('Do this', ['Why', 'Watch for']);
-  const why = pick('Why', ['Watch for']);
-  const watchFor = pick('Watch for', []);
+  const doThis = pick('Do this', ['Why', 'Watch for', 'Eat', 'Avoid']);
+  const why = pick('Why', ['Watch for', 'Eat', 'Avoid']);
+  const watchFor = pick('Watch for', ['Eat', 'Avoid']);
+  const eatLine = pick('Eat', ['Avoid']);
+  const avoidLine = pick('Avoid', []);
+  // Expected shape: "Food (quantity): reason ; Food2 (quantity): reason2 ; ..."
+  const parseFoodItems = (line) => {
+    if (!line || /^none specified$/i.test(line.trim())) return [];
+    return line.split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean).map((item) => {
+      const idx = item.indexOf(':');
+      return idx === -1
+        ? { food: item, detail: '' }
+        : { food: item.slice(0, idx).trim(), detail: item.slice(idx + 1).trim() };
+    }).filter((e) => e.food);
+  };
 
   if (doThis || why) {
-    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor };
+    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor, eat: parseFoodItems(eatLine), avoid: parseFoodItems(avoidLine) };
   }
 
   // No recognizable labels at all — surface the raw content rather than nothing.
@@ -342,24 +393,42 @@ function naiveFallbackParse(text) {
     why: sentences.slice(1).join(' ') || null,
     evidence: [],
     watch_for: null,
+    eat: [],
+    avoid: [],
   };
 }
 
-function mockStage1(userMessage) {
-  return [
+function mockStage1(userMessage, foodRelevant) {
+  const lines = [
     '[MOCK — OPENAI_API_KEY not set]',
-    'Do this: After your next meal, add one fiber-rich food you did not eat earlier today.',
-    'Why: The uploaded source library associates diverse fiber intake with improved SCFA production and healthier aging markers (mock data — set OPENAI_API_KEY for a real, grounded response).',
+    'Do this: After your next meal, add one 1/2-cup serving of a fiber-rich food you did not eat earlier today — beans, lentils, oats, or a whole grain.',
+    'Why: The uploaded source library associates a roughly 25g/day increase in fiber intake with measurable microbiome changes within two weeks, and links diverse fiber sources to improved SCFA production and healthier aging markers (mock data — set OPENAI_API_KEY for a real, grounded response).',
     'Watch for: This is placeholder content and is not grounded in your actual research library.',
-  ].join('\n');
+  ];
+  if (foodRelevant) {
+    lines.push(
+      'Eat: Lentils (about 1/2 cup): ferments into propionate, which supports satiety and metabolic signaling ; Oats (about 1/2 cup dry): a strong resistant-starch source for SCFA-producing bacteria ; Cooled potatoes or rice (a few times per week): resistant starch forms on cooling, feeding beneficial microbes.',
+      'Avoid: Ultra-processed low-fiber snacks: displacing fiber sources reduces substrate for SCFA production.'
+    );
+  }
+  return lines.join('\n');
 }
 
 function mockDistill(stage1Text) {
+  const foodRelevant = stage1Text.includes('\nEat:');
   return {
-    headline: '[MOCK] Add One Fiber Food',
-    do_this: '[MOCK — ANTHROPIC_API_KEY not set] After your next meal, add one fiber-rich food you did not eat earlier today.',
-    why: 'This is a mock distillation. Set ANTHROPIC_API_KEY to get a real Stage 2 response.',
-    evidence: [{ text: stage1Text.slice(0, 200), type: 'limitation' }],
+    headline: '[MOCK] Add One Fiber Serving',
+    do_this: '[MOCK — ANTHROPIC_API_KEY not set] After your next meal, add one 1/2-cup serving of a fiber-rich food you did not eat earlier today — beans, lentils, oats, or a whole grain.',
+    why: 'This is a mock distillation. Set ANTHROPIC_API_KEY to get a real Stage 2 response. The uploaded source library associates a roughly 25g/day increase in fiber intake with measurable microbiome changes within two weeks.',
+    evidence: [{ text: stage1Text.slice(0, 160), type: 'limitation' }],
     watch_for: null,
+    eat: foodRelevant ? [
+      { food: 'Lentils', detail: 'about 1/2 cup — ferments into propionate, which supports satiety and metabolic signaling.' },
+      { food: 'Oats', detail: 'about 1/2 cup dry — a strong resistant-starch source for SCFA-producing bacteria.' },
+      { food: 'Cooled potatoes or rice', detail: 'a few times per week — resistant starch forms on cooling, feeding beneficial microbes.' },
+    ] : [],
+    avoid: foodRelevant ? [
+      { food: 'Ultra-processed low-fiber snacks', detail: 'displacing fiber sources reduces substrate for SCFA production.' },
+    ] : [],
   };
 }

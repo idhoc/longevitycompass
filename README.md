@@ -101,6 +101,31 @@ GPT — those aren't addressable via the API. Two real options if you want that:
   a rich hover tooltip (icon, name, exact %, "click to open") instead of a bare
   browser tooltip.
 
+## Food guide (Eat / Limit) and specificity
+
+For the seven topics where food choices are the actual lever (`foodRelevant:
+true` in `data/topics.json` — Nutrition, Gut Microbiome, Metabolic & CV,
+Micronutrient, Cognitive, Energy & Mitochondrial, Weight), the pipeline asks
+for two extra lines beyond the core Do this/Why/Watch for: an `Eat:` line and
+an `Avoid:` line, each a semicolon-separated list of "Food (quantity if the
+source gives one): one-line reason." Stage 2 splits these into a real `eat[]`
+/ `avoid[]` array, rendered as a two-column card distinct from the rest of the
+plan. Topics where food isn't the mechanism (Purpose, Sleep, Activity) simply
+get empty arrays and show nothing extra — this isn't a UI toggle, it's driven
+by whether the topic's own source library is actually about food.
+
+The system prompt also now explicitly forbids vague quantities: if the source
+gives a number (25g/day, 1/2 cup, twice a week), the response must use it —
+"add more fiber" is treated as a **specificity failure**, the same way the
+original prompt-grading rubric penalized it. This was already a rule in
+Section 3 of your system prompt; Section 11 (added here, per-request) makes it
+concrete and unavoidable rather than aspirational.
+
+Topic pages also now show a one-line editorial description (`description` in
+`topics.json`) above the plan area regardless of whether a plan has been
+generated yet, so a freshly opened topic reads as a finished page, not an
+empty box waiting for content.
+
 ## Personalization & settings
 
 - **Onboarding**: on a browser's first visit, a modal collects the profile fields

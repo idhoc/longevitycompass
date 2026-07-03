@@ -43,7 +43,7 @@ function main() {
   // Public-safe topic list for the frontend: id/label/icon only. Deliberately excludes
   // `emphasis`/`sources`/`knownLimitation` — that's prompt-engineering detail that belongs
   // server-side, not in a client-inspectable JS bundle.
-  const publicTopics = topics.map(({ id, label, icon, knownLimitation }) => ({ id, label, icon, knownLimitation: knownLimitation || null }));
+  const publicTopics = topics.map(({ id, label, icon, knownLimitation, description }) => ({ id, label, icon, knownLimitation: knownLimitation || null, description: description || null }));
   fs.mkdirSync(path.dirname(PUBLIC_TOPICS_OUT), { recursive: true });
   fs.writeFileSync(PUBLIC_TOPICS_OUT, JSON.stringify(publicTopics, null, 2));
   console.log(`Wrote ${PUBLIC_TOPICS_OUT}`);

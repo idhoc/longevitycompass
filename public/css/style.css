@@ -279,6 +279,13 @@ h2 { font-size: 17px; margin: 0 0 10px; }
 }
 .topic-title-row { display: flex; align-items: center; }
 
+.topic-intro {
+  font-size: 13.5px; line-height: 1.55; color: var(--text-secondary);
+  border-left: 3px solid var(--dbx-accent, var(--accent));
+  padding: 2px 0 2px 12px; margin: 0 0 18px;
+  max-width: 640px;
+}
+
 .limitation-note {
   background: var(--limitation-bg);
   border: 1px solid var(--limitation-border);
@@ -640,3 +647,26 @@ h2 { font-size: 17px; margin: 0 0 10px; }
 .radar-tooltip-hint { color: var(--text-muted); font-size: 11px; border-left: 1px solid var(--border); padding-left: 7px; }
 .radar-point { cursor: pointer; transition: r 0.15s ease; }
 .radar-point:hover { r: 8; }
+
+/* ---------- Food guide (Eat / Limit) ---------- */
+.food-guide-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;
+}
+@media (max-width: 640px) { .food-guide-grid { grid-template-columns: 1fr; } }
+.food-guide-col {
+  border-radius: 10px; padding: 12px 14px;
+  border: 1px solid var(--border);
+}
+.food-guide-eat { background: color-mix(in srgb, var(--good) 7%, var(--surface-1)); }
+.food-guide-avoid { background: var(--page-plane); }
+.food-guide-col-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+.food-guide-eat .food-guide-col-label { color: var(--good); }
+.food-guide-avoid .food-guide-col-label { color: var(--text-muted); }
+.food-item { padding: 7px 0; border-top: 1px solid var(--border); }
+.food-item:first-of-type { border-top: none; padding-top: 0; }
+.food-item-name { display: block; font-size: 13px; font-weight: 700; }
+.food-item-detail { display: block; font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 1px; }
