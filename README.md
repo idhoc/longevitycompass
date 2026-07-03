@@ -67,6 +67,25 @@ GPT — those aren't addressable via the API. Two real options if you want that:
    `public/data/topics.json` — the function reads from that bundle, not the raw
    files, so it has to be rebuilt after edits.
 
+## Personalization & settings
+
+- **Onboarding**: on a browser's first visit, a modal collects the profile fields
+  and (optionally) a genetic-markers checklist before showing the dashboard.
+  "Skip for now" is always available — it won't ask again either way.
+- **Genetic markers**: the checklist only lists variants that actually appear in
+  `data/sources/micronutrient.md` (MTHFR, VDR, APOE4, HFE, TRPM6, FADS1/ELOVL2,
+  PEMT, BCMO1, GPX1, zinc transporter). Reported markers are wired into the
+  **Micronutrient & Vitamin Status** and **Cognitive Health** topics' prompts
+  specifically (the two topics whose source library actually covers genetics) —
+  other topics receive the data but have no genetic source to ground it in, so
+  they correctly ignore it rather than fabricate a connection.
+- **Settings tab**: theme (System/Light/Dark, persisted, no flash on reload),
+  "always show full plan detail" (overrides the default collapse-after-first-view
+  behavior), and "reset all local data."
+- **Plan card headline**: Stage 2 (Claude) now also produces a short, punchy
+  headline that's a compression of `do_this` — never a new claim — so each
+  topic's card leads with something memorable instead of a plain label/value row.
+
 ## Known gaps in the research library (flagged, not hidden)
 
 - **Sleep Quality & Circadian Health** and **Physical Activity & Movement** have

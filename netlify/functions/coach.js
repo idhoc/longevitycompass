@@ -99,6 +99,7 @@ exports.handler = async (event) => {
     topicId,
     escalation: false,
     generatedAt: new Date().toISOString(),
+    headline: structured.headline || null,
     doThis: structured.do_this || null,
     why: structured.why || null,
     evidence: Array.isArray(structured.evidence) ? structured.evidence : [],
@@ -139,8 +140,8 @@ function checkLocalRedFlags(profile) {
 
 function buildUserMessage(topic, profile) {
   const lines = Object.entries(profile)
-    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
-    .map(([k, v]) => `- ${labelize(k)}: ${v}`);
+    .filter(([, v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0))
+    .map(([k, v]) => `- ${labelize(k)}: ${Array.isArray(v) ? v.join(', ') : v}`);
   return [
     "Here is the user's current profile:",
     lines.length ? lines.join('\n') : '(no profile data provided)',
@@ -195,9 +196,10 @@ async function callClaudeDistill(stage1Text) {
 
   const instruction = [
     'You will restructure the coach response below into STRICT JSON only — no prose, no markdown fences.',
-    'Schema: {"do_this": string|null, "why": string|null, "evidence": [{"text": string, "type": "figure"|"limitation"}], "watch_for": string|null}',
+    'Schema: {"headline": string|null, "do_this": string|null, "why": string|null, "evidence": [{"text": string, "type": "figure"|"limitation"}], "watch_for": string|null}',
     'Rules:',
-    '- Do NOT add, remove, soften, or invent any fact. Restructure only.',
+    '- Do NOT add, remove, soften, or invent any fact. Restructure and compress only.',
+    '- "headline": a punchy, memorable, <=6-word imperative title that restates "do_this" — e.g. "Do this: After plating dinner, add one fiber-rich food you did not eat earlier today" -> "Add One Fiber Food Tonight". It must be a compression of do_this, never a new claim or a different action.',
     '- Split the "Why" section: pull out sentences that contain a number, percentage, or named study/timeframe as separate "evidence" entries with type "figure".',
     '- Any sentence containing "does not show", "does not prove", "does not establish", or similar hedges goes into "evidence" with type "limitation".',
     '- If a field is absent in the source text, use null (or [] for evidence).',
@@ -245,8 +247,10 @@ function naiveFallbackParse(text) {
     const m = text.match(re);
     return m ? m[1].trim() : null;
   };
+  const doThis = pick('Do this', ['Why', 'Watch for']);
   return {
-    do_this: pick('Do this', ['Why', 'Watch for']),
+    headline: null,
+    do_this: doThis,
     why: pick('Why', ['Watch for']),
     evidence: [],
     watch_for: pick('Watch for', []),
@@ -264,6 +268,7 @@ function mockStage1(userMessage) {
 
 function mockDistill(stage1Text) {
   return {
+    headline: '[MOCK] Add One Fiber Food',
     do_this: '[MOCK — ANTHROPIC_API_KEY not set] After your next meal, add one fiber-rich food you did not eat earlier today.',
     why: 'This is a mock distillation. Set ANTHROPIC_API_KEY to get a real Stage 2 response.',
     evidence: [{ text: stage1Text.slice(0, 200), type: 'limitation' }],

@@ -4,7 +4,25 @@
   const STORAGE = {
     profile: 'lc_profile_v1',
     topics: 'lc_topics_v1',
+    settings: 'lc_settings_v1',
+    onboarded: 'lc_onboarded_v1',
   };
+
+  // Only variants that actually appear in data/sources/micronutrient.md — keeping this list
+  // tied to the source library means the checkbox options never imply coverage the coach
+  // doesn't actually have.
+  const GENETIC_VARIANTS = [
+    'MTHFR C677T (folate metabolism)',
+    'VDR (vitamin D receptor)',
+    'APOE4 allele',
+    'HFE (iron overload)',
+    'TRPM6 (magnesium absorption)',
+    'FADS1 / ELOVL2 (omega-3 conversion)',
+    'PEMT (choline)',
+    'BCMO1 (beta-carotene conversion)',
+    'GPX1 (selenium / antioxidant defense)',
+    'Zinc transporter gene variant',
+  ];
 
   let TOPICS = [];
 
@@ -14,6 +32,23 @@
     catch { return {}; }
   }
   function setProfile(p) { localStorage.setItem(STORAGE.profile, JSON.stringify(p)); }
+
+  function getSettings() {
+    const defaults = { theme: 'system', alwaysExpandPlans: false };
+    try { return { ...defaults, ...(JSON.parse(localStorage.getItem(STORAGE.settings)) || {}) }; }
+    catch { return defaults; }
+  }
+  function setSettings(s) { localStorage.setItem(STORAGE.settings, JSON.stringify(s)); }
+
+  function applyTheme() {
+    const { theme } = getSettings();
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+
+  function isOnboarded() { return localStorage.getItem(STORAGE.onboarded) === 'true'; }
+  function setOnboarded() { localStorage.setItem(STORAGE.onboarded, 'true'); }
 
   function getAllTopicState() {
     try { return JSON.parse(localStorage.getItem(STORAGE.topics)) || {}; }
@@ -40,6 +75,7 @@
     const hash = location.hash.replace(/^#\/?/, '');
     if (!hash || hash === 'dashboard') return { view: 'dashboard' };
     if (hash === 'profile') return { view: 'profile' };
+    if (hash === 'settings') return { view: 'settings' };
     const m = hash.match(/^topic\/(.+)$/);
     if (m) return { view: 'topic', id: m[1] };
     return { view: 'dashboard' };
@@ -50,6 +86,8 @@
   window.addEventListener('hashchange', render);
 
   // ---------- boot ----------
+  applyTheme();
+
   async function boot() {
     try {
       const res = await fetch('data/topics.json');
@@ -59,6 +97,7 @@
       return;
     }
     render();
+    if (!isOnboarded()) renderOnboardingModal();
   }
 
   // ---------- sidebar ----------
@@ -67,6 +106,7 @@
     const navTop = [
       { key: 'dashboard', icon: 'home', label: 'Dashboard' },
       { key: 'profile', icon: 'user', label: 'My profile' },
+      { key: 'settings', icon: 'settings', label: 'Settings' },
     ];
     let html = `<div class="brand">${lcIcon('heart', 22)}<span>Longevity Compass</span></div>`;
     html += '<div class="nav-group">';
@@ -144,6 +184,49 @@
     { key: 'diastolicBP', label: 'Diastolic BP (optional)', type: 'number' },
   ];
 
+  function buildProfileFieldsHtml(profile, idPrefix) {
+    const gv = profile.geneticVariants || [];
+    const fieldsHtml = PROFILE_FIELDS.map((f) => {
+      const val = profile[f.key] ?? '';
+      if (f.type === 'select') {
+        return `<div class="field"><label>${f.label}</label><select name="${f.key}">${f.options.map((o) => `<option value="${o}" ${o === val ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select></div>`;
+      }
+      return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${val}"/></div>`;
+    }).join('');
+
+    const geneticHtml = `
+      <fieldset class="genetic-fieldset form-grid" style="grid-column:1/-1">
+        <legend>Genetic profile (optional)</legend>
+        <p class="genetic-hint" style="grid-column:1/-1">If a consumer genetic test (23andMe, clinical panel, etc.) has told you that you carry any of these, check them. Skip anything you're unsure of — this is never used to diagnose, only to point to the matching general-population research.</p>
+        <div class="genetic-grid" style="grid-column:1/-1">
+          ${GENETIC_VARIANTS.map((v, i) => `
+            <label class="genetic-option">
+              <input type="checkbox" name="geneticVariants" value="${escapeHtml(v)}" id="${idPrefix}-gv-${i}" ${gv.includes(v) ? 'checked' : ''}/>
+              ${escapeHtml(v)}
+            </label>
+          `).join('')}
+        </div>
+      </fieldset>
+    `;
+
+    const flagsHtml = `
+      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="chestPain" id="${idPrefix}-chestPain" ${profile.chestPain ? 'checked' : ''}/><label for="${idPrefix}-chestPain">I'm currently experiencing chest pain</label></div>
+      <div class="field checkbox" style="grid-column:1/-1"><input type="checkbox" name="suicidalIdeation" id="${idPrefix}-suicidalIdeation" ${profile.suicidalIdeation ? 'checked' : ''}/><label for="${idPrefix}-suicidalIdeation">I'm having thoughts of harming myself</label></div>
+    `;
+
+    return fieldsHtml + flagsHtml + geneticHtml;
+  }
+
+  function collectProfileFromForm(form) {
+    const fd = new FormData(form);
+    const next = {};
+    for (const f of PROFILE_FIELDS) next[f.key] = fd.get(f.key) || '';
+    next.chestPain = fd.get('chestPain') === 'on';
+    next.suicidalIdeation = fd.get('suicidalIdeation') === 'on';
+    next.geneticVariants = fd.getAll('geneticVariants');
+    return next;
+  }
+
   function renderProfile() {
     const main = document.getElementById('main');
     const profile = getProfile();
@@ -159,28 +242,105 @@
       </div>
     `;
     const form = document.getElementById('profile-form');
-    form.innerHTML = PROFILE_FIELDS.map((f) => {
-      const val = profile[f.key] ?? '';
-      if (f.type === 'select') {
-        return `<div class="field"><label>${f.label}</label><select name="${f.key}">${f.options.map((o) => `<option value="${o}" ${o === val ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select></div>`;
-      }
-      return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${val}"/></div>`;
-    }).join('') + `
-      <div class="field checkbox"><input type="checkbox" name="chestPain" id="chestPain" ${profile.chestPain ? 'checked' : ''}/><label for="chestPain">I'm currently experiencing chest pain</label></div>
-      <div class="field checkbox"><input type="checkbox" name="suicidalIdeation" id="suicidalIdeation" ${profile.suicidalIdeation ? 'checked' : ''}/><label for="suicidalIdeation">I'm having thoughts of harming myself</label></div>
-    `;
+    form.innerHTML = buildProfileFieldsHtml(profile, 'profile');
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const fd = new FormData(form);
-      const next = {};
-      for (const f of PROFILE_FIELDS) next[f.key] = fd.get(f.key) || '';
-      next.chestPain = fd.get('chestPain') === 'on';
-      next.suicidalIdeation = fd.get('suicidalIdeation') === 'on';
-      setProfile(next);
+      setProfile(collectProfileFromForm(form));
       const note = document.getElementById('save-note');
       note.classList.add('show');
       setTimeout(() => note.classList.remove('show'), 1500);
+    });
+  }
+
+  // ---------- onboarding modal (first visit only) ----------
+  function renderOnboardingModal() {
+    const profile = getProfile();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h1>Welcome to Longevity Compass</h1>
+        <p class="subtitle">A few details make every topic's plan specific to you instead of generic. Everything here stays in your browser, and none of it is used to diagnose anything — skip anything you'd rather not share.</p>
+        <form id="onboarding-form" class="form-grid"></form>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="onboarding-skip">Skip for now</button>
+          <button type="submit" form="onboarding-form" class="btn btn-primary">Save & continue</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const form = overlay.querySelector('#onboarding-form');
+    form.innerHTML = buildProfileFieldsHtml(profile, 'onboard');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      setProfile(collectProfileFromForm(form));
+      setOnboarded();
+      overlay.remove();
+      render();
+    });
+    overlay.querySelector('#onboarding-skip').addEventListener('click', () => {
+      setOnboarded();
+      overlay.remove();
+    });
+  }
+
+  // ---------- settings ----------
+  function renderSettings() {
+    const main = document.getElementById('main');
+    const settings = getSettings();
+    main.innerHTML = `
+      <h1>Settings</h1>
+      <p class="subtitle">Local to this browser — nothing here is sent anywhere.</p>
+      <div class="card">
+        <div class="settings-section">
+          <div class="settings-row-label">Appearance</div>
+          <div class="theme-options" id="theme-options">
+            ${['system', 'light', 'dark'].map((t) => `<div class="theme-option ${settings.theme === t ? 'active' : ''}" data-theme-choice="${t}">${t[0].toUpperCase() + t.slice(1)}</div>`).join('')}
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Always show full plan detail</div>
+              <div class="settings-row-desc">Off by default: a plan you've already opened once collapses to a one-line summary on your next visit.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="always-expand-toggle" ${settings.alwaysExpandPlans ? 'checked' : ''}/>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row-label">Data</div>
+          <div class="settings-row-desc" style="margin-bottom:10px">Clears your profile, genetic markers, and all topic progress from this browser. Cannot be undone.</div>
+          <button class="btn btn-danger" id="reset-data-btn">Reset all local data</button>
+        </div>
+      </div>
+    `;
+
+    main.querySelectorAll('[data-theme-choice]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const s = getSettings();
+        s.theme = el.dataset.themeChoice;
+        setSettings(s);
+        applyTheme();
+        renderSettings();
+      });
+    });
+    main.querySelector('#always-expand-toggle').addEventListener('change', (e) => {
+      const s = getSettings();
+      s.alwaysExpandPlans = e.target.checked;
+      setSettings(s);
+    });
+    main.querySelector('#reset-data-btn').addEventListener('click', () => {
+      if (!confirm('Reset all local data? This clears your profile, genetic markers, and topic progress on this device.')) return;
+      localStorage.removeItem(STORAGE.profile);
+      localStorage.removeItem(STORAGE.topics);
+      localStorage.removeItem(STORAGE.onboarded);
+      navigate('/dashboard');
+      location.reload();
     });
   }
 
@@ -248,39 +408,55 @@
       return;
     }
 
-    if (!state.hasViewedFull) {
-      area.innerHTML = buildFullCard(result);
+    const alwaysExpand = getSettings().alwaysExpandPlans;
+    if (!state.hasViewedFull || alwaysExpand) {
+      area.innerHTML = buildFullCard(result, topic);
       state.hasViewedFull = true;
       setTopicState(topicId, state);
     } else {
       area.innerHTML = `
         <div class="card collapsed-summary" id="collapsed-toggle">
-          <span class="summary-text"><strong>Do this:</strong> ${escapeHtml(result.doThis || '—')}</span>
+          <span class="summary-text"><strong>${escapeHtml(result.headline || 'Today’s action')}</strong> — ${escapeHtml(result.doThis || '—')}</span>
           <span class="chevron">${lcIcon('chevron', 16)}</span>
         </div>
       `;
       document.getElementById('collapsed-toggle').addEventListener('click', () => {
-        area.innerHTML = buildFullCard(result);
+        area.innerHTML = buildFullCard(result, topic);
       }, { once: true });
     }
   }
 
-  function buildFullCard(result) {
+  function buildFullCard(result, topic) {
     const evidence = (result.evidence && result.evidence.length)
       ? result.evidence
       : deriveEvidenceChips(result.why);
     const chipsHtml = evidence.map((e) =>
       `<span class="evidence-chip ${e.type === 'limitation' ? 'limitation' : ''}">${escapeHtml(e.text)}</span>`
     ).join('');
+    const headline = result.headline || deriveHeadline(result.doThis);
 
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
-        <div class="plan-row"><div class="plan-label">Do this</div><div class="plan-value">${escapeHtml(result.doThis || '—')}</div></div>
-        ${result.why ? `<div class="plan-row"><div class="plan-label">Why</div><div class="plan-value">${escapeHtml(result.why)}${chipsHtml ? `<div style="margin-top:8px">${chipsHtml}</div>` : ''}</div></div>` : ''}
-        ${result.watchFor ? `<div class="plan-row"><div class="plan-label">Watch for</div><div class="plan-value">${escapeHtml(result.watchFor)}</div></div>` : ''}
+        <div class="plan-headline-row">
+          <span class="plan-headline-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
+          <div class="plan-headline-text">
+            <p class="plan-headline">${escapeHtml(headline)}</p>
+            ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
+          </div>
+        </div>
+        ${result.why ? `<hr class="plan-divider"/><div class="plan-why">${escapeHtml(result.why)}${chipsHtml ? `<div style="margin-top:10px">${chipsHtml}</div>` : ''}</div>` : ''}
+        ${result.watchFor ? `<div class="plan-watchfor">⚑ ${escapeHtml(result.watchFor)}</div>` : ''}
       </div>
     `;
+  }
+
+  // Fallback headline for mock mode / naive-parse fallback, when Stage 2 didn't supply one:
+  // first ~6 words of the action, title-cased into something card-sized and memorable.
+  function deriveHeadline(doThis) {
+    if (!doThis) return 'Today’s action';
+    const words = doThis.replace(/^\[MOCK[^\]]*\]\s*/, '').split(/\s+/).slice(0, 6).join(' ');
+    return words.replace(/[.,;:]$/, '');
   }
 
   // Fallback client-side chip splitter, used only if the server's evidence array is empty
@@ -337,6 +513,7 @@
     renderSidebar(route);
     if (route.view === 'dashboard') renderDashboard();
     else if (route.view === 'profile') renderProfile();
+    else if (route.view === 'settings') renderSettings();
     else if (route.view === 'topic') renderTopic(route.id);
   }
 
