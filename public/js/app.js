@@ -113,7 +113,20 @@
       { key: 'profile', icon: 'user', label: 'My profile' },
       { key: 'settings', icon: 'settings', label: 'Settings' },
     ];
+    const xp = getXP();
+    const level = levelForXP(xp);
+    const into = xpIntoLevel(xp);
+
     let html = `<div class="brand">${lcIcon('heart', 22)}<span>Longevity Compass</span></div>`;
+    html += `
+      <div class="level-badge">
+        <div class="level-badge-top">
+          <span class="level-badge-title">${lcIcon('bolt', 12)} Lv.${level} ${escapeHtml(levelTitle(level))}</span>
+          <span class="level-badge-xp">${into}/${100} XP</span>
+        </div>
+        <div class="level-badge-track"><div class="level-badge-fill" style="width:${into}%"></div></div>
+      </div>
+    `;
     html += '<div class="nav-group">';
     for (const item of navTop) {
       const active = route.view === item.key ? 'active' : '';
@@ -125,7 +138,7 @@
     for (const t of TOPICS) {
       const active = route.view === 'topic' && route.id === t.id ? 'active' : '';
       const pct = scoreForTopic(t.id);
-      html += `<a class="nav-link ${active}" href="#/topic/${t.id}">${lcIcon(t.icon, 18)}<span class="nav-label">${t.label}</span>${renderMiniRing(pct, 20)}</a>`;
+      html += `<a class="nav-link ${active}" href="#/topic/${t.id}"><span style="color:${topicAccent(t.id)}">${lcIcon(t.icon, 18)}</span><span class="nav-label">${t.label}</span>${renderMiniRing(pct, 20)}</a>`;
     }
     html += '</div>';
     el.innerHTML = html;
@@ -180,7 +193,7 @@
     const focusList = document.getElementById('focus-list');
     focusList.innerHTML = focusOrder.map(({ t, score }) => `
       <div class="focus-item" data-topic="${t.id}">
-        <span class="icon-badge">${lcIcon(t.icon, 20)}</span>
+        <span class="icon-badge" style="color:${topicAccent(t.id)};background:${topicAccent(t.id)}22">${lcIcon(t.icon, 20)}</span>
         <span class="focus-text">
           <div class="focus-title">${t.label}</div>
           <div class="focus-pct">${score}% adherence this week</div>
@@ -592,7 +605,7 @@
     main.innerHTML = `
       <div class="topic-header">
         <div class="topic-title-row">
-          <span class="icon-badge">${lcIcon(topic.icon, 20)}</span>
+          <span class="icon-badge" style="color:${topicAccent(topic.id)};background:${topicAccent(topic.id)}22">${lcIcon(topic.icon, 20)}</span>
           <div>
             <h1 style="margin-bottom:2px">${topic.label}</h1>
             <p class="subtitle" style="margin-bottom:0">${score}% adherence this week</p>
@@ -619,13 +632,31 @@
     row.innerHTML = state.days.map((done, i) => `<div class="tracker-dot ${done ? 'done' : ''}" data-i="${i}">${done ? lcIcon('check', 14) : i + 1}</div>`).join('');
     row.querySelectorAll('.tracker-dot').forEach((dot) => {
       dot.addEventListener('click', () => {
-        const s = getTopicState(topicId);
         const i = Number(dot.dataset.i);
-        s.days[i] = !s.days[i];
+        const s = getTopicState(topicId);
+        const wasDone = s.days[i];
+        s.days[i] = !wasDone;
         setTopicState(topicId, s);
+        if (!wasDone) celebrateCompletion(dot, topicId, s);
         onTrackerChanged(topicId, s);
       });
     });
+  }
+
+  // Single source of truth for "a day just got marked done": awards lifetime XP (which never
+  // decreases — unchecking a day later does not claw XP back), bursts confetti at the
+  // triggering element, and celebrates louder if the whole week just completed.
+  function celebrateCompletion(triggerEl, topicId, state) {
+    burstConfetti(triggerEl);
+    const { level, leveledUp } = awardXP();
+    const allDone = state.days.every(Boolean);
+    if (leveledUp) {
+      showToast(`${lcIcon('bolt', 16)} Level up! You're now <strong>${escapeHtml(levelTitle(level))}</strong> (Lv.${level})`, { celebrate: true, duration: 3600 });
+    } else if (allDone) {
+      const topic = TOPICS.find((t) => t.id === topicId);
+      showToast(`${lcIcon('check', 16)} Full week on ${escapeHtml(topic ? topic.label : 'this topic')}!`, { celebrate: true });
+      burstConfetti(triggerEl, { count: 40 });
+    }
   }
 
   function onTrackerChanged(topicId, state) {
@@ -640,10 +671,10 @@
   function updateMarkDoneButton(btn, state) {
     const nextIdx = state.days.findIndex((d) => !d);
     if (nextIdx === -1) {
-      btn.textContent = 'This week complete ✓';
+      btn.innerHTML = `${lcIcon('check', 15)} This week complete`;
       btn.disabled = true;
     } else {
-      btn.textContent = `Mark day ${nextIdx + 1} done`;
+      btn.innerHTML = `${lcIcon('bolt', 15)} Mark day ${nextIdx + 1} done <span class="xp-tag">+10 XP</span>`;
       btn.disabled = false;
     }
   }
@@ -700,6 +731,7 @@
       if (nextIdx === -1) return;
       s.days[nextIdx] = true;
       setTopicState(topicId, s);
+      celebrateCompletion(btn, topicId, s);
       onTrackerChanged(topicId, s);
     });
   }
@@ -708,15 +740,20 @@
     const evidence = (result.evidence && result.evidence.length)
       ? result.evidence
       : deriveEvidenceChips(result.why);
-    const chipsHtml = evidence.map((e) =>
-      `<span class="evidence-chip ${e.type === 'limitation' ? 'limitation' : ''}">${escapeHtml(e.text)}</span>`
-    ).join('');
+    const evidenceHtml = evidence.map((e) => `
+      <div class="evidence-card ${e.type === 'limitation' ? 'limitation' : ''}">
+        <span class="evidence-card-icon">${lcIcon(e.type === 'limitation' ? 'chevron' : 'check', 14)}</span>
+        <span>${escapeHtml(e.text)}</span>
+      </div>
+    `).join('');
     const headline = result.headline || deriveHeadline(result.doThis);
+    const accent = topic ? topicAccent(topic.id) : null;
+    const accentStyle = accent ? ` style="--dbx-accent:${accent}"` : '';
 
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
-        <div class="deliverable-box">
+        <div class="deliverable-box"${accentStyle}>
           <div class="deliverable-label">Today's deliverable</div>
           <div class="plan-headline-row">
             <span class="plan-headline-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
@@ -725,9 +762,9 @@
               ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
             </div>
           </div>
-          <button class="btn btn-primary" id="mark-done-btn" style="margin-top:14px">Mark done</button>
+          <button class="btn btn-primary" id="mark-done-btn" style="margin-top:14px"></button>
         </div>
-        ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}${chipsHtml ? `<div style="margin-top:10px">${chipsHtml}</div>` : ''}</div>` : ''}
+        ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}</div>${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}` : ''}
         ${result.watchFor ? `<div class="plan-section-label">Heads up</div><div class="plan-watchfor">${lcIcon('chevron', 12)} ${escapeHtml(result.watchFor)}</div>` : ''}
       </div>
     `;

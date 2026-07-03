@@ -21,9 +21,18 @@ User profile + topic  --->  Stage 1: OpenAI (ChatGPT)  --->  Stage 2: Anthropic 
   (`data/sources/*.md`) to OpenAI's Chat Completions API. This is the only stage
   that is allowed to introduce facts, and only from the supplied library.
 - **Stage 2 (distillation)** — the raw Stage 1 text is sent to Anthropic's Messages
-  API with instructions to reshape it into `{do_this, why, evidence[], watch_for}`
-  JSON and to add or change nothing factual. This is presentation-layer work, not
-  research work.
+  API using **forced tool-use** (not "please reply with JSON as text" — a schema
+  is passed and Claude is required to call it, so the API itself guarantees a
+  valid structured object; there is no JSON string to parse or fail on). It
+  reshapes Stage 1's text into `{headline, do_this, why, evidence[], watch_for}`
+  and strips any markdown formatting Stage 1 left in, without adding or changing
+  any factual content. This is presentation-layer work, not research work.
+- **Never a blank card.** If Stage 2 is unavailable, a fallback parser extracts
+  the same fields from Stage 1's raw text directly; if even that structure isn't
+  present, the full cleaned text is shown rather than nothing. An earlier version
+  of this fallback parser had a regex bug (a duplicated colon that made its
+  "stop here" pattern impossible to match) that could silently produce a blank
+  plan — fixed and covered by a unit test in the commit that fixed it.
 - **Escalation safety** runs twice: once as a deterministic local check
   (`checkLocalRedFlags` in `coach.js`, before either API call) and once inside the
   system prompt itself (Section 5). Either one tripping short-circuits straight to
@@ -66,6 +75,31 @@ GPT — those aren't addressable via the API. Two real options if you want that:
    regenerated `netlify/functions/lib/sources-bundle.json` and
    `public/data/topics.json` — the function reads from that bundle, not the raw
    files, so it has to be rebuilt after edits.
+
+## The experience layer (motivation, without fake pressure)
+
+- **Lifetime XP & levels** (`public/js/effects.js`): every day marked done awards
+  +10 XP toward a level that only ever goes up — shown as a badge + progress bar
+  at the top of the sidebar. This is deliberately separate from the adherence
+  percentages (radar, sidebar rings, topic pages), which stay honest and can go
+  down if you uncheck a day. The split matters: adherence tells you the truth
+  about this week, XP rewards effort you've already put in and can never be taken
+  away — the intentional replacement for streaks, which reward "not missing a
+  day" and end up pressuring people to fake compliance rather than recover from
+  a missed one.
+- **Confetti + toasts**: marking a day done bursts a small confetti animation at
+  the button; completing a topic's full week or leveling up triggers a bigger
+  burst and a toast notification.
+- **Topic identity colors**: each of the 10 topics has its own accent color
+  (from the same validated, colorblind-safe categorical palette used for the
+  sidebar icons, plan-card headers, and topic badges) — used for *identity*
+  contexts. The radar chart deliberately keeps a single hue, because it's one
+  series' magnitude across categories, not 10 different series — mixing the two
+  color jobs is a common charting mistake.
+- **Radar v2**: renders ~40% larger, morphs smoothly between old and new values
+  on every change (rather than snapping), has a soft glow on the data line, and
+  a rich hover tooltip (icon, name, exact %, "click to open") instead of a bare
+  browser tooltip.
 
 ## Personalization & settings
 

@@ -1,10 +1,13 @@
 // Two-stage coaching pipeline:
 //   Stage 1 (ChatGPT): reads the topic's source library + the system prompt, produces a
 //     grounded "Do this / Why / Watch for" style answer in plain text.
-//   Stage 2 (Claude): takes ONLY that stage-1 text and reshapes it into strict JSON for the
-//     UI. It is explicitly told not to add, remove, or alter any factual claim — restructure
-//     only. This mirrors the "ChatGPT grounds, Claude distills" design agreed on with the
-//     user, and keeps the two jobs (research fidelity vs. presentation) separated.
+//   Stage 2 (Claude): takes ONLY that stage-1 text and reshapes it into structured data for
+//     the UI, via forced tool-use (not "please write JSON as text" — that's fragile and was
+//     the root cause of blank plan cards in production: any stray markdown or formatting
+//     quirk from Stage 1 could break a text-based JSON.parse). Tool-use makes the Anthropic
+//     API itself guarantee a schema-valid object — there is no JSON string to parse or fail
+//     on. Claude is explicitly told not to add, remove, or alter any factual claim —
+//     restructure and de-markdown only.
 //
 // Safety notes:
 //   - API keys are read from environment variables and never sent to the client.
@@ -12,6 +15,8 @@
 //     alongside the model's own Section 5 escalation logic (never rely on a single layer).
 //   - If OPENAI_API_KEY / ANTHROPIC_API_KEY are unset, each stage falls back to a clearly
 //     labeled mock response so the rest of the app is testable without live keys/cost.
+//   - Even in the worst case (Stage 2 totally unavailable), the fallback parser guarantees
+//     the user sees the real Stage 1 content — never a blank card.
 
 const bundle = require('./lib/sources-bundle.json');
 
@@ -26,6 +31,45 @@ const ESCALATION_MARKERS = [
   'contact a doctor',
   'contact a licensed',
 ];
+
+const FORMAT_TOOL = {
+  name: 'format_plan',
+  description: "Return the coach's response restructured for a UI card. Restructuring and removing markdown syntax is allowed; changing, adding, or softening any factual content is not.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      headline: {
+        type: 'string',
+        description: 'A punchy, memorable, <=6-word imperative title that compresses do_this. E.g. "After plating dinner, add one fiber-rich food" -> "Add One Fiber Food Tonight". Never a new claim.',
+      },
+      do_this: {
+        type: 'string',
+        description: 'The single tiny action, plain text, no markdown, no leading label.',
+      },
+      why: {
+        type: 'string',
+        description: 'The explanatory sentence(s) tying the action to the source claim, plain text, no markdown.',
+      },
+      evidence: {
+        type: 'array',
+        description: 'Sentences from "why" that contain a number/percentage/named study/timeframe (type "figure"), or a hedge like "does not show/prove/establish" (type "limitation"). Empty array if none.',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string' },
+            type: { type: 'string', enum: ['figure', 'limitation'] },
+          },
+          required: ['text', 'type'],
+        },
+      },
+      watch_for: {
+        type: ['string', 'null'],
+        description: 'Only if the source text has a real caution to flag; otherwise null. Plain text, no markdown.',
+      },
+    },
+    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for'],
+  },
+};
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -67,6 +111,10 @@ exports.handler = async (event) => {
     '',
     `Emphasis: ${topic.emphasis}`,
     '',
+    '## 11. Output Formatting for This Turn',
+    '',
+    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    '',
     sourceText,
   ].join('\n');
 
@@ -79,11 +127,15 @@ exports.handler = async (event) => {
     return respond(502, { error: `Stage 1 (grounding) failed: ${err.message}` });
   }
 
+  if (!stage1Text.trim()) {
+    return respond(502, { error: 'Stage 1 (grounding) returned an empty response. Try again.' });
+  }
+
   if (ESCALATION_MARKERS.some((marker) => stage1Text.toLowerCase().includes(marker))) {
     return respond(200, {
       topicId,
       escalation: true,
-      message: stage1Text.trim(),
+      message: stripMarkdown(stage1Text).trim(),
     });
   }
 
@@ -160,6 +212,19 @@ function labelize(key) {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 
+// Strips markdown syntax so plain-text UI never shows literal **/##/- characters, regardless
+// of which code path (tool-use success or naive fallback) produced the string.
+function stripMarkdown(s) {
+  if (!s) return s;
+  return s
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/`([^`]*)`/g, '$1')
+    .trim();
+}
+
 async function callOpenAI(systemPrompt, userMessage) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -174,7 +239,7 @@ async function callOpenAI(systemPrompt, userMessage) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       temperature: 0.3,
-      max_tokens: 500,
+      max_tokens: 600,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
@@ -195,15 +260,8 @@ async function callClaudeDistill(stage1Text) {
   }
 
   const instruction = [
-    'You will restructure the coach response below into STRICT JSON only — no prose, no markdown fences.',
-    'Schema: {"headline": string|null, "do_this": string|null, "why": string|null, "evidence": [{"text": string, "type": "figure"|"limitation"}], "watch_for": string|null}',
-    'Rules:',
-    '- Do NOT add, remove, soften, or invent any fact. Restructure and compress only.',
-    '- "headline": a punchy, memorable, <=6-word imperative title that restates "do_this" — e.g. "Do this: After plating dinner, add one fiber-rich food you did not eat earlier today" -> "Add One Fiber Food Tonight". It must be a compression of do_this, never a new claim or a different action.',
-    '- Split the "Why" section: pull out sentences that contain a number, percentage, or named study/timeframe as separate "evidence" entries with type "figure".',
-    '- Any sentence containing "does not show", "does not prove", "does not establish", or similar hedges goes into "evidence" with type "limitation".',
-    '- If a field is absent in the source text, use null (or [] for evidence).',
-    '- Output ONLY the JSON object, nothing else.',
+    "Restructure the coach response below by calling the format_plan tool.",
+    'Do NOT add, remove, soften, or invent any fact — restructure, split, and strip markdown formatting only.',
     '',
     'Coach response to restructure:',
     '"""',
@@ -222,6 +280,8 @@ async function callClaudeDistill(stage1Text) {
       model: ANTHROPIC_MODEL,
       max_tokens: 800,
       temperature: 0,
+      tools: [FORMAT_TOOL],
+      tool_choice: { type: 'tool', name: 'format_plan' },
       messages: [{ role: 'user', content: instruction }],
     }),
   });
@@ -229,31 +289,59 @@ async function callClaudeDistill(stage1Text) {
     throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
   }
   const data = await res.json();
-  const text = data.content?.[0]?.text?.trim() || '';
-  return parseJsonLoose(text);
+  const toolUse = (data.content || []).find((b) => b.type === 'tool_use' && b.name === 'format_plan');
+  if (!toolUse || !toolUse.input) {
+    throw new Error('Anthropic response had no format_plan tool_use block');
+  }
+  return sanitizeStructured(toolUse.input);
 }
 
-function parseJsonLoose(text) {
-  const cleaned = text.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-  return JSON.parse(cleaned);
+function sanitizeStructured(input) {
+  return {
+    headline: stripMarkdown(input.headline || ''),
+    do_this: stripMarkdown(input.do_this || ''),
+    why: stripMarkdown(input.why || ''),
+    evidence: Array.isArray(input.evidence)
+      ? input.evidence.map((e) => ({ text: stripMarkdown(e.text || ''), type: e.type === 'limitation' ? 'limitation' : 'figure' }))
+      : [],
+    watch_for: input.watch_for ? stripMarkdown(input.watch_for) : null,
+  };
 }
 
-// Used only when a real stage-1 response exists but Claude's JSON call fails/is unavailable:
-// splits on the prompt's own "Do this: / Why: / Watch for:" labels so the UI never breaks.
+// Last-resort path — used only when Stage 2 (Claude) is unavailable or errors. Tries the
+// prompt's own "Do this: / Why: / Watch for:" labels first (tolerant of stray markdown around
+// them); if that structure genuinely isn't present, it NEVER returns everything empty — the
+// full cleaned Stage 1 text becomes the "why" so the user always sees real content, and a short
+// derived line becomes "do_this", rather than a blank card with just a generic headline.
 function naiveFallbackParse(text) {
+  const cleaned = stripMarkdown(text);
   const pick = (label, stops) => {
-    const stopPattern = stops.map((s) => `${s}:`).join('|');
+    // NOTE: stops must NOT include the trailing colon here — it's added once in the lookahead
+    // below. A previous version appended ":" to each stop AND in the lookahead, producing
+    // "(?:Why:|Watch for:):" which requires a literal double colon and can never match —
+    // that silently broke every fallback parse, letting "do_this" swallow the entire rest
+    // of the text (including the Why/Watch for sections) instead of stopping at them.
+    const stopPattern = stops.join('|');
     const re = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=(?:${stopPattern}):|$)`, 'i');
-    const m = text.match(re);
+    const m = cleaned.match(re);
     return m ? m[1].trim() : null;
   };
   const doThis = pick('Do this', ['Why', 'Watch for']);
+  const why = pick('Why', ['Watch for']);
+  const watchFor = pick('Watch for', []);
+
+  if (doThis || why) {
+    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor };
+  }
+
+  // No recognizable labels at all — surface the raw content rather than nothing.
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
   return {
     headline: null,
-    do_this: doThis,
-    why: pick('Why', ['Watch for']),
+    do_this: sentences[0] || cleaned.slice(0, 140) || null,
+    why: sentences.slice(1).join(' ') || null,
     evidence: [],
-    watch_for: pick('Watch for', []),
+    watch_for: null,
   };
 }
 
