@@ -4,69 +4,79 @@
     "label": "Nutrition & Dietary Pattern",
     "icon": "leaf",
     "knownLimitation": null,
-    "description": "How your overall eating pattern — not any single food — shapes cellular aging, from telomere length to mitochondrial function and gut microbiota balance."
+    "description": "How your overall eating pattern — not any single food — shapes cellular aging, from telomere length to mitochondrial function and gut microbiota balance.",
+    "sourceLabel": "Nutrition & Dietary Pattern research (Mediterranean/Plant-Based/Okinawan/DASH)"
   },
   {
     "id": "gut-microbiome",
     "label": "Gut Microbiome & Metabolic Byproducts",
     "icon": "atom",
     "knownLimitation": null,
-    "description": "The bacteria in your gut ferment fiber into compounds that influence inflammation, metabolism, and how well your intestinal barrier holds up as you age."
+    "description": "The bacteria in your gut ferment fiber into compounds that influence inflammation, metabolism, and how well your intestinal barrier holds up as you age.",
+    "sourceLabel": "Gut Microbiome & SCFA research (Xiong)"
   },
   {
     "id": "purpose",
     "label": "Sense of Purpose & Social Connection",
     "icon": "hands",
     "knownLimitation": null,
-    "description": "A strong sense of purpose is one of the most consistently replicated predictors of longer life across large population studies — this is the best-evidenced topic in the library."
+    "description": "A strong sense of purpose is one of the most consistently replicated predictors of longer life across large population studies — this is the best-evidenced topic in the library.",
+    "sourceLabel": "Sense of Purpose & Longevity research ladder"
   },
   {
     "id": "sleep",
     "label": "Sleep Quality & Circadian Health",
     "icon": "moon",
-    "knownLimitation": "This topic has no dedicated adult sleep-science source in the current library — it borrows two sleep-adjacent findings from the Purpose document. Flagged to the user as a gap to fill with a real sleep/circadian research doc.",
-    "description": "Sleep quality and circadian regulation are foundational to recovery — though this topic currently borrows adjacent findings rather than drawing on a dedicated sleep-science source."
+    "knownLimitation": "This topic has no dedicated adult sleep-science source in the static library — it borrows two sleep-adjacent findings from the Purpose document and is expected to lean on live web search (restricted to credible domains) for topic-specific depth.",
+    "description": "Sleep quality and circadian regulation are foundational to recovery — though this topic currently borrows adjacent findings rather than drawing on a dedicated sleep-science source.",
+    "sourceLabel": "Sense of Purpose & Longevity research ladder (sleep-adjacent findings only)"
   },
   {
     "id": "activity",
     "label": "Physical Activity & Movement",
     "icon": "walk",
-    "knownLimitation": "This topic has no dedicated adult exercise-science source in the current library — it borrows one behavioral finding from the Purpose document. Flagged to the user as a gap to fill with a real physical-activity research doc.",
-    "description": "Physical activity is one of the best-established levers for healthy aging — this topic focuses on small, sustainable ways to move more, not workout prescriptions."
+    "knownLimitation": "This topic has no dedicated adult exercise-science source in the static library — it borrows one behavioral finding from the Purpose document and is expected to lean on live web search (restricted to credible domains) for topic-specific depth.",
+    "description": "Physical activity is one of the best-established levers for healthy aging — this topic focuses on small, sustainable ways to move more, not workout prescriptions.",
+    "sourceLabel": "Sense of Purpose & Longevity research ladder (movement-adjacent findings only)"
   },
   {
     "id": "metabolic-cv",
     "label": "Metabolic & Cardiovascular Risk",
     "icon": "heartpulse",
     "knownLimitation": null,
-    "description": "Blood pressure, cholesterol, and blood sugar share the same dietary levers — this topic focuses on the DASH-diet mechanisms behind all three."
+    "description": "Blood pressure, cholesterol, and blood sugar share the same dietary levers — this topic focuses on the DASH-diet mechanisms behind all three.",
+    "sourceLabel": "DASH Diet research (Nutrition document, DASH section only)"
   },
   {
     "id": "micronutrient",
     "label": "Micronutrient & Vitamin Status",
     "icon": "droplet",
     "knownLimitation": null,
-    "description": "Vitamin and mineral status — and how genetics can shift individual needs — plays a quiet but measurable role in aging and chronic disease risk."
+    "description": "Vitamin and mineral status — and how genetics can shift individual needs — plays a quiet but measurable role in aging and chronic disease risk.",
+    "sourceLabel": "Micronutrient & Nutrigenomics research"
   },
   {
     "id": "cognitive",
     "label": "Cognitive Health & Neuroprotection",
     "icon": "brain",
     "knownLimitation": null,
-    "description": "Brain aging is shaped by both psychosocial factors like purpose and specific nutrients like B12, folate, and omega-3 fatty acids."
+    "description": "Brain aging is shaped by both psychosocial factors like purpose and specific nutrients like B12, folate, and omega-3 fatty acids.",
+    "sourceLabel": "Purpose research (cognitive-decline section) + Micronutrient research (B12/folate/omega-3/APOE)"
   },
   {
     "id": "energy-mitochondrial",
     "label": "Energy & Mitochondrial Function",
     "icon": "bolt",
     "knownLimitation": null,
-    "description": "Mitochondrial health depends on specific dietary compounds — polyphenols, healthy fats, fermentable fiber — that support cellular energy production."
+    "description": "Mitochondrial health depends on specific dietary compounds — polyphenols, healthy fats, fermentable fiber — that support cellular energy production.",
+    "sourceLabel": "Mitochondrial-health research (Nutrition document, Mediterranean & Okinawan mechanism sections)"
   },
   {
     "id": "weight",
     "label": "Weight Management & Body Composition",
     "icon": "scale",
     "knownLimitation": null,
-    "description": "Weight management here is framed around appetite-hormone signaling from fiber fermentation — not calorie counting."
+    "description": "Weight management here is framed around appetite-hormone signaling from fiber fermentation — not calorie counting.",
+    "sourceLabel": "Gut Microbiome research (Xiong), propionate/satiety-signaling section"
   }
 ]

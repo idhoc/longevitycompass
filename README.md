@@ -165,6 +165,117 @@ key not actually saved before the last deploy (env vars only apply to the
 issue on the OpenAI or Anthropic account. The error message shown in the UI
 includes the HTTP status from whichever API failed, which narrows it down fast.
 
+## Extended grounding: live web search (added this round)
+
+Stage 1 can now also use OpenAI's hosted `web_search_preview` tool, controlled by:
+
+- `ENABLE_WEB_SEARCH` (default `true` — set to `"false"` to disable)
+- `OPENAI_WEB_SEARCH_MODEL` (default `gpt-4o` — the model that carries the search tool; the plain-text model in `OPENAI_MODEL` is unchanged and still used for the no-search fallback path)
+
+The static source library is still the primary, default source. Web search is
+scoped by **prompt instruction, not an API-level domain filter**, to a named
+allowlist (NIH/PubMed, CDC, WHO, FDA, .edu/major hospitals, Nature/NEJM/JAMA/
+Lancet/BMJ/Cell) and is meant to fill genuine gaps — the two topics with thin
+static libraries (Sleep, Activity) explicitly invite it — or add variety across
+repeated requests, not fire on every single turn. Every web-sourced claim must
+be labeled as such in the response, distinct from library claims. The response
+card shows a "web search" badge when it actually fired, and a `usedWebSearch`
+field is returned from the API either way.
+
+**Honesty note on this piece specifically**: I could not test a real successful
+`web_search_preview` call end-to-end — this sandbox has no live API key and no
+network path to `api.openai.com`. The integration is defensively coded so a
+wrong assumption about the response shape degrades gracefully: any failure in
+that code path (wrong model, API drift, rate limit, unexpected JSON shape)
+silently falls back to the plain Chat Completions call that's been proven to
+work, rather than breaking the request. Do one real smoke test with your keys
+before relying on it, and check server logs if `usedWebSearch` never comes back
+`true`.
+
+## A more versatile, less narrow-path prompt (added this round)
+
+You asked for a coach that doesn't just default to "add fiber" or "take a walk"
+for everyone. I extended the prompt through **Section 10 and beyond** —
+`data/system-prompt.md` (your Sections 1-9, the actual system-prompt deliverable
+for your internship) is untouched. Everything below is appended per-request by
+`coach.js`'s `buildSystemPrompt()`:
+
+- **Section 10** — the topic's source library + a richer, more specific
+  `emphasis` line per topic (`data/topics.json`) that explicitly instructs
+  mechanism *rotation* (don't reuse the same action/citation across requests)
+  and fixes a real quality bug this project caught earlier, where the Cognitive
+  topic was silently reusing the Purpose topic's citation almost verbatim.
+- **Section 11** — output formatting (plain text, exact numbers when a source
+  has one, the Eat/Avoid format for food-relevant topics).
+- **Section 12** — the web search rules described above (only appended if
+  `ENABLE_WEB_SEARCH` is on).
+- **Section 14** — a lighter "Follow-Up Conversation Mode" prompt used only by
+  the new chat feature (below), so a follow-up answer reads as a short,
+  conversational reply instead of the full Do this/Why/Watch for template.
+
+Two more request-time levers make each plan less generic without touching the
+prompt file at all:
+
+- **Adherence-aware pacing** — every plan request now sends this week's
+  adherence % for that topic. Below ~40%, the model is told to shrink the
+  action further; above ~80%, it's told it's safe to expand (citing the
+  Fogg-model rule already in your Section 6).
+- **Anti-repetition memory** — the last few `do_this` actions generated for a
+  topic are sent back with the next request and the model is told not to repeat
+  the same action or mechanism, so regenerating a plan doesn't just reshuffle
+  the same suggestion.
+
+## Evidence strength & "show your work"
+
+Each evidence bullet on a plan card now carries a strength badge — **Strong**
+(meta-analyses/systematic reviews/large cohorts), **Moderate** (a single named
+study or RCT), or **Preliminary** (animal/in-vitro/mechanistic) — inferred by
+Claude's Stage 2 distillation from the language Stage 1 used, plus a verbatim
+quoted phrase when the source text actually contains one (never invented). The
+bottom of every plan card also names the specific source library used
+(`topic.sourceLabel`) and shows a "live web search" badge when this response
+actually pulled from the web, so a plan reads as sourced, not asserted.
+
+## Conversational follow-up
+
+Every plan card now has an "Ask a follow-up question" panel. It POSTs to the
+same `/api/coach` function with `mode: 'followup'`, the current plan as
+context, and the last few turns of chat history, and gets back a short (1-4
+sentence) grounded answer — still escalation-checked, still eligible for the
+same web search rules, but deliberately skipping the Stage 2 JSON distillation
+(a free-form answer doesn't fit the Do this/Why/Watch for schema). Chat history
+is kept per topic in `localStorage`.
+
+## Today & Journal: a home that isn't a bare dashboard
+
+- **Today** (new default landing view) — a hero greeting, and your 1-3
+  lowest-adherence topics as actionable cards you can mark done *inline*,
+  without opening the topic page, plus a compact glance-radar and a recent
+  activity feed.
+- **Journal** (new view) — a chronological timeline, grouped by day, of every
+  plan generated, day marked done, full week completed, and level-up — the
+  "so what have I actually been doing" view that a bare percentage sidebar
+  couldn't answer.
+- **Overview** (the old default dashboard) is still there, renamed in the nav —
+  it's the full-size radar + stats view for when you want the whole picture
+  rather than "what should I do right now."
+
+## What I deliberately did not build this round (flagged, not silently dropped)
+
+From the brainstorm you approved, these are real ideas I did **not** implement,
+because they need infrastructure/credentials only you can provision, or are a
+genuinely separate feature scope from this pass:
+
+- **Weekly cross-topic synthesis digest** (an AI-written "here's your week
+  across all 10 topics" summary) — a good Tier-2 follow-up, not done here.
+- **Meal photo logging** (vision-model food recognition) — needs a vision-model
+  call path and image storage/handling that don't exist yet.
+- **Self-experiment daily rating capture** (e.g. rate energy 1-5 and correlate
+  with actions taken) — needs a new data model, not done here.
+- **Real accounts/backend, wearable OAuth (Oura/Whoop/Apple Health, etc.)** —
+  already flagged in the brainstorm as needing infrastructure and credentials
+  only you can set up; still out of scope for a `localStorage`-only MVP.
+
 ## Known gaps in the research library (flagged, not hidden)
 
 - **Sleep Quality & Circadian Health** and **Physical Activity & Movement** have
@@ -202,9 +313,11 @@ scripts/build-sources.js  bundles data/ into the function-safe JSON + public top
 
 - No backend database — profile and adherence tracking live in `localStorage`.
   Fine for a single-device demo; a real account system is a follow-up.
-- No streaks/badges/levels — deliberately excluded (see the original design
+- No **streaks** specifically — deliberately excluded (see the original design
   discussion: streak mechanics reward "not missing a day," which pressures users
-  to fake compliance rather than recover from a missed one).
+  to fake compliance rather than recover from a missed one). Lifetime XP/levels
+  *are* built (see "The experience layer" above) as the intentional replacement:
+  they reward total real actions taken and never decrease.
 - No rate limiting on `/api/coach` — acceptable for an internal demo, not for a
   public link. Add it (per-IP or per-session) before sharing broadly, since every
   request costs real OpenAI + Anthropic API spend.

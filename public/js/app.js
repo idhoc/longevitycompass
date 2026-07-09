@@ -6,7 +6,11 @@
     topics: 'lc_topics_v1',
     settings: 'lc_settings_v1',
     onboarded: 'lc_onboarded_v1',
+    journal: 'lc_journal_v1',
+    chat: 'lc_chat_v1',
   };
+  const JOURNAL_MAX = 60;
+  const HISTORY_MAX = 5;
 
   // Only variants that actually appear in data/sources/micronutrient.md — keeping this list
   // tied to the source library means the options never imply coverage the coach doesn't
@@ -61,7 +65,7 @@
   }
   function getTopicState(id) {
     const all = getAllTopicState();
-    return all[id] || { days: [false, false, false, false, false, false, false], hasViewedFull: false, lastResult: null };
+    return all[id] || { days: [false, false, false, false, false, false, false], hasViewedFull: false, lastResult: null, history: [] };
   }
   function setTopicState(id, state) {
     const all = getAllTopicState();
@@ -75,15 +79,42 @@
     return Math.round((done / 7) * 100);
   }
 
+  // ---------- journal (chronological event log) ----------
+  function getJournal() {
+    try { return JSON.parse(localStorage.getItem(STORAGE.journal)) || []; }
+    catch { return []; }
+  }
+  function addJournalEntry(entry) {
+    const list = getJournal();
+    list.unshift({ ts: Date.now(), ...entry });
+    localStorage.setItem(STORAGE.journal, JSON.stringify(list.slice(0, JOURNAL_MAX)));
+  }
+
+  // ---------- follow-up chat history (per topic) ----------
+  function getAllChat() {
+    try { return JSON.parse(localStorage.getItem(STORAGE.chat)) || {}; }
+    catch { return {}; }
+  }
+  function getChatHistory(topicId) {
+    return getAllChat()[topicId] || [];
+  }
+  function setChatHistory(topicId, history) {
+    const all = getAllChat();
+    all[topicId] = history.slice(-20);
+    localStorage.setItem(STORAGE.chat, JSON.stringify(all));
+  }
+
   // ---------- routing ----------
   function currentRoute() {
     const hash = location.hash.replace(/^#\/?/, '');
-    if (!hash || hash === 'dashboard') return { view: 'dashboard' };
+    if (!hash || hash === 'today') return { view: 'today' };
+    if (hash === 'dashboard') return { view: 'dashboard' };
+    if (hash === 'journal') return { view: 'journal' };
     if (hash === 'profile') return { view: 'profile' };
     if (hash === 'settings') return { view: 'settings' };
     const m = hash.match(/^topic\/(.+)$/);
     if (m) return { view: 'topic', id: m[1] };
-    return { view: 'dashboard' };
+    return { view: 'today' };
   }
 
   function navigate(hash) { location.hash = hash; }
@@ -109,7 +140,9 @@
   function renderSidebar(route) {
     const el = document.getElementById('sidebar');
     const navTop = [
-      { key: 'dashboard', icon: 'home', label: 'Dashboard' },
+      { key: 'today', icon: 'bolt', label: 'Today' },
+      { key: 'dashboard', icon: 'home', label: 'Overview' },
+      { key: 'journal', icon: 'leaf', label: 'Journal' },
       { key: 'profile', icon: 'user', label: 'My profile' },
       { key: 'settings', icon: 'settings', label: 'Settings' },
     ];
@@ -207,6 +240,162 @@
     document.querySelectorAll('.radar-point').forEach((el) => {
       el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
     });
+  }
+
+  // ---------- today (unified home) ----------
+  function renderToday() {
+    const main = document.getElementById('main');
+    const scores = TOPICS.map((t) => scoreForTopic(t.id));
+    const candidates = TOPICS.map((t, i) => ({ t, score: scores[i], state: getTopicState(t.id) }))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3);
+    const xp = getXP();
+    const level = levelForXP(xp);
+    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    const recent = getJournal().slice(0, 5);
+
+    main.innerHTML = `
+      <div class="today-hero">
+        <div class="today-date">${dateStr}</div>
+        <h1 class="today-greeting">${greeting()}</h1>
+        <p class="today-sub">Lv.${level} ${escapeHtml(levelTitle(level))} so far. Here${candidates.length > 1 ? "'re" : "'s"} your ${candidates.length > 1 ? 'lowest-adherence topics' : 'topic that needs the most attention'} right now.</p>
+        <div class="today-actions-list" id="today-actions-list"></div>
+      </div>
+      <div class="today-grid">
+        <div class="card">
+          <h2>Recent activity</h2>
+          <p class="subtitle" style="margin-bottom:0">Your latest entries — see the full <a href="#/journal">Journal</a>.</p>
+          <div class="journal-feed" id="today-recent-feed" style="margin-top:14px"></div>
+        </div>
+        <div class="card today-mini-radar-card">
+          <div id="today-mini-radar" class="radar-chart-host" style="max-width:260px"></div>
+        </div>
+      </div>
+    `;
+
+    renderTodayActions(candidates);
+    renderRadar(document.getElementById('today-mini-radar'), TOPICS, scores, { size: 240, padding: 30, labels: false });
+    document.querySelectorAll('#today-mini-radar .radar-point').forEach((el) => {
+      el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
+    });
+
+    const recentFeed = document.getElementById('today-recent-feed');
+    recentFeed.innerHTML = recent.length
+      ? recent.map((e) => renderJournalEntryHtml(e)).join('')
+      : `<div class="journal-empty" style="padding:20px">Nothing logged yet — generate a plan or mark a day done.</div>`;
+  }
+
+  function renderTodayActions(candidates) {
+    const list = document.getElementById('today-actions-list');
+    if (!candidates.length) {
+      list.innerHTML = `<div class="today-empty">Set up your profile to get personalized actions.</div>`;
+      return;
+    }
+    list.innerHTML = candidates.map(({ t, state }, i) => {
+      const accent = topicAccent(t.id);
+      const result = state.lastResult;
+      const hasPlan = result && !result.escalation;
+      const headline = hasPlan ? (result.headline || deriveHeadline(result.doThis)) : t.label;
+      const sub = hasPlan ? (result.doThis || '') : (t.description || 'No plan yet for this topic.');
+      const allDone = state.days.every(Boolean);
+      let cta;
+      if (!hasPlan) {
+        cta = `<button class="btn btn-secondary today-open-btn" data-topic="${t.id}">Open topic</button>`;
+      } else if (allDone) {
+        cta = `<span class="evidence-strength strength-strong">${lcIcon('check', 11)} Week done</span>`;
+      } else {
+        cta = `<button class="btn btn-primary today-mark-btn" data-topic="${t.id}">${lcIcon('bolt', 14)} Mark done <span class="xp-tag">+10 XP</span></button>`;
+      }
+      return `
+        <div class="today-action-card stagger-item" style="--i:${i}">
+          <span class="today-action-icon" style="color:${accent};background:${accent}22">${lcIcon(t.icon, 20)}</span>
+          <div class="today-action-body">
+            <div class="today-action-topic">${escapeHtml(t.label)}</div>
+            <div class="today-action-headline">${escapeHtml(headline)}</div>
+            ${sub ? `<div class="today-action-sub">${escapeHtml(sub)}</div>` : ''}
+          </div>
+          <span class="today-action-cta">${cta}</span>
+        </div>
+      `;
+    }).join('');
+
+    list.querySelectorAll('.today-mark-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const s = markNextDayDone(btn.dataset.topic, btn);
+        if (s) renderToday();
+      });
+    });
+    list.querySelectorAll('.today-open-btn').forEach((btn) => {
+      btn.addEventListener('click', () => navigate(`/topic/${btn.dataset.topic}`));
+    });
+  }
+
+  // Marks the next not-done day for a topic (used by both the topic page's mark-done button
+  // and Today's inline cards) so both entry points share one celebration/XP/journal path.
+  function markNextDayDone(topicId, triggerEl) {
+    const s = getTopicState(topicId);
+    const nextIdx = s.days.findIndex((d) => !d);
+    if (nextIdx === -1) return null;
+    s.days[nextIdx] = true;
+    setTopicState(topicId, s);
+    celebrateCompletion(triggerEl, topicId, s);
+    renderSidebar(currentRoute());
+    return s;
+  }
+
+  // ---------- journal ----------
+  function renderJournal() {
+    const main = document.getElementById('main');
+    const entries = getJournal();
+    main.innerHTML = `
+      <h1>Journal</h1>
+      <p class="subtitle">A timeline of plans generated, actions completed, and milestones reached — all local to this browser.</p>
+      <div class="card"><div class="journal-feed" id="journal-feed"></div></div>
+    `;
+    const feed = document.getElementById('journal-feed');
+    if (!entries.length) {
+      feed.innerHTML = `<div class="journal-empty">${lcIcon('leaf', 28)}<div style="margin-top:10px">Nothing logged yet — generate a plan or mark a day done to start your timeline.</div></div>`;
+      return;
+    }
+    feed.innerHTML = groupJournalByDay(entries).map(([dayLabel, items]) => `
+      <div class="journal-day-group">
+        <div class="journal-day-label">${escapeHtml(dayLabel)}</div>
+        ${items.map((e) => renderJournalEntryHtml(e)).join('')}
+      </div>
+    `).join('');
+  }
+
+  function renderJournalEntryHtml(e) {
+    const topic = e.topicId ? TOPICS.find((t) => t.id === e.topicId) : null;
+    const icon = e.type === 'levelup' ? 'bolt' : e.type === 'week' ? 'check' : e.type === 'plan' ? (topic ? topic.icon : 'leaf') : 'check';
+    const color = topic ? topicAccent(topic.id) : 'var(--accent)';
+    return `
+      <div class="journal-entry">
+        <span class="journal-entry-icon" style="color:${color}">${lcIcon(icon, 15)}</span>
+        <span class="journal-entry-text">${escapeHtml(e.text)}<span class="journal-entry-time">${formatJournalTime(e.ts)}</span></span>
+      </div>
+    `;
+  }
+
+  function groupJournalByDay(entries) {
+    const map = new Map();
+    entries.forEach((e) => {
+      const key = new Date(e.ts).toDateString();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(e);
+    });
+    const todayKey = new Date().toDateString();
+    const yestKey = new Date(Date.now() - 86400000).toDateString();
+    return Array.from(map.entries()).map(([key, items]) => {
+      let label = new Date(key).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+      if (key === todayKey) label = 'Today';
+      else if (key === yestKey) label = 'Yesterday';
+      return [label, items];
+    });
+  }
+
+  function formatJournalTime(ts) {
+    return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
   // ---------- profile ----------
@@ -650,12 +839,15 @@
   // triggering element, and celebrates louder if the whole week just completed.
   function celebrateCompletion(triggerEl, topicId, state) {
     burstConfetti(triggerEl);
+    const topic = TOPICS.find((t) => t.id === topicId);
+    addJournalEntry({ type: 'done', topicId, text: `Completed today's action for ${topic ? topic.label : 'a topic'}` });
     const { level, leveledUp } = awardXP();
     const allDone = state.days.every(Boolean);
     if (leveledUp) {
+      addJournalEntry({ type: 'levelup', text: `Leveled up to Lv.${level} ${levelTitle(level)}` });
       showToast(`${lcIcon('bolt', 16)} Level up! You're now <strong>${escapeHtml(levelTitle(level))}</strong> (Lv.${level})`, { celebrate: true, duration: 3600 });
     } else if (allDone) {
-      const topic = TOPICS.find((t) => t.id === topicId);
+      addJournalEntry({ type: 'week', topicId, text: `Completed a full week of ${topic ? topic.label : 'this topic'}` });
       showToast(`${lcIcon('check', 16)} Full week on ${escapeHtml(topic ? topic.label : 'this topic')}!`, { celebrate: true });
       burstConfetti(triggerEl, { count: 40 });
     }
@@ -725,18 +917,17 @@
 
   function wirePlanCard(topicId) {
     const btn = document.getElementById('mark-done-btn');
-    if (!btn) return;
-    updateMarkDoneButton(btn, getTopicState(topicId));
-    btn.addEventListener('click', () => {
-      const s = getTopicState(topicId);
-      const nextIdx = s.days.findIndex((d) => !d);
-      if (nextIdx === -1) return;
-      s.days[nextIdx] = true;
-      setTopicState(topicId, s);
-      celebrateCompletion(btn, topicId, s);
-      onTrackerChanged(topicId, s);
-    });
+    if (btn) {
+      updateMarkDoneButton(btn, getTopicState(topicId));
+      btn.addEventListener('click', () => {
+        const s = markNextDayDone(topicId, btn);
+        if (s) onTrackerChanged(topicId, s);
+      });
+    }
+    wireChatPanel(topicId);
   }
+
+  const STRENGTH_LABEL = { strong: 'Strong evidence', moderate: 'Moderate evidence', preliminary: 'Preliminary' };
 
   function buildFullCard(result, topic) {
     const evidence = (result.evidence && result.evidence.length)
@@ -745,7 +936,11 @@
     const evidenceHtml = evidence.map((e) => `
       <div class="evidence-card ${e.type === 'limitation' ? 'limitation' : ''}">
         <span class="evidence-card-icon">${lcIcon(e.type === 'limitation' ? 'chevron' : 'check', 14)}</span>
-        <span>${escapeHtml(e.text)}</span>
+        <span>
+          ${escapeHtml(e.text)}
+          ${e.strength ? `<span class="evidence-strength strength-${e.strength}">${escapeHtml(STRENGTH_LABEL[e.strength] || e.strength)}</span>` : ''}
+          ${e.sourceQuote ? `<div class="source-quote">“${escapeHtml(e.sourceQuote)}”</div>` : ''}
+        </span>
       </div>
     `).join('');
     const headline = result.headline || deriveHeadline(result.doThis);
@@ -787,8 +982,105 @@
         ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}</div>${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}` : ''}
         ${foodGuideHtml}
         ${result.watchFor ? `<div class="plan-section-label">Heads up</div><div class="plan-watchfor">${lcIcon('chevron', 12)} ${escapeHtml(result.watchFor)}</div>` : ''}
+        <div class="plan-sources-footer">
+          ${lcIcon('dna', 13)} ${topic && topic.sourceLabel ? escapeHtml(topic.sourceLabel) : 'Curated research library'}
+          ${result.usedWebSearch ? `<span class="web-search-badge">${lcIcon('atom', 11)} Includes live web search</span>` : ''}
+        </div>
+        ${buildChatPanelHtml(topic)}
       </div>
     `;
+  }
+
+  function buildChatPanelHtml(topic) {
+    const topicId = topic ? topic.id : null;
+    const history = topicId ? getChatHistory(topicId) : [];
+    return `
+      <div class="chat-panel" data-topic="${topicId || ''}">
+        <button type="button" class="chat-toggle" id="chat-toggle">${lcIcon('chevron', 14)} Ask a follow-up question</button>
+        <div id="chat-body" style="display:none">
+          <div class="chat-messages" id="chat-messages">${history.map((m) => renderChatBubbleHtml(m)).join('')}</div>
+          <div class="chat-input-row">
+            <input type="text" class="chat-input" id="chat-input" placeholder="e.g. does this still apply if I'm vegetarian?" maxlength="300"/>
+            <button type="button" class="btn btn-primary" id="chat-send">Send</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderChatBubbleHtml(m) {
+    return `<div class="chat-bubble ${m.role === 'user' ? 'user' : 'coach'}">${escapeHtml(m.content)}</div>`;
+  }
+
+  function wireChatPanel(topicId) {
+    const toggle = document.getElementById('chat-toggle');
+    if (!toggle) return;
+    const body = document.getElementById('chat-body');
+    toggle.addEventListener('click', () => {
+      const showing = body.style.display !== 'none';
+      body.style.display = showing ? 'none' : '';
+      if (!showing) {
+        const messages = document.getElementById('chat-messages');
+        messages.scrollTop = messages.scrollHeight;
+      }
+    });
+
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+    const messagesEl = document.getElementById('chat-messages');
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      const topic = TOPICS.find((t) => t.id === topicId);
+      const state = getTopicState(topicId);
+      const history = getChatHistory(topicId);
+      history.push({ role: 'user', content: text });
+      setChatHistory(topicId, history);
+      messagesEl.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'user', content: text }));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      input.value = '';
+      input.disabled = true;
+      sendBtn.disabled = true;
+
+      const loadingHtml = `<div class="chat-bubble coach" id="chat-loading"><span class="loader"></span></div>`;
+      messagesEl.insertAdjacentHTML('beforeend', loadingHtml);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      try {
+        const res = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'followup',
+            topicId,
+            profile: getProfile(),
+            planContext: state.lastResult ? { headline: state.lastResult.headline, doThis: state.lastResult.doThis, why: state.lastResult.why } : null,
+            history: history.slice(0, -1),
+            message: text,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        const reply = data.escalation ? data.message : data.reply;
+        const updated = getChatHistory(topicId);
+        updated.push({ role: 'coach', content: reply });
+        setChatHistory(topicId, updated);
+        document.getElementById('chat-loading')?.remove();
+        messagesEl.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: reply }));
+      } catch (err) {
+        document.getElementById('chat-loading')?.remove();
+        messagesEl.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: `Something went wrong: ${err.message}` }));
+      } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
   }
 
   // Fallback headline for mock mode / naive-parse fallback, when Stage 2 didn't supply one:
@@ -830,17 +1122,28 @@
       </div>
     `;
     try {
+      const priorState = getTopicState(topicId);
+      const context = {
+        adherencePct: scoreForTopic(topicId),
+        recentActions: (priorState.history || []).slice(-HISTORY_MAX),
+      };
       const res = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicId, profile: getProfile() }),
+        body: JSON.stringify({ topicId, profile: getProfile(), context }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
       const isMock = (data.raw || '').includes('[MOCK') || (data.why || '').includes('mock');
       const state = getTopicState(topicId);
       state.lastResult = { ...data, mock: isMock };
-      if (!data.escalation) state.hasViewedFull = false; // show full detail again for a fresh plan
+      if (!data.escalation) {
+        state.hasViewedFull = false; // show full detail again for a fresh plan
+        const topic = TOPICS.find((t) => t.id === topicId);
+        const history = (state.history || []).concat(data.doThis ? [data.doThis] : []).slice(-HISTORY_MAX);
+        state.history = history;
+        addJournalEntry({ type: 'plan', topicId, text: `Generated a plan for ${topic ? topic.label : topicId}: ${data.headline || deriveHeadline(data.doThis)}` });
+      }
       setTopicState(topicId, state);
       renderPlanArea(topicId, state);
     } catch (err) {
@@ -863,7 +1166,9 @@
     main.classList.remove('view-fade');
     void main.offsetWidth; // force reflow so the fade-in animation restarts on every navigation
     main.classList.add('view-fade');
-    if (route.view === 'dashboard') renderDashboard();
+    if (route.view === 'today') renderToday();
+    else if (route.view === 'dashboard') renderDashboard();
+    else if (route.view === 'journal') renderJournal();
     else if (route.view === 'profile') renderProfile();
     else if (route.view === 'settings') renderSettings();
     else if (route.view === 'topic') renderTopic(route.id);

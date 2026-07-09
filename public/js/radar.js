@@ -65,17 +65,21 @@ function renderRadar(svgEl, topics, scores, opts) {
   svg += `<text x="${center}" y="${center + 15}" text-anchor="middle" class="radar-hero-label">overall</text>`;
 
   // Axis labels with topic icon, via foreignObject so we can reuse the existing icon set.
-  topics.forEach((t, i) => {
-    const [x, y] = pointFor(i, 1.22);
-    const cos = Math.cos(angleFor(i));
-    const justify = Math.abs(cos) < 0.2 ? 'center' : cos > 0 ? 'flex-start' : 'flex-end';
-    const w = 96;
-    svg += `<foreignObject x="${x - w / 2}" y="${y - 11}" width="${w}" height="22" style="overflow:visible;pointer-events:none">
-      <div xmlns="http://www.w3.org/1999/xhtml" class="radar-label-html" style="justify-content:${justify}">
-        <span class="radar-label-icon">${lcIcon(t.icon, 13)}</span><span>${escapeXml(shortLabel(t))}</span>
-      </div>
-    </foreignObject>`;
-  });
+  // Skipped entirely in compact mode (opts.labels === false) — a small "at a glance" radar
+  // relies on the hover tooltip instead, since 10 text labels don't fit legibly under ~300px.
+  if (opts.labels !== false) {
+    topics.forEach((t, i) => {
+      const [x, y] = pointFor(i, 1.22);
+      const cos = Math.cos(angleFor(i));
+      const justify = Math.abs(cos) < 0.2 ? 'center' : cos > 0 ? 'flex-start' : 'flex-end';
+      const w = 96;
+      svg += `<foreignObject x="${x - w / 2}" y="${y - 11}" width="${w}" height="22" style="overflow:visible;pointer-events:none">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="radar-label-html" style="justify-content:${justify}">
+          <span class="radar-label-icon">${lcIcon(t.icon, 13)}</span><span>${escapeXml(shortLabel(t))}</span>
+        </div>
+      </foreignObject>`;
+    });
+  }
 
   svg += '</svg>';
   svgEl.innerHTML = svg;

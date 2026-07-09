@@ -1,6 +1,10 @@
 // Two-stage coaching pipeline:
 //   Stage 1 (ChatGPT): reads the topic's source library + the system prompt, produces a
-//     grounded "Do this / Why / Watch for" style answer in plain text.
+//     grounded "Do this / Why / Watch for" style answer in plain text. Since this deployment
+//     (see Section 12 below), Stage 1 may also use OpenAI's hosted web search, restricted by
+//     prompt to a domain allowlist (NIH/PubMed/CDC/WHO/major universities/journals) — the
+//     static library remains the primary source; web search fills genuine gaps (thin topics
+//     like Sleep/Activity) rather than replacing it.
 //   Stage 2 (Claude): takes ONLY that stage-1 text and reshapes it into structured data for
 //     the UI, via forced tool-use (not "please write JSON as text" — that's fragile and was
 //     the root cause of blank plan cards in production: any stray markdown or formatting
@@ -17,10 +21,17 @@
 //     labeled mock response so the rest of the app is testable without live keys/cost.
 //   - Even in the worst case (Stage 2 totally unavailable), the fallback parser guarantees
 //     the user sees the real Stage 1 content — never a blank card.
+//   - Web search (Section 12) is restricted by prompt to named credible domains and is never
+//     the ONLY grounding — it supplements the curated library, and every web-sourced claim
+//     must be labeled as such, distinct from library claims. If the OpenAI Responses API call
+//     (which carries the web-search tool) fails for any reason — wrong model, API drift, rate
+//     limit — this falls back to the plain Chat Completions call rather than erroring out.
 
 const bundle = require('./lib/sources-bundle.json');
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_WEB_SEARCH_MODEL = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-4o';
+const WEB_SEARCH_ENABLED = process.env.ENABLE_WEB_SEARCH !== 'false';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -31,6 +42,8 @@ const ESCALATION_MARKERS = [
   'contact a doctor',
   'contact a licensed',
 ];
+
+const TRUSTED_DOMAINS_TEXT = 'government health agencies (nih.gov, ncbi.nlm.nih.gov/pubmed, cdc.gov, who.int, fda.gov), academic/medical institutions (harvard.edu, mayoclinic.org, stanford.edu, and similar .edu or major hospital domains), and peer-reviewed journals or their DOI/PubMed pages (nature.com, nejm.org, jamanetwork.com, thelancet.com, bmj.com, cell.com)';
 
 const FORMAT_TOOL = {
   name: 'format_plan',
@@ -52,14 +65,23 @@ const FORMAT_TOOL = {
       },
       evidence: {
         type: 'array',
-        description: 'Sentences from "why" that contain a number/percentage/named study/timeframe (type "figure"), or a hedge like "does not show/prove/establish" (type "limitation"). Empty array if none.',
+        description: 'Sentences from "why" (and any web-sourced claims) that contain a number/percentage/named study/timeframe, or a hedge like "does not show/prove/establish". Empty array if none.',
         items: {
           type: 'object',
           properties: {
             text: { type: 'string' },
             type: { type: 'string', enum: ['figure', 'limitation'] },
+            strength: {
+              type: 'string',
+              enum: ['strong', 'moderate', 'preliminary'],
+              description: 'Infer from the language used: "strong" for meta-analyses/systematic reviews/large cohorts (tens of thousands+ participants); "moderate" for a single named study, RCT, or moderate-size cohort; "preliminary" for pre-clinical, animal, in-vitro, or purely mechanistic claims.',
+            },
+            source_quote: {
+              type: ['string', 'null'],
+              description: 'If this sentence contains a phrase in quotation marks, extract it verbatim here. Otherwise null. Never invent a quote.',
+            },
           },
-          required: ['text', 'type'],
+          required: ['text', 'type', 'strength', 'source_quote'],
         },
       },
       watch_for: {
@@ -109,73 +131,43 @@ exports.handler = async (event) => {
 
   const localFlag = checkLocalRedFlags(profile || {});
   if (localFlag) {
-    return respond(200, {
-      topicId,
-      escalation: true,
-      message: localFlag,
-    });
+    return respond(200, { topicId, escalation: true, message: localFlag });
   }
 
-  const sourceText = topic.sources
-    .map((id) => bundle.sources[id])
-    .join('\n\n---\n\n');
-
-  const formattingRules = [
-    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
-    'Whenever the source library gives a specific number for the action you are recommending — grams, a percentage, a frequency, a timeframe — state that exact number. Never write "more," "some," or "a bit" when the source has already told you how much. If the source genuinely gives no number for this specific action, say so plainly rather than inventing one.',
-  ];
-
-  if (topic.foodRelevant) {
-    formattingRules.push(
-      'This topic involves specific foods. After Watch for (or after Why, if there is no Watch for), add exactly two more lines, each a single line (no line breaks within it):',
-      'Eat: 3-5 items separated by " ; ", each item formatted as "Food name (quantity or frequency if the source states one): one-line reason" — e.g. "Eat: Lentils (about 1/2 cup): ferments into propionate, which supports satiety signaling ; Oats (about 1/2 cup dry): a strong resistant-starch source for SCFA-producing bacteria." If the source gives no quantity for an item, drop the parenthetical rather than inventing one; never drop the reason.',
-      'Avoid: 2-4 items in the exact same format, but only foods the source specifically names as something to limit (e.g. refined carbohydrates, excess sodium, ultra-processed food). If the source does not call out anything to avoid for this specific topic, write exactly "Avoid: none specified" — do not invent a caution the source doesn\'t support.'
-    );
+  if (body.mode === 'followup') {
+    return handleFollowup(topic, body);
   }
 
-  const systemPrompt = [
-    bundle.systemPrompt,
-    '',
-    '## 10. Source Library for This Turn',
-    '',
-    `Topic: ${topic.label}`,
-    '',
-    `Emphasis: ${topic.emphasis}`,
-    '',
-    '## 11. Output Formatting for This Turn',
-    '',
-    ...formattingRules,
-    '',
-    sourceText,
-  ].join('\n');
+  return handlePlanRequest(topic, body);
+};
 
-  const userMessage = buildUserMessage(topic, profile || {});
+async function handlePlanRequest(topic, body) {
+  const { topicId, profile } = body;
+  const context = body.context || {};
+  const systemPrompt = buildSystemPrompt(topic);
+  const userMessage = buildUserMessage(topic, profile || {}, context);
 
-  let stage1Text;
+  let stage1;
   try {
-    stage1Text = await callOpenAI(systemPrompt, userMessage, topic.foodRelevant);
+    stage1 = await callOpenAI(systemPrompt, userMessage, topic.foodRelevant);
   } catch (err) {
     return respond(502, { error: `Stage 1 (grounding) failed: ${err.message}` });
   }
 
-  if (!stage1Text.trim()) {
+  if (!stage1.text.trim()) {
     return respond(502, { error: 'Stage 1 (grounding) returned an empty response. Try again.' });
   }
 
-  if (ESCALATION_MARKERS.some((marker) => stage1Text.toLowerCase().includes(marker))) {
-    return respond(200, {
-      topicId,
-      escalation: true,
-      message: stripMarkdown(stage1Text).trim(),
-    });
+  if (ESCALATION_MARKERS.some((marker) => stage1.text.toLowerCase().includes(marker))) {
+    return respond(200, { topicId, escalation: true, message: stripMarkdown(stage1.text).trim() });
   }
 
   let structured;
   try {
-    structured = await callClaudeDistill(stage1Text);
+    structured = await callClaudeDistill(stage1.text);
   } catch (err) {
     console.error('Stage 2 (distill) failed, falling back to naive parse:', err.message);
-    structured = naiveFallbackParse(stage1Text);
+    structured = naiveFallbackParse(stage1.text);
   }
 
   return respond(200, {
@@ -189,9 +181,109 @@ exports.handler = async (event) => {
     watchFor: structured.watch_for || null,
     eat: Array.isArray(structured.eat) ? structured.eat : [],
     avoid: Array.isArray(structured.avoid) ? structured.avoid : [],
-    raw: stage1Text,
+    usedWebSearch: !!stage1.usedWebSearch,
+    raw: stage1.text,
   });
-};
+}
+
+// Conversational follow-up on an already-generated plan. Deliberately lighter-weight than the
+// main plan pipeline: no Stage 2 JSON distillation (a free-form answer doesn't fit the
+// Do-this/Why/Watch-for schema), just a short grounded reply, still escalation-checked, still
+// eligible for the same web-search grounding.
+async function handleFollowup(topic, body) {
+  const { topicId, profile, planContext, history, message } = body;
+  if (!message || !message.trim()) {
+    return respond(400, { error: 'Missing follow-up message' });
+  }
+
+  const systemPrompt = [
+    buildSystemPrompt(topic),
+    '',
+    '## 14. Follow-Up Conversation Mode',
+    '',
+    "The user already received the plan quoted below and is now asking a follow-up question about it. Answer conversationally in 1-4 sentences, staying inside every rule above (grounding, scope, escalation, plain text, no markdown). Do not restate the full Do this/Why/Watch for template unless the user is explicitly asking for a new plan — just answer the specific question. If the honest answer is 'the library doesn't cover that,' say so.",
+  ].join('\n');
+
+  const transcriptLines = [`Original plan given: ${JSON.stringify(planContext || {})}`];
+  if (Array.isArray(history)) {
+    history.slice(-6).forEach((turn) => {
+      transcriptLines.push(`${turn.role === 'user' ? 'User' : 'Coach'}: ${turn.content}`);
+    });
+  }
+  transcriptLines.push(`User: ${message.trim()}`);
+  transcriptLines.push('Coach:');
+
+  const userMessage = transcriptLines.join('\n');
+
+  let stage1;
+  if (!process.env.OPENAI_API_KEY) {
+    stage1 = { text: mockFollowupReply(message), usedWebSearch: false };
+  } else {
+    try {
+      stage1 = await callOpenAI(systemPrompt, userMessage, false);
+    } catch (err) {
+      return respond(502, { error: `Follow-up failed: ${err.message}` });
+    }
+  }
+
+  const cleaned = stripMarkdown(stage1.text).trim();
+  if (ESCALATION_MARKERS.some((marker) => cleaned.toLowerCase().includes(marker))) {
+    return respond(200, { topicId, mode: 'followup', escalation: true, message: cleaned });
+  }
+
+  return respond(200, {
+    topicId,
+    mode: 'followup',
+    escalation: false,
+    reply: cleaned,
+    usedWebSearch: !!stage1.usedWebSearch,
+  });
+}
+
+function buildSystemPrompt(topic) {
+  const sourceText = topic.sources.map((id) => bundle.sources[id]).join('\n\n---\n\n');
+
+  const formattingRules = [
+    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    'Whenever a source gives a specific number for the action you are recommending — grams, a percentage, a frequency, a timeframe — state that exact number. Never write "more," "some," or "a bit" when a source has already told you how much. If no source gives a number for this specific action, say so plainly rather than inventing one.',
+  ];
+
+  if (topic.foodRelevant) {
+    formattingRules.push(
+      'This topic involves specific foods. After Watch for (or after Why, if there is no Watch for), add exactly two more lines, each a single line (no line breaks within it):',
+      'Eat: 3-5 items separated by " ; ", each item formatted as "Food name (quantity or frequency if stated): one-line reason" — e.g. "Eat: Lentils (about 1/2 cup): ferments into propionate, which supports satiety signaling ; Oats (about 1/2 cup dry): a strong resistant-starch source for SCFA-producing bacteria." If a source gives no quantity for an item, drop the parenthetical rather than inventing one; never drop the reason.',
+      'Avoid: 2-4 items in the exact same format, but only foods a source specifically names as something to limit (e.g. refined carbohydrates, excess sodium, ultra-processed food). If nothing is called out to avoid for this specific topic, write exactly "Avoid: none specified" — do not invent a caution.'
+    );
+  }
+
+  const sections = [
+    bundle.systemPrompt,
+    '',
+    '## 10. Source Library for This Turn',
+    '',
+    `Topic: ${topic.label}`,
+    '',
+    `Emphasis: ${topic.emphasis}`,
+    '',
+    '## 11. Output Formatting for This Turn',
+    '',
+    ...formattingRules,
+  ];
+
+  if (WEB_SEARCH_ENABLED) {
+    sections.push(
+      '',
+      '## 12. Extended Grounding (This Deployment)',
+      '',
+      `In addition to the static source library below, you have web search available this turn. Use it only to find additional, specific support from ${TRUSTED_DOMAINS_TEXT}. Never cite blogs, commercial wellness sites, forums, or unsourced health content, even if search surfaces them.`,
+      `When you use a web-found source, say so plainly (e.g. "A 2023 NIH-funded study found...") and give the specific finding with its number/timeframe, exactly as you would for a library source — never blend a web claim into a library claim as if they were the same source. The static library below is still the primary, default source; reach for web search specifically when the library is thin for this topic (that is flagged in the Emphasis line above when true), when the user's question needs more specific support than the library has, or to add genuine variety across repeated requests — not by default on every single turn. If web search finds nothing better than the library already has, rely on the library alone; do not pad the response with a redundant citation just to prove search ran.`,
+      `Search suggestion for this topic specifically: ${topic.webSearchHint || 'peer-reviewed research from PubMed, NIH, or a major academic medical center'}.`
+    );
+  }
+
+  sections.push('', sourceText);
+  return sections.join('\n');
+}
 
 function respond(statusCode, body) {
   return {
@@ -223,16 +315,32 @@ function checkLocalRedFlags(profile) {
   return null;
 }
 
-function buildUserMessage(topic, profile) {
+function buildUserMessage(topic, profile, context) {
   const lines = Object.entries(profile)
     .filter(([, v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0))
     .map(([k, v]) => `- ${labelize(k)}: ${Array.isArray(v) ? v.join(', ') : v}`);
-  return [
+
+  const parts = [
     "Here is the user's current profile:",
     lines.length ? lines.join('\n') : '(no profile data provided)',
-    '',
-    `Build today's action plan for ${topic.label}.`,
-  ].join('\n');
+  ];
+
+  if (typeof context.adherencePct === 'number') {
+    parts.push(
+      '',
+      `Current adherence on this topic this week: ${Math.round(context.adherencePct)}%. If this is low (under ~40%), make today's action smaller/easier than usual — reduce friction further rather than adding ambition. If this is high (over ~80%), it is safe to gently expand or add a small second layer, per the Fogg-model rule in Section 6 of your instructions ("expand only after the user confirms the current step is working").`
+    );
+  }
+
+  if (Array.isArray(context.recentActions) && context.recentActions.length) {
+    parts.push(
+      '',
+      `Actions already suggested for this topic recently (do not repeat the same action or mechanism — pick a genuinely different one per your Emphasis instructions): ${context.recentActions.map((a) => `"${a}"`).join('; ')}`
+    );
+  }
+
+  parts.push('', `Build today's action plan for ${topic.label}.`);
+  return parts.join('\n');
 }
 
 function toFiniteOrNull(v) {
@@ -258,11 +366,59 @@ function stripMarkdown(s) {
     .trim();
 }
 
+// Returns { text, usedWebSearch }. Tries the web-search-enabled Responses API path first (if
+// enabled); on ANY failure (unsupported model, API shape drift, rate limit), falls back to the
+// plain Chat Completions call that has been proven to work, rather than erroring the request.
 async function callOpenAI(systemPrompt, userMessage, foodRelevant) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return mockStage1(userMessage, foodRelevant);
+    return { text: mockStage1(userMessage, foodRelevant), usedWebSearch: false };
   }
+
+  if (WEB_SEARCH_ENABLED) {
+    try {
+      const text = await callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage);
+      if (text && text.trim()) return { text: text.trim(), usedWebSearch: true };
+    } catch (err) {
+      console.error('Web-search-enabled OpenAI call failed, falling back to standard call:', err.message);
+    }
+  }
+
+  const text = await callOpenAIChatCompletions(apiKey, systemPrompt, userMessage);
+  return { text, usedWebSearch: false };
+}
+
+async function callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage) {
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_WEB_SEARCH_MODEL,
+      input: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      tools: [{ type: 'web_search_preview' }],
+      max_output_tokens: 700,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenAI Responses ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  if (typeof data.output_text === 'string' && data.output_text.trim()) {
+    return data.output_text;
+  }
+  const messageItem = (data.output || []).find((item) => item.type === 'message');
+  const textBlock = messageItem?.content?.find((c) => c.type === 'output_text' || c.type === 'text');
+  if (textBlock?.text) return textBlock.text;
+  throw new Error('No output text found in OpenAI Responses payload');
+}
+
+async function callOpenAIChatCompletions(apiKey, systemPrompt, userMessage) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -293,9 +449,10 @@ async function callClaudeDistill(stage1Text) {
   }
 
   const instruction = [
-    "Restructure the coach response below by calling the format_plan tool.",
+    'Restructure the coach response below by calling the format_plan tool.',
     'Do NOT add, remove, soften, or invent any fact — restructure, split, and strip markdown formatting only.',
     'If the response has an "Eat:" and/or "Avoid:" line (semicolon-separated items like "Food (quantity): reason"), split each on " ; " then split each item on the first ":" into food vs. detail. If a line is absent, or Avoid says "none specified", return an empty array for it.',
+    'For each evidence item, infer a "strength" tier from the language used (see schema) and extract any quoted phrase as "source_quote" (null if none).',
     '',
     'Coach response to restructure:',
     '"""',
@@ -312,7 +469,7 @@ async function callClaudeDistill(stage1Text) {
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
-      max_tokens: 800,
+      max_tokens: 900,
       temperature: 0,
       tools: [FORMAT_TOOL],
       tool_choice: { type: 'tool', name: 'format_plan' },
@@ -339,7 +496,12 @@ function sanitizeStructured(input) {
     do_this: stripMarkdown(input.do_this || ''),
     why: stripMarkdown(input.why || ''),
     evidence: Array.isArray(input.evidence)
-      ? input.evidence.map((e) => ({ text: stripMarkdown(e.text || ''), type: e.type === 'limitation' ? 'limitation' : 'figure' }))
+      ? input.evidence.map((e) => ({
+        text: stripMarkdown(e.text || ''),
+        type: e.type === 'limitation' ? 'limitation' : 'figure',
+        strength: ['strong', 'moderate', 'preliminary'].includes(e.strength) ? e.strength : 'moderate',
+        sourceQuote: e.source_quote ? stripMarkdown(e.source_quote) : null,
+      }))
       : [],
     watch_for: input.watch_for ? stripMarkdown(input.watch_for) : null,
     eat: cleanItems(input.eat),
@@ -398,6 +560,10 @@ function naiveFallbackParse(text) {
   };
 }
 
+function mockFollowupReply(message) {
+  return `[MOCK — OPENAI_API_KEY not set] I don't have a live model to answer "${message.trim().slice(0, 80)}" right now, but once your API key is set, I'll answer this conversationally in a few sentences, grounded in the same source library and web search rules as your plan.`;
+}
+
 function mockStage1(userMessage, foodRelevant) {
   const lines = [
     '[MOCK — OPENAI_API_KEY not set]',
@@ -420,7 +586,7 @@ function mockDistill(stage1Text) {
     headline: '[MOCK] Add One Fiber Serving',
     do_this: '[MOCK — ANTHROPIC_API_KEY not set] After your next meal, add one 1/2-cup serving of a fiber-rich food you did not eat earlier today — beans, lentils, oats, or a whole grain.',
     why: 'This is a mock distillation. Set ANTHROPIC_API_KEY to get a real Stage 2 response. The uploaded source library associates a roughly 25g/day increase in fiber intake with measurable microbiome changes within two weeks.',
-    evidence: [{ text: stage1Text.slice(0, 160), type: 'limitation' }],
+    evidence: [{ text: stage1Text.slice(0, 160), type: 'limitation', strength: 'moderate', sourceQuote: null }],
     watch_for: null,
     eat: foodRelevant ? [
       { food: 'Lentils', detail: 'about 1/2 cup — ferments into propionate, which supports satiety and metabolic signaling.' },
