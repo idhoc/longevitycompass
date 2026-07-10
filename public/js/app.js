@@ -12,6 +12,7 @@
     synthesis: 'lc_synthesis_v1',
     reminderFired: 'lc_reminder_fired_v1',
     briefing: 'lc_briefing_v1',
+    meals: 'lc_meals_v1',
   };
   const JOURNAL_MAX = 60;
   const HISTORY_MAX = 5;
@@ -173,6 +174,21 @@
   }
   function setBriefing(b) { localStorage.setItem(STORAGE.briefing, JSON.stringify(b)); }
 
+  // ---------- meal log (structured, for the running calorie/macro tracker) ----------
+  function getMeals() {
+    try { return JSON.parse(localStorage.getItem(STORAGE.meals)) || []; }
+    catch { return []; }
+  }
+  function addMeal(entry) {
+    const list = getMeals();
+    list.unshift({ ts: Date.now(), ...entry });
+    localStorage.setItem(STORAGE.meals, JSON.stringify(list.slice(0, 200)));
+  }
+  function todaysMeals() {
+    const todayKey = new Date().toDateString();
+    return getMeals().filter((m) => new Date(m.ts).toDateString() === todayKey);
+  }
+
   // ---------- voice: Web Speech API helpers (feature-detected, no build step needed) ----------
   function getSpeechRecognitionCtor() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -192,6 +208,7 @@
     if (!hash || hash === 'today') return { view: 'today' };
     if (hash === 'dashboard') return { view: 'dashboard' };
     if (hash === 'topics') return { view: 'topics' };
+    if (hash === 'nutrition') return { view: 'nutrition' };
     if (hash === 'journal') return { view: 'journal' };
     if (hash === 'profile') return { view: 'profile' };
     if (hash === 'settings') return { view: 'settings' };
@@ -225,8 +242,10 @@
     const el = document.getElementById('sidebar');
     const navItems = [
       { key: 'today', icon: 'bolt', label: 'Today' },
+      { key: 'coach', icon: 'mic', label: 'Coach', action: 'openCoach' },
       { key: 'dashboard', icon: 'home', label: 'Overview' },
       { key: 'topics', icon: 'dna', label: 'Topics' },
+      { key: 'nutrition', icon: 'meal', label: 'Meal Log' },
       { key: 'journal', icon: 'leaf', label: 'Journal' },
       { key: 'profile', icon: 'user', label: 'My profile' },
       { key: 'settings', icon: 'settings', label: 'Settings' },
@@ -238,7 +257,11 @@
     let html = `<div class="rail-brand">${lcIcon('heart', 22)}</div>`;
     for (const item of navItems) {
       const active = route.view === item.key ? 'active' : '';
-      html += `<a class="rail-link ${active}" href="#/${item.key}">${lcIcon(item.icon, 20)}<span class="rail-tooltip">${item.label}</span></a>`;
+      if (item.action) {
+        html += `<button type="button" class="rail-link ${active}" data-rail-action="${item.action}">${lcIcon(item.icon, 20)}<span class="rail-tooltip">${item.label}</span></button>`;
+      } else {
+        html += `<a class="rail-link ${active}" href="#/${item.key}">${lcIcon(item.icon, 20)}<span class="rail-tooltip">${item.label}</span></a>`;
+      }
     }
     html += '<div class="rail-spacer"></div>';
     html += `
@@ -248,6 +271,8 @@
       </div>
     `;
     el.innerHTML = html;
+    const coachBtn = el.querySelector('[data-rail-action="openCoach"]');
+    if (coachBtn) coachBtn.addEventListener('click', () => { if (window._lcOpenCoach) window._lcOpenCoach(); });
   }
 
   // ---------- overview (full radar + stats) ----------
@@ -1464,6 +1489,9 @@
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const recent = getJournal().slice(0, 5);
     const synthesis = getSynthesis();
+    const todaysMealList = todaysMeals();
+    const todaysMealCount = todaysMealList.length;
+    const todaysCalories = todaysMealList.reduce((sum, m) => sum + (m.totalCaloriesEstimate || 0), 0);
 
     main.innerHTML = `
       <div class="today-hero">
@@ -1484,15 +1512,14 @@
         </div>
       </div>
 
-      <div class="card meal-log-card" id="meal-log-card">
-        <h2>${lcIcon('leaf', 17)} Log a meal</h2>
-        <p class="subtitle" style="margin-bottom:0">Snap or upload a photo — the coach estimates calories, macros, and one specific suggestion tied to a real mechanism.</p>
-        <div class="meal-upload-row">
-          <button type="button" class="meal-upload-btn" id="meal-upload-btn" aria-label="Upload a meal photo">${lcIcon('leaf', 22)}</button>
-          <input type="file" accept="image/*" capture="environment" id="meal-file-input" style="display:none"/>
-          <span style="font-size:12.5px;color:var(--text-muted)">JPG or PNG, analyzed on our server — never stored.</span>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2 style="margin-bottom:2px">${lcIcon('meal', 17)} Nutrition today</h2>
+            <p class="subtitle" style="margin-bottom:0">${todaysMealCount ? `${todaysMealCount} meal${todaysMealCount === 1 ? '' : 's'} logged, ~${Math.round(todaysCalories)} kcal so far.` : 'No meals logged yet today.'}</p>
+          </div>
+          <a href="#/nutrition" class="btn btn-primary">${lcIcon('meal', 14)} Log a meal</a>
         </div>
-        <div id="meal-result"></div>
       </div>
 
       <div class="today-grid">
@@ -1508,7 +1535,6 @@
     `;
 
     renderTodayActions(candidates);
-    wireMealLogCard();
     loadDailyBriefing(scores);
     renderRadar(document.getElementById('today-mini-radar'), TOPICS, scores, { size: 240, padding: 30, labels: false });
     document.querySelectorAll('#today-mini-radar .radar-point').forEach((el) => {
@@ -1556,6 +1582,75 @@
         btn.disabled = false;
       }
     });
+  }
+
+  // ---------- Nutrition / Meal Log (dedicated page — its own nav item, not a buried card) ----------
+  function renderNutritionLog() {
+    const main = document.getElementById('main');
+    main.innerHTML = `
+      <h1>${lcIcon('meal', 22)} Nutrition Log</h1>
+      <p class="subtitle">Snap or upload a meal photo — the coach estimates calories and macros, and gives one suggestion tied to a real mechanism, never generic advice.</p>
+      <div class="nutrition-summary-row" id="nutrition-summary-row"></div>
+      <div class="card meal-log-card" id="meal-log-card">
+        <h2>Log a meal</h2>
+        <div class="meal-upload-row">
+          <button type="button" class="meal-upload-btn" id="meal-upload-btn" aria-label="Upload a meal photo">${lcIcon('meal', 22)}</button>
+          <input type="file" accept="image/*" capture="environment" id="meal-file-input" style="display:none"/>
+          <span style="font-size:12.5px;color:var(--text-muted)">JPG or PNG, analyzed on our server — never stored server-side. Your history below lives only in this browser.</span>
+        </div>
+        <div id="meal-result"></div>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <h2>History</h2>
+        <div id="meal-history-list"></div>
+      </div>
+    `;
+    wireMealLogCard();
+    renderNutritionSummary();
+    renderMealHistory();
+  }
+
+  function renderNutritionSummary() {
+    const el = document.getElementById('nutrition-summary-row');
+    if (!el) return;
+    const meals = todaysMeals();
+    const kcal = meals.reduce((s, m) => s + (m.totalCaloriesEstimate || 0), 0);
+    const protein = meals.reduce((s, m) => s + (m.proteinG || 0), 0);
+    const carbs = meals.reduce((s, m) => s + (m.carbsG || 0), 0);
+    const fat = meals.reduce((s, m) => s + (m.fatG || 0), 0);
+    const tiles = [
+      ['kcal today', Math.round(kcal)],
+      ['protein', Math.round(protein) + 'g'],
+      ['carbs', Math.round(carbs) + 'g'],
+      ['fat', Math.round(fat) + 'g'],
+    ];
+    el.innerHTML = tiles.map(([label, val]) => `
+      <div class="nutrition-summary-tile"><div class="nutrition-summary-val">${val}</div><div class="nutrition-summary-label">${escapeHtml(label)}</div></div>
+    `).join('');
+  }
+
+  function renderMealHistory() {
+    const el = document.getElementById('meal-history-list');
+    if (!el) return;
+    const meals = getMeals();
+    if (!meals.length) {
+      el.innerHTML = `<div class="journal-empty" style="padding:30px 10px">No meals logged yet — analyze a photo above and tap "Log this meal."</div>`;
+      return;
+    }
+    el.innerHTML = meals.slice(0, 40).map((m) => {
+      const foodNames = (m.foods || []).map((f) => f.name).join(', ') || 'Meal';
+      const time = new Date(m.ts).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+      return `
+        <div class="meal-history-item">
+          ${m.thumbnail ? `<img src="${m.thumbnail}" class="meal-history-thumb" alt=""/>` : `<span class="meal-history-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--text-muted)">${lcIcon('meal', 18)}</span>`}
+          <div class="meal-history-body">
+            <div class="meal-history-foods">${escapeHtml(foodNames)}</div>
+            <div class="meal-history-meta">${time}${m.confidence ? ' · ' + m.confidence + ' confidence' : ''}</div>
+          </div>
+          <div class="meal-history-kcal">${m.totalCaloriesEstimate != null ? Math.round(m.totalCaloriesEstimate) + ' kcal' : '—'}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   // ---------- meal photo logging (Thrive-inspired) ----------
@@ -1620,13 +1715,22 @@
           <div class="macro-tile"><div class="macro-tile-val">${data.fatG != null ? Math.round(data.fatG) + 'g' : '—'}</div><div class="macro-tile-label">Fat</div></div>
         </div>
         ${data.suggestion ? `<div class="meal-suggestion">${lcIcon('check', 13)} ${escapeHtml(data.suggestion)}</div>` : ''}
-        <button class="btn btn-secondary" id="log-meal-btn" style="margin-top:14px">Log this meal to Journal</button>
+        <button class="btn btn-primary" id="log-meal-btn" style="margin-top:14px">Log this meal</button>
       </div>
     `;
     document.getElementById('log-meal-btn').addEventListener('click', (e) => {
-      addJournalEntry({ type: 'meal', text: `Logged a meal: ${foods.map((f) => f.name).join(', ') || 'estimated ' + (data.totalCaloriesEstimate || '?') + ' kcal'}` });
+      const foodNames = foods.map((f) => f.name).join(', ') || `estimated ${data.totalCaloriesEstimate || '?'} kcal`;
+      addJournalEntry({ type: 'meal', text: `Logged a meal: ${foodNames}` });
+      addMeal({
+        foods, thumbnail: dataUrl,
+        totalCaloriesEstimate: data.totalCaloriesEstimate,
+        proteinG: data.proteinG, carbsG: data.carbsG, fatG: data.fatG,
+        confidence: data.confidence,
+      });
       e.currentTarget.disabled = true;
       e.currentTarget.textContent = 'Logged';
+      renderNutritionSummary();
+      renderMealHistory();
     });
   }
 
@@ -1781,12 +1885,11 @@
 
   // ---------- global "Ask Compass" cross-topic coach ----------
   function renderGlobalCoach() {
-    const fab = document.createElement('button');
-    fab.className = 'global-fab';
-    fab.setAttribute('aria-label', 'Ask Compass');
-    fab.innerHTML = lcIcon('hands', 24);
-    document.body.appendChild(fab);
-
+    // Deliberately NOT a floating bottom-right bubble — that exact visual pattern (fixed
+    // circular button, bottom-right corner) is the signature shape ad blockers and privacy
+    // extensions commonly hide via generic "chat widget" cosmetic filters. The permanent
+    // "Coach" item in the icon rail (wired via window._lcOpenCoach, set below) is the
+    // guaranteed entry point instead.
     const overlay = document.createElement('div');
     overlay.className = 'global-chat-overlay';
     overlay.style.display = 'none';
@@ -1818,10 +1921,10 @@
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    fab.addEventListener('click', () => {
-      overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+    window._lcOpenCoach = () => {
+      overlay.style.display = overlay.style.display === 'flex' ? 'none' : 'flex';
       if (overlay.style.display === 'flex') renderMessages();
-    });
+    };
     document.getElementById('global-chat-close').addEventListener('click', () => { overlay.style.display = 'none'; });
 
     const input = document.getElementById('global-chat-input');
@@ -1941,6 +2044,7 @@
     if (route.view === 'today') renderToday();
     else if (route.view === 'dashboard') renderDashboard();
     else if (route.view === 'topics') renderTopicsGrid();
+    else if (route.view === 'nutrition') renderNutritionLog();
     else if (route.view === 'journal') renderJournal();
     else if (route.view === 'profile') renderProfile();
     else if (route.view === 'settings') renderSettings();

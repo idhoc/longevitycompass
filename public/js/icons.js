@@ -20,6 +20,8 @@ window.LC_ICONS = {
   sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
   dna: '<path d="M7 3c0 6 10 6 10 12"/><path d="M17 21c0-6-10-6-10-12"/><path d="M8 6h8M7.3 9.5h9.4M7.3 14.5h9.4M8 18h8"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  meal: '<path d="M7 3v6a2 2 0 0 0 4 0V3M9 9v12"/><path d="M16 3c-1.6 0-2.6 2.2-2.6 5s1 5 2.6 5v9"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M9 21h6"/>',
 };
 
 function lcIcon(name, size) {
