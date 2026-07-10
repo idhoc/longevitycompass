@@ -11,6 +11,7 @@
     globalChat: 'lc_global_chat_v1',
     synthesis: 'lc_synthesis_v1',
     reminderFired: 'lc_reminder_fired_v1',
+    briefing: 'lc_briefing_v1',
   };
   const JOURNAL_MAX = 60;
   const HISTORY_MAX = 5;
@@ -164,6 +165,26 @@
     catch { return null; }
   }
   function setSynthesis(s) { localStorage.setItem(STORAGE.synthesis, JSON.stringify(s)); }
+
+  // ---------- daily briefing (ambient, auto-generated once per calendar day) ----------
+  function getBriefing() {
+    try { return JSON.parse(localStorage.getItem(STORAGE.briefing)) || null; }
+    catch { return null; }
+  }
+  function setBriefing(b) { localStorage.setItem(STORAGE.briefing, JSON.stringify(b)); }
+
+  // ---------- voice: Web Speech API helpers (feature-detected, no build step needed) ----------
+  function getSpeechRecognitionCtor() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+  function speakText(text, onEnd) {
+    if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1.0;
+    if (onEnd) utter.onend = onEnd;
+    window.speechSynthesis.speak(utter);
+  }
 
   // ---------- routing ----------
   function currentRoute() {
@@ -1092,7 +1113,100 @@
         if (s) onTrackerChanged(topicId, s);
       });
     }
+    const sessionBtn = document.getElementById('start-session-btn');
+    if (sessionBtn) {
+      sessionBtn.addEventListener('click', () => {
+        const state = getTopicState(topicId);
+        const steps = state.lastResult && Array.isArray(state.lastResult.steps) ? state.lastResult.steps : [];
+        if (steps.length) startGuidedSession(steps, topicId);
+      });
+    }
     wireChatPanel(topicId);
+  }
+
+  // ---------- guided paced session player (Google-inspired) ----------
+  function startGuidedSession(steps, topicId) {
+    let idx = 0;
+    let remaining = steps[0].seconds;
+    let paused = false;
+    let timer = null;
+    const RING_R = 96;
+    const CIRC = 2 * Math.PI * RING_R;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'session-overlay';
+    overlay.innerHTML = `
+      <button type="button" class="session-close" id="session-close">${lcIcon('close', 22)}</button>
+      <div class="session-step-count" id="session-step-count"></div>
+      <div class="session-ring-wrap">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          <circle cx="110" cy="110" r="${RING_R}" fill="none" stroke="var(--gridline)" stroke-width="8"/>
+          <circle id="session-ring" cx="110" cy="110" r="${RING_R}" fill="none" stroke="var(--accent)" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="${CIRC}" stroke-dashoffset="0" transform="rotate(-90 110 110)"/>
+        </svg>
+        <div class="session-ring-num" id="session-ring-num"></div>
+      </div>
+      <div class="session-step-label" id="session-step-label"></div>
+      <div class="session-controls">
+        <button class="btn btn-secondary" id="session-pause">Pause</button>
+        <button class="btn btn-secondary" id="session-skip">Skip</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const ring = overlay.querySelector('#session-ring');
+    const ringNum = overlay.querySelector('#session-ring-num');
+    const stepLabel = overlay.querySelector('#session-step-label');
+    const stepCount = overlay.querySelector('#session-step-count');
+    const pauseBtn = overlay.querySelector('#session-pause');
+
+    function renderStep() {
+      stepCount.textContent = `Step ${idx + 1} of ${steps.length}`;
+      stepLabel.textContent = steps[idx].label;
+      speakText(steps[idx].label);
+    }
+
+    function tick() {
+      if (paused) return;
+      remaining -= 1;
+      const frac = Math.max(0, remaining / steps[idx].seconds);
+      ring.setAttribute('stroke-dashoffset', String(CIRC * (1 - frac)));
+      ringNum.textContent = String(Math.max(0, remaining));
+      if (remaining <= 0) {
+        idx += 1;
+        if (idx >= steps.length) { finish(); return; }
+        remaining = steps[idx].seconds;
+        renderStep();
+      }
+    }
+
+    function finish() {
+      clearInterval(timer);
+      window.speechSynthesis?.cancel();
+      overlay.remove();
+      const s = markNextDayDone(topicId, document.body);
+      if (s) { onTrackerChanged(topicId, s); showToast(`${lcIcon('check', 16)} Guided session complete!`, { celebrate: true }); }
+    }
+
+    overlay.querySelector('#session-close').addEventListener('click', () => {
+      clearInterval(timer);
+      window.speechSynthesis?.cancel();
+      overlay.remove();
+    });
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    });
+    overlay.querySelector('#session-skip').addEventListener('click', () => {
+      idx += 1;
+      if (idx >= steps.length) { finish(); return; }
+      remaining = steps[idx].seconds;
+      renderStep();
+    });
+
+    renderStep();
+    ringNum.textContent = String(remaining);
+    timer = setInterval(tick, 1000);
   }
 
   const STRENGTH_LABEL = { strong: 'Strong evidence', moderate: 'Moderate evidence', preliminary: 'Preliminary' };
@@ -1152,7 +1266,10 @@
               ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
             </div>
           </div>
-          <button class="btn btn-primary" id="mark-done-btn" style="margin-top:14px"></button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn btn-primary" id="mark-done-btn"></button>
+            ${Array.isArray(result.steps) && result.steps.length ? `<button class="btn btn-secondary" id="start-session-btn">${lcIcon('bolt', 14)} Start guided session (${result.steps.length} steps)</button>` : ''}
+          </div>
         </div>
         ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}</div>${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}` : ''}
         ${foodGuideHtml}
@@ -1352,6 +1469,7 @@
       <div class="today-hero">
         <div class="today-date">${dateStr}</div>
         <h1 class="today-greeting">${greeting()}</h1>
+        <div id="daily-briefing-slot"></div>
         <p class="today-sub">Lv.${level} ${escapeHtml(levelTitle(level))} so far. Here${candidates.length > 1 ? "'re" : "'s"} your ${candidates.length > 1 ? 'lowest-adherence topics' : 'topic that needs the most attention'} right now.</p>
         <div class="today-actions-list" id="today-actions-list"></div>
       </div>
@@ -1364,6 +1482,17 @@
         <div id="synthesis-body-wrap">
           ${synthesis ? `<div class="synthesis-body">${escapeHtml(synthesis.synthesis)}</div><div class="synthesis-meta">Generated ${new Date(synthesis.generatedAt).toLocaleString()}</div>` : `<p class="subtitle" style="margin:12px 0 0">A cross-topic AI analysis of your week — what's working, how two of your topics connect, and what to focus on next. Generated on demand, not on every visit.</p>`}
         </div>
+      </div>
+
+      <div class="card meal-log-card" id="meal-log-card">
+        <h2>${lcIcon('leaf', 17)} Log a meal</h2>
+        <p class="subtitle" style="margin-bottom:0">Snap or upload a photo — the coach estimates calories, macros, and one specific suggestion tied to a real mechanism.</p>
+        <div class="meal-upload-row">
+          <button type="button" class="meal-upload-btn" id="meal-upload-btn" aria-label="Upload a meal photo">${lcIcon('leaf', 22)}</button>
+          <input type="file" accept="image/*" capture="environment" id="meal-file-input" style="display:none"/>
+          <span style="font-size:12.5px;color:var(--text-muted)">JPG or PNG, analyzed on our server — never stored.</span>
+        </div>
+        <div id="meal-result"></div>
       </div>
 
       <div class="today-grid">
@@ -1379,6 +1508,8 @@
     `;
 
     renderTodayActions(candidates);
+    wireMealLogCard();
+    loadDailyBriefing(scores);
     renderRadar(document.getElementById('today-mini-radar'), TOPICS, scores, { size: 240, padding: 30, labels: false });
     document.querySelectorAll('#today-mini-radar .radar-point').forEach((el) => {
       el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
@@ -1425,6 +1556,114 @@
         btn.disabled = false;
       }
     });
+  }
+
+  // ---------- meal photo logging (Thrive-inspired) ----------
+  function wireMealLogCard() {
+    const uploadBtn = document.getElementById('meal-upload-btn');
+    const fileInput = document.getElementById('meal-file-input');
+    const resultEl = document.getElementById('meal-result');
+    if (!uploadBtn) return;
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result;
+        resultEl.innerHTML = `
+          <div class="meal-result">
+            <div style="display:flex;align-items:center;gap:12px">
+              <img src="${dataUrl}" class="meal-preview-thumb" alt="Uploaded meal photo"/>
+              <span style="font-size:13px;color:var(--text-muted)"><span class="loader"></span> Analyzing your photo…</span>
+            </div>
+          </div>
+        `;
+        try {
+          const settings = getSettings();
+          const res = await fetch('/api/coach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'mealPhoto', imageBase64: dataUrl, profile: getProfile(), context: { allowWebSearch: settings.allowWebSearch } }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Request failed');
+          renderMealResult(data, dataUrl);
+        } catch (err) {
+          resultEl.innerHTML = `<div class="empty-state" style="margin-top:12px">Something went wrong: ${escapeHtml(err.message)}</div>`;
+        }
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = '';
+    });
+  }
+
+  function renderMealResult(data, dataUrl) {
+    const resultEl = document.getElementById('meal-result');
+    const foods = data.foods || [];
+    resultEl.innerHTML = `
+      <div class="meal-result">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <img src="${dataUrl}" class="meal-preview-thumb" alt="Uploaded meal photo"/>
+          <div style="flex:1">
+            <span class="meal-confidence">${data.confidence === 'moderate' ? 'Moderate confidence' : 'Low confidence'} estimate</span>
+            <div class="meal-calories-hero">${data.totalCaloriesEstimate != null ? Math.round(data.totalCaloriesEstimate) + ' kcal' : '— kcal'}</div>
+          </div>
+        </div>
+        <div class="meal-food-list">
+          ${foods.map((f) => `<div class="meal-food-row"><span>${escapeHtml(f.name)}</span><span class="meal-food-detail">${f.estimatedGrams != null ? Math.round(f.estimatedGrams) + 'g' : ''}${f.estimatedCalories != null ? ' · ' + Math.round(f.estimatedCalories) + ' kcal' : ''}</span></div>`).join('')}
+        </div>
+        <div class="macro-row">
+          <div class="macro-tile"><div class="macro-tile-val">${data.proteinG != null ? Math.round(data.proteinG) + 'g' : '—'}</div><div class="macro-tile-label">Protein</div></div>
+          <div class="macro-tile"><div class="macro-tile-val">${data.carbsG != null ? Math.round(data.carbsG) + 'g' : '—'}</div><div class="macro-tile-label">Carbs</div></div>
+          <div class="macro-tile"><div class="macro-tile-val">${data.fatG != null ? Math.round(data.fatG) + 'g' : '—'}</div><div class="macro-tile-label">Fat</div></div>
+        </div>
+        ${data.suggestion ? `<div class="meal-suggestion">${lcIcon('check', 13)} ${escapeHtml(data.suggestion)}</div>` : ''}
+        <button class="btn btn-secondary" id="log-meal-btn" style="margin-top:14px">Log this meal to Journal</button>
+      </div>
+    `;
+    document.getElementById('log-meal-btn').addEventListener('click', (e) => {
+      addJournalEntry({ type: 'meal', text: `Logged a meal: ${foods.map((f) => f.name).join(', ') || 'estimated ' + (data.totalCaloriesEstimate || '?') + ' kcal'}` });
+      e.currentTarget.disabled = true;
+      e.currentTarget.textContent = 'Logged';
+    });
+  }
+
+  // ---------- ambient daily briefing (Oura-inspired: proactive, not button-triggered) ----------
+  async function loadDailyBriefing(scores) {
+    const slot = document.getElementById('daily-briefing-slot');
+    if (!slot) return;
+    const todayKey = new Date().toDateString();
+    const cached = getBriefing();
+    if (cached && cached.dateKey === todayKey) {
+      slot.innerHTML = renderBriefingHtml(cached.text);
+      return;
+    }
+    try {
+      const topicsSummary = TOPICS.map((t, i) => ({ id: t.id, label: t.label, score: scores[i] }));
+      const res = await fetch('/api/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'briefing', topicsSummary, context: { allowWebSearch: false } }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.escalation) return;
+      setBriefing({ dateKey: todayKey, text: data.briefing });
+      slot.innerHTML = renderBriefingHtml(data.briefing);
+    } catch {
+      // Ambient/best-effort — silently skip on failure rather than showing an error banner
+      // for a feature the user didn't explicitly request this instant.
+    }
+  }
+
+  function renderBriefingHtml(text) {
+    return `
+      <div class="daily-briefing">
+        <span class="daily-briefing-icon">${lcIcon('bolt', 18)}</span>
+        <span class="daily-briefing-text"><span class="daily-briefing-label">Today's briefing</span>${escapeHtml(text)}</span>
+      </div>
+    `;
   }
 
   function renderTodayActions(candidates) {
@@ -1557,6 +1796,10 @@
           <span class="global-chat-title">${lcIcon('hands', 17)} Ask Compass</span>
           <button class="global-chat-close" id="global-chat-close">${lcIcon('close', 18)}</button>
         </div>
+        <div class="voice-orb-wrap">
+          <button type="button" class="voice-orb" id="voice-orb" aria-label="Talk to your coach">${lcIcon('hands', 30)}</button>
+          <div class="voice-status" id="voice-status">Tap to speak</div>
+        </div>
         <div class="global-chat-messages" id="global-chat-messages"></div>
         <div class="global-chat-input-row">
           <input type="text" class="chat-input" id="global-chat-input" placeholder="What should I focus on this week?" maxlength="300"/>
@@ -1584,9 +1827,16 @@
     const input = document.getElementById('global-chat-input');
     const sendBtn = document.getElementById('global-chat-send');
     const messagesEl = document.getElementById('global-chat-messages');
+    const orb = document.getElementById('voice-orb');
+    const voiceStatus = document.getElementById('voice-status');
 
-    async function send() {
-      const text = input.value.trim();
+    function setOrbState(state) {
+      orb.classList.remove('listening', 'thinking', 'speaking');
+      if (state !== 'idle') orb.classList.add(state);
+    }
+
+    async function send(text, viaVoice) {
+      text = (text || input.value).trim();
       if (!text) return;
       const history = getGlobalChat();
       history.push({ role: 'user', content: text });
@@ -1595,6 +1845,7 @@
       input.value = '';
       input.disabled = true;
       sendBtn.disabled = true;
+      if (viaVoice) { setOrbState('thinking'); voiceStatus.textContent = 'Thinking…'; }
       messagesEl.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="global-chat-loading"><span class="loader"></span></div>`);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -1621,17 +1872,57 @@
         updated.push({ role: 'coach', content: reply });
         setGlobalChat(updated);
         renderMessages();
+        if (viaVoice) {
+          setOrbState('speaking');
+          voiceStatus.textContent = 'Speaking…';
+          speakText(reply, () => { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; });
+        }
       } catch (err) {
         document.getElementById('global-chat-loading')?.remove();
         messagesEl.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: `Something went wrong: ${err.message}` }));
+        if (viaVoice) { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; }
       } finally {
         input.disabled = false;
         sendBtn.disabled = false;
         input.focus();
       }
     }
-    sendBtn.addEventListener('click', send);
+    sendBtn.addEventListener('click', () => send());
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+
+    // Voice input: feature-detected Web Speech API. Falls back to a clear inline message
+    // (never a silent no-op or a thrown error) if the browser doesn't support it.
+    const SR = getSpeechRecognitionCtor();
+    let recognition = null;
+    let listening = false;
+    if (SR) {
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        send(text, true);
+      };
+      recognition.onerror = () => { listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; };
+      recognition.onend = () => { listening = false; };
+    }
+    orb.addEventListener('click', () => {
+      if (!recognition) {
+        voiceStatus.textContent = "Voice input isn't supported in this browser — type below instead.";
+        return;
+      }
+      window.speechSynthesis?.cancel();
+      if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; return; }
+      try {
+        recognition.start();
+        listening = true;
+        setOrbState('listening');
+        voiceStatus.textContent = 'Listening…';
+      } catch {
+        voiceStatus.textContent = 'Could not start the microphone — check browser permissions.';
+      }
+    });
   }
 
   function escapeHtml(s) {

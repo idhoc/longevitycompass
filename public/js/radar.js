@@ -39,20 +39,19 @@ function renderRadar(svgEl, topics, scores, opts) {
     </filter>
   </defs>`;
 
-  // Outer bezel ring — the "instrument face" edge.
-  svg += `<circle cx="${center}" cy="${center}" r="${maxR + 14}" fill="none" stroke="var(--baseline)" stroke-width="1.5"/>`;
+  // Outer bezel ring — the "instrument face" edge. Kept to a single hairline circle plus a
+  // sparse set of tick marks (not a busy engraved-dial texture) for a calmer, more modern read.
   svg += `<circle cx="${center}" cy="${center}" r="${maxR + 22}" fill="none" stroke="var(--gridline)" stroke-width="1"/>`;
 
-  // Tick marks around the bezel — decorative dial texture, independent of the topic count.
-  const TICK_COUNT = 48;
+  const TICK_COUNT = 24;
   for (let i = 0; i < TICK_COUNT; i++) {
     const a = (Math.PI * 2 * i) / TICK_COUNT - Math.PI / 2;
     const major = i % 6 === 0;
     const outerR = maxR + 22;
-    const innerR = outerR - (major ? 11 : 5);
+    const innerR = outerR - (major ? 8 : 4);
     const x1 = center + Math.cos(a) * innerR, y1 = center + Math.sin(a) * innerR;
     const x2 = center + Math.cos(a) * outerR, y2 = center + Math.sin(a) * outerR;
-    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compass-bezel-tick${major ? ' major' : ''}" stroke-width="${major ? 1.6 : 1}"/>`;
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compass-bezel-tick${major ? ' major' : ''}" stroke-width="${major ? 1.4 : 1}"/>`;
   }
 
   // Adherence gridlines (concentric rings) — hairline, recessive, one hue.

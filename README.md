@@ -6,6 +6,76 @@ Claude restructures it into clean JSON for the UI) built around a literal
 compass instrument — a needle that swings to your strongest topic — instead of
 a generic dashboard.
 
+## A third pass: competitor-inspired features, voice, and a calmer UI
+
+The brief for this round was explicit: look at Thrive AI Health Coach, the
+Google Health app, and Oura Advisor, take the specific features that fit, and
+don't hold back on scope. It also flagged that the previous round's "brass
+instrument" visual treatment read as busy/ugly rather than premium — the fix
+here is a real simplification pass, not another coat of paint.
+
+- **A voice coach with a glowing orb** (`renderGlobalCoach()` in `app.js`) —
+  the existing cross-topic "Ask Compass" chat now has a literal glowing orb
+  that breathes at idle, pulses while listening, and animates while
+  "speaking." Tap it to talk: `SpeechRecognition` (feature-detected, with a
+  clear inline fallback message if the browser doesn't support it — never a
+  silent failure) transcribes your question, sends it through the existing
+  global-chat pipeline, and `speechSynthesis` reads the reply aloud.
+- **Meal photo logging** (Thrive-inspired) — a "Log a meal" card on Today:
+  upload or snap a photo, a vision-capable model (`OPENAI_VISION_MODEL`,
+  default `gpt-4o`) identifies the foods actually visible and estimates
+  calories/macros per typical serving, then the same forced-tool-use Stage 2
+  pattern used everywhere else in this app structures it into a real card —
+  estimated calories, a protein/carb/fat breakdown, and one suggestion tied to
+  an actual mechanism (fiber/SCFA, protein/satiety), never "eat healthier."
+  Estimates are explicitly labeled low/moderate confidence, never presented as
+  food-scale-accurate.
+- **Guided paced sessions** (Google-inspired) — when an action is naturally a
+  short timed sequence (a breathing pattern, a stretch routine, a walk's
+  warm-up/brisk/cool-down structure) rather than one instruction, Stage 2 can
+  now emit an optional `steps` array. A "Start guided session" button opens a
+  full-screen player: a countdown ring per step, auto-advance, pause/skip, and
+  spoken step cues via `speechSynthesis`. Most actions are still a single
+  instruction and correctly get no steps — this isn't forced onto everything.
+- **An ambient Daily Briefing** (Oura Advisor-inspired) — a short, 2-sentence
+  proactive note at the top of Today, fetched automatically once per calendar
+  day (not button-triggered) so it reads as "the coach already looked," the
+  way a wearable-data advisor greets you each morning. Deliberately distinct
+  from the on-demand Weekly Synthesis, which stays a bigger, user-triggered
+  analysis.
+- **A real simplification pass on the UI**, not just more decoration: removed
+  the diagonal gradient overlays on cards (deliverable box, topic tiles,
+  synthesis card) in favor of flat tints or a single accent hairline, went to
+  pill-shaped buttons and larger corner radii throughout, increased card
+  padding/whitespace, and thinned the compass bezel (fewer, lighter tick
+  marks) — closer to the calmer, glanceable feel of Oura/Google Health while
+  keeping the serif display headline and the compass-needle concept as the
+  distinguishing personality, per the explicit "don't make it boring" note.
+- **Cross-referencing, made explicit in the prompt**: Section 12 now
+  instructs the model to prefer a web finding that holds up across at least
+  two independent credible sources over a single one-off result, and to say
+  so plainly if two sources disagree on a number rather than silently picking
+  one. Sleep and Activity — the two topics with only 1-2 static citations —
+  are now explicitly flipped to treat live web search as their *primary*
+  source rather than a supplement.
+- **On the 10-topic structure**: you gave permission to adjust it based on
+  the actual source documents. There are only 4 real source files
+  (`data/sources/*.md` — nutrition, gut-microbiome, purpose, micronutrient).
+  Rather than inventing new "topics" with no source material behind them
+  (which would undercut the entire grounding premise of this app), I kept the
+  10 topics but made the two genuinely thin ones (Sleep, Activity)
+  web-search-primary instead of stretching them further from adjacent
+  citations. The cross-topic AI surfaces (Ask Compass, Weekly Synthesis,
+  Daily Briefing) are what actually remove the feeling of being boxed into 10
+  static cards, without fabricating source coverage that doesn't exist.
+
+**What I could not verify in this sandbox, stated plainly**: there is no
+microphone or audio output here, and no live OpenAI/Anthropic key, so the
+voice recognition, text-to-speech, and vision-based meal analysis are
+defensively coded (graceful fallback messages, mock-mode responses that
+exercise the full UI) but not verified against a real microphone or a real
+photo. Test with your own keys and a real device before relying on them.
+
 ## A second, major pass: new identity, new AI surfaces, deeper profile
 
 After the first working version shipped, the brief changed from "make it work
@@ -279,6 +349,7 @@ Stage 1 can now also use OpenAI's hosted `web_search_preview` tool, controlled b
 
 - `ENABLE_WEB_SEARCH` (default `true` — set to `"false"` to disable)
 - `OPENAI_WEB_SEARCH_MODEL` (default `gpt-4o` — the model that carries the search tool; the plain-text model in `OPENAI_MODEL` is unchanged and still used for the no-search fallback path)
+- `OPENAI_VISION_MODEL` (default `gpt-4o` — used only by meal photo analysis, `mode: 'mealPhoto'` in `coach.js`)
 
 The static source library is still the primary, default source. Web search is
 scoped by **prompt instruction, not an API-level domain filter**, to a named

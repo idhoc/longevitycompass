@@ -112,8 +112,55 @@ const FORMAT_TOOL = {
           required: ['food', 'detail'],
         },
       },
+      steps: {
+        type: 'array',
+        description: 'Only if the response has a "Steps:" line (a naturally sequential, timed action like breathing, a stretch routine, or a walk warm-up/cool-down), formatted as semicolon-separated items like "Label (seconds)". Split each into {label, seconds}. Empty array if there is no "Steps:" line — most actions are a single instruction, not a sequence, and should NOT be forced into steps.',
+        items: {
+          type: 'object',
+          properties: { label: { type: 'string' }, seconds: { type: 'number' } },
+          required: ['label', 'seconds'],
+        },
+      },
     },
-    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for', 'eat', 'avoid'],
+    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for', 'eat', 'avoid', 'steps'],
+  },
+};
+
+const OPENAI_VISION_MODEL = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+
+const MEAL_FORMAT_TOOL = {
+  name: 'format_meal',
+  description: "Structure a meal-photo analysis for a UI card. Restructuring only — never invent a food that wasn't actually described as visible in the photo.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      foods: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            estimated_grams: { type: ['number', 'null'] },
+            estimated_calories: { type: ['number', 'null'] },
+          },
+          required: ['name', 'estimated_grams', 'estimated_calories'],
+        },
+      },
+      total_calories_estimate: { type: ['number', 'null'] },
+      protein_g: { type: ['number', 'null'] },
+      carbs_g: { type: ['number', 'null'] },
+      fat_g: { type: ['number', 'null'] },
+      suggestion: {
+        type: 'string',
+        description: 'One specific, grounded suggestion tied to a real mechanism (fiber/gut microbiome, protein/satiety signaling, etc.) relevant to what is actually in the photo — never generic ("eat healthier").',
+      },
+      confidence: {
+        type: 'string',
+        enum: ['low', 'moderate'],
+        description: 'Photo-based portion/calorie estimates are never high-confidence. Use "moderate" only for a clear, well-lit, single-plate photo with recognizable, common portions; "low" otherwise.',
+      },
+    },
+    required: ['foods', 'total_calories_estimate', 'protein_g', 'carbs_g', 'fat_g', 'suggestion', 'confidence'],
   },
 };
 
@@ -139,6 +186,12 @@ exports.handler = async (event) => {
   }
   if (body.mode === 'synthesis') {
     return handleSynthesis(body);
+  }
+  if (body.mode === 'briefing') {
+    return handleBriefing(body);
+  }
+  if (body.mode === 'mealPhoto') {
+    return handleMealPhoto(body);
   }
 
   const { topicId, profile } = body;
@@ -194,6 +247,7 @@ async function handlePlanRequest(topic, body) {
     watchFor: structured.watch_for || null,
     eat: Array.isArray(structured.eat) ? structured.eat : [],
     avoid: Array.isArray(structured.avoid) ? structured.avoid : [],
+    steps: Array.isArray(structured.steps) ? structured.steps : [],
     usedWebSearch: !!stage1.usedWebSearch,
     sources: Array.isArray(stage1.sources) ? stage1.sources : [],
     raw: stage1.text,
@@ -367,6 +421,110 @@ async function handleSynthesis(body) {
   });
 }
 
+// Ambient Daily Briefing: short (2-3 sentence), proactive daily note — distinct from the
+// on-demand Weekly Synthesis. This is fetched automatically once per day by the client (not
+// button-triggered) so it reads as "the coach already looked and is telling you," the way a
+// wearable-data advisor greets you each morning, rather than another action to take.
+async function handleBriefing(body) {
+  const { topicsSummary } = body;
+  const context = body.context || {};
+
+  const summaryLines = (Array.isArray(topicsSummary) ? topicsSummary : [])
+    .map((t) => `- ${t.label}: ${Math.round(t.score || 0)}% adherence this week`)
+    .join('\n');
+
+  const systemPrompt = [
+    bundle.systemPrompt,
+    '',
+    '## 10. Daily Briefing Mode (This Deployment)',
+    '',
+    'Write exactly 2 short sentences (plain text, no markdown, no headers) greeting the user with a proactive daily note based on the adherence numbers below — not a full plan, not a full synthesis. Sentence 1: the single most notable real thing about their week so far (a strength or a gap), citing a real number. Sentence 2: one small, specific nudge for today tied to that. Stay inside every Section 1-9 rule (scope, escalation, evidence honesty).',
+    '',
+    "This week's adherence across all topics:",
+    summaryLines,
+  ].join('\n');
+
+  const userMessage = "Write today's briefing.";
+
+  let stage1;
+  if (!process.env.OPENAI_API_KEY) {
+    stage1 = { text: '[MOCK] Your strongest area this week is holding steady, and two topics haven\'t been started yet. A two-minute action on one of those today would round out your week.', usedWebSearch: false };
+  } else {
+    try {
+      stage1 = await callOpenAI(systemPrompt, userMessage, false, context.allowWebSearch);
+    } catch (err) {
+      return respond(502, { error: `Briefing failed: ${err.message}` });
+    }
+  }
+
+  const cleaned = stripMarkdown(stage1.text).trim();
+  if (ESCALATION_MARKERS.some((marker) => cleaned.toLowerCase().includes(marker))) {
+    return respond(200, { mode: 'briefing', escalation: true, message: cleaned });
+  }
+  return respond(200, { mode: 'briefing', escalation: false, briefing: cleaned, generatedAt: new Date().toISOString() });
+}
+
+// Meal photo analysis (Thrive-inspired): a vision-capable Stage 1 look at an uploaded photo,
+// then the same forced-tool-use Stage 2 pattern used everywhere else in this app to turn that
+// into a reliable structured card — estimated foods/calories/macros plus one suggestion tied to
+// a real mechanism, never generic advice. Estimates are photo-based and explicitly labeled
+// low/moderate confidence, never presented as a food-scale-accurate measurement.
+async function handleMealPhoto(body) {
+  const { imageBase64, profile } = body;
+  const context = body.context || {};
+  if (!imageBase64 || !imageBase64.startsWith('data:image/')) {
+    return respond(400, { error: 'Missing or invalid image' });
+  }
+
+  let stage1Text;
+  let usedVision = false;
+  if (!process.env.OPENAI_API_KEY) {
+    stage1Text = mockMealStage1();
+  } else {
+    try {
+      stage1Text = await callOpenAIVision(process.env.OPENAI_API_KEY, imageBase64, buildMealPrompt(profile || {}));
+      usedVision = true;
+    } catch (err) {
+      return respond(502, { error: `Meal photo analysis failed: ${err.message}` });
+    }
+  }
+
+  let structured;
+  try {
+    structured = await callClaudeDistillMeal(stage1Text);
+  } catch (err) {
+    console.error('Meal Stage 2 (distill) failed, falling back to raw text:', err.message);
+    structured = {
+      foods: [], total_calories_estimate: null, protein_g: null, carbs_g: null, fat_g: null,
+      suggestion: stripMarkdown(stage1Text).slice(0, 240), confidence: 'low',
+    };
+  }
+
+  return respond(200, {
+    mode: 'mealPhoto',
+    generatedAt: new Date().toISOString(),
+    usedVision,
+    foods: Array.isArray(structured.foods) ? structured.foods : [],
+    totalCaloriesEstimate: structured.total_calories_estimate ?? null,
+    proteinG: structured.protein_g ?? null,
+    carbsG: structured.carbs_g ?? null,
+    fatG: structured.fat_g ?? null,
+    suggestion: structured.suggestion || null,
+    confidence: structured.confidence === 'moderate' ? 'moderate' : 'low',
+  });
+}
+
+function buildMealPrompt(profile) {
+  return [
+    "Look at this meal photo. Identify each distinct food you can actually see — do not guess at things you can't see (e.g. don't assume a sauce is present if you can't see it).",
+    'For each food, estimate a typical serving weight in grams and calories, based on common portion sizes and standard nutrition data. State plainly that these are visual estimates, not a food-scale measurement.',
+    'Estimate total calories and protein/carbs/fat in grams for the whole plate.',
+    'Give exactly one specific suggestion tied to a real nutritional mechanism relevant to what is actually on the plate (e.g. fiber and gut microbiome/SCFA production, protein and satiety signaling, refined-carbohydrate and blood-sugar response) — never a generic "eat healthier."',
+    profile.dietPattern ? `The user follows a ${profile.dietPattern} diet pattern — keep the suggestion compatible with that.` : '',
+    'Plain text only, no markdown.',
+  ].filter(Boolean).join(' ');
+}
+
 function buildSystemPrompt(topic, context) {
   context = context || {};
   const sourceText = topic.sources.map((id) => bundle.sources[id]).join('\n\n---\n\n');
@@ -374,6 +532,7 @@ function buildSystemPrompt(topic, context) {
   const formattingRules = [
     'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
     'Whenever a source gives a specific number for the action you are recommending — grams, a percentage, a frequency, a timeframe — state that exact number. Never write "more," "some," or "a bit" when a source has already told you how much. If no source gives a number for this specific action, say so plainly rather than inventing one.',
+    'If — and only if — the action you chose is naturally a short timed sequence rather than one instruction (a breathing pattern, a stretch routine, a walk with a warm-up/brisk/cool-down structure), add one more line: "Steps: Label one (seconds) ; Label two (seconds) ; ..." — e.g. "Steps: Inhale slowly through your nose (4) ; Hold (7) ; Exhale slowly through your mouth (8)". Most actions (eat this, message someone, journal one line) are NOT sequential — do not invent steps for a single-instruction action just to use this feature. Never more than 6 steps.',
   ];
 
   if (topic.foodRelevant) {
@@ -405,6 +564,7 @@ function buildSystemPrompt(topic, context) {
       '',
       `You have live web search available this turn, and you are explicitly encouraged to use it — this deployment's user has given standing permission to branch beyond the static library whenever it makes the answer more specific or current. Use it to find additional, specific support from ${TRUSTED_DOMAINS_TEXT}. Never cite blogs, commercial wellness sites, forums, or unsourced health content, even if search surfaces them.`,
       `When you use a web-found source, say so plainly (e.g. "A 2023 NIH-funded study found...") and give the specific finding with its number/timeframe, exactly as you would for a library source — never blend a web claim into a library claim as if they were the same source. The static library below is still the anchor for this topic's core mechanism, but you should actively reach for web search whenever: the library is thin for this topic (flagged in the Emphasis line above when true), the user's profile includes something the static library does not cover at all (a genetic variant, a specific number like resting heart rate or blood pressure), the user's question needs more specific/current support than the library has, or to add genuine variety across repeated requests. Do not treat web search as a last resort — treat the static library as the floor, not the ceiling, of what you can ground a claim in.`,
+      `Cross-reference before stating a specific numeric or causal claim from the web: prefer a finding that shows up consistently across at least two independent credible sources over a single one-off result, and if two credible sources meaningfully disagree on a number, say so rather than picking one silently (e.g. "estimates range from X to Y across sources" rather than presenting one as certain). This matters most on thin topics — see the Emphasis line above for whether this topic depends on web search more heavily.`,
       `Search suggestion for this topic specifically: ${topic.webSearchHint || 'peer-reviewed research from PubMed, NIH, or a major academic medical center'}.`
     );
   }
@@ -614,6 +774,110 @@ async function callOpenAIChatCompletions(apiKey, systemPrompt, userMessage) {
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
+// Vision-capable call for meal photo analysis — separate from callOpenAI's text-only path
+// since it needs an image content part and a dedicated (usually pricier/more accurate) model.
+async function callOpenAIVision(apiKey, imageDataUrl, promptText) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_VISION_MODEL,
+      temperature: 0.2,
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: promptText },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenAI Vision ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error('No text in OpenAI Vision response');
+  return text;
+}
+
+async function callClaudeDistillMeal(stage1Text) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return mockMealDistill(stage1Text);
+
+  const instruction = [
+    'Restructure the meal analysis below by calling the format_meal tool. Do not invent foods not mentioned in the text.',
+    '',
+    'Meal analysis to restructure:',
+    '"""',
+    stage1Text,
+    '"""',
+  ].join('\n');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 700,
+      temperature: 0,
+      tools: [MEAL_FORMAT_TOOL],
+      tool_choice: { type: 'tool', name: 'format_meal' },
+      messages: [{ role: 'user', content: instruction }],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  const toolUse = (data.content || []).find((b) => b.type === 'tool_use' && b.name === 'format_meal');
+  if (!toolUse || !toolUse.input) {
+    throw new Error('Anthropic response had no format_meal tool_use block');
+  }
+  const input = toolUse.input;
+  return {
+    foods: Array.isArray(input.foods)
+      ? input.foods.map((f) => ({ name: stripMarkdown(f.name || ''), estimatedGrams: f.estimated_grams ?? null, estimatedCalories: f.estimated_calories ?? null })).filter((f) => f.name)
+      : [],
+    total_calories_estimate: input.total_calories_estimate ?? null,
+    protein_g: input.protein_g ?? null,
+    carbs_g: input.carbs_g ?? null,
+    fat_g: input.fat_g ?? null,
+    suggestion: stripMarkdown(input.suggestion || ''),
+    confidence: input.confidence === 'moderate' ? 'moderate' : 'low',
+  };
+}
+
+function mockMealStage1() {
+  return '[MOCK — OPENAI_API_KEY not set] This is placeholder meal analysis text. Once your API key is set, this will describe the actual foods visible in your photo with estimated grams and calories per item, based on standard portion-size data — not a food-scale measurement.';
+}
+
+function mockMealDistill() {
+  return {
+    foods: [
+      { name: '[MOCK] Grilled chicken breast', estimatedGrams: 140, estimatedCalories: 230 },
+      { name: '[MOCK] Steamed broccoli', estimatedGrams: 100, estimatedCalories: 35 },
+      { name: '[MOCK] White rice', estimatedGrams: 150, estimatedCalories: 195 },
+    ],
+    total_calories_estimate: 460,
+    protein_g: 38,
+    carbs_g: 45,
+    fat_g: 6,
+    suggestion: '[MOCK — set OPENAI_API_KEY for a real analysis] Swapping the white rice for a fiber-rich whole grain would add substrate for SCFA-producing gut bacteria without changing the rest of the plate.',
+    confidence: 'low',
+  };
+}
+
 async function callClaudeDistill(stage1Text) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -624,6 +888,7 @@ async function callClaudeDistill(stage1Text) {
     'Restructure the coach response below by calling the format_plan tool.',
     'Do NOT add, remove, soften, or invent any fact — restructure, split, and strip markdown formatting only.',
     'If the response has an "Eat:" and/or "Avoid:" line (semicolon-separated items like "Food (quantity): reason"), split each on " ; " then split each item on the first ":" into food vs. detail. If a line is absent, or Avoid says "none specified", return an empty array for it.',
+    'If the response has a "Steps:" line (semicolon-separated items like "Label (seconds)"), split each on " ; " then parse the parenthetical number as seconds. If absent, return an empty array — do not invent a step sequence for a non-sequential action.',
     'For each evidence item, infer a "strength" tier from the language used (see schema) and extract any quoted phrase as "source_quote" (null if none).',
     '',
     'Coach response to restructure:',
@@ -678,6 +943,9 @@ function sanitizeStructured(input) {
     watch_for: input.watch_for ? stripMarkdown(input.watch_for) : null,
     eat: cleanItems(input.eat),
     avoid: cleanItems(input.avoid),
+    steps: Array.isArray(input.steps)
+      ? input.steps.map((s) => ({ label: stripMarkdown(s.label || ''), seconds: Number(s.seconds) || 0 })).filter((s) => s.label && s.seconds > 0).slice(0, 6)
+      : [],
   };
 }
 
@@ -699,11 +967,12 @@ function naiveFallbackParse(text) {
     const m = cleaned.match(re);
     return m ? m[1].trim() : null;
   };
-  const doThis = pick('Do this', ['Why', 'Watch for', 'Eat', 'Avoid']);
-  const why = pick('Why', ['Watch for', 'Eat', 'Avoid']);
-  const watchFor = pick('Watch for', ['Eat', 'Avoid']);
-  const eatLine = pick('Eat', ['Avoid']);
-  const avoidLine = pick('Avoid', []);
+  const doThis = pick('Do this', ['Why', 'Watch for', 'Eat', 'Avoid', 'Steps']);
+  const why = pick('Why', ['Watch for', 'Eat', 'Avoid', 'Steps']);
+  const watchFor = pick('Watch for', ['Eat', 'Avoid', 'Steps']);
+  const eatLine = pick('Eat', ['Avoid', 'Steps']);
+  const avoidLine = pick('Avoid', ['Steps']);
+  const stepsLine = pick('Steps', []);
   // Expected shape: "Food (quantity): reason ; Food2 (quantity): reason2 ; ..."
   const parseFoodItems = (line) => {
     if (!line || /^none specified$/i.test(line.trim())) return [];
@@ -714,9 +983,17 @@ function naiveFallbackParse(text) {
         : { food: item.slice(0, idx).trim(), detail: item.slice(idx + 1).trim() };
     }).filter((e) => e.food);
   };
+  // Expected shape: "Label one (seconds) ; Label two (seconds) ; ..."
+  const parseSteps = (line) => {
+    if (!line) return [];
+    return line.split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean).map((item) => {
+      const m = item.match(/^(.*)\((\d+)\)\s*$/);
+      return m ? { label: m[1].trim(), seconds: Number(m[2]) } : null;
+    }).filter(Boolean).slice(0, 6);
+  };
 
   if (doThis || why) {
-    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor, eat: parseFoodItems(eatLine), avoid: parseFoodItems(avoidLine) };
+    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor, eat: parseFoodItems(eatLine), avoid: parseFoodItems(avoidLine), steps: parseSteps(stepsLine) };
   }
 
   // No recognizable labels at all — surface the raw content rather than nothing.
@@ -729,6 +1006,7 @@ function naiveFallbackParse(text) {
     watch_for: null,
     eat: [],
     avoid: [],
+    steps: [],
   };
 }
 
@@ -768,5 +1046,10 @@ function mockDistill(stage1Text) {
     avoid: foodRelevant ? [
       { food: 'Ultra-processed low-fiber snacks', detail: 'displacing fiber sources reduces substrate for SCFA production.' },
     ] : [],
+    steps: [
+      { label: '[MOCK] Inhale slowly through your nose', seconds: 4 },
+      { label: 'Hold', seconds: 7 },
+      { label: 'Exhale slowly through your mouth', seconds: 8 },
+    ],
   };
 }
