@@ -13,6 +13,7 @@
     reminderFired: 'lc_reminder_fired_v1',
     briefing: 'lc_briefing_v1',
     meals: 'lc_meals_v1',
+    tourSeen: 'lc_tour_seen_v1',
   };
   const JOURNAL_MAX = 60;
   const HISTORY_MAX = 5;
@@ -379,6 +380,113 @@
   }
 
   // ---------- rail navigation (replaces the old wide topic-list sidebar) ----------
+  // ---------- first-login guided tour (spotlight + tooltip over the nav) ----------
+  // A passive walkthrough of what each tab actually does, not just what it's labeled — the
+  // nav rail is always present in the DOM (as a side rail on desktop, a bottom bar on mobile),
+  // so every step targets a rail link and needs no page navigation, which keeps this robust
+  // against timing/render-order issues. Any step whose target isn't found is skipped rather
+  // than shown broken.
+  const TOUR_STEPS = [
+    { title: 'Welcome to Longevity Compass', body: "Here's a 30-second tour of what everything does — skip anytime from the corner." },
+    { selector: 'a[href="#/today"]', title: 'Today', body: 'Your daily home base: top priorities, a quick AI morning briefing, and one-tap logging for whatever you did today.' },
+    { selector: 'a[href="#/coach"]', title: 'Coach', body: 'Talk or type with your AI coach any time. It sees your whole profile, not just one topic, so you can ask anything.' },
+    { selector: 'a[href="#/dashboard"]', title: 'Overview', body: 'Your compass, as a real 3D globe — drag to rotate it. Each glowing marker is a topic; brighter means better adherence that week.' },
+    { selector: 'a[href="#/topics"]', title: 'Domains', body: '12 research-backed topics, grouped into 4 broad areas: Movement, Nutrition, Mind, and Recovery.' },
+    { selector: 'a[href="#/nutrition"]', title: 'Meal Log', body: 'Snap a photo of a meal for an instant estimate of calories and macros, plus a running total for the day.' },
+    { selector: 'a[href="#/journal"]', title: 'Journal', body: "A running timeline of everything you've done and generated — a real record, not just a streak count." },
+    { selector: 'a[href="#/profile"]', title: 'My Profile', body: 'The details that make every plan specific to you — lifestyle, goals, even genetics if you have them. Editable any time.' },
+    { selector: 'a[href="#/settings"]', title: 'Settings', body: "Tune the coach's voice, appearance, coaching tone, and how much detail you see by default." },
+    { title: "You're all set", body: 'Open a topic, tap Coach, or just start with Today. You can replay this tour any time from Settings.' },
+  ];
+
+  function positionTourTooltip(tooltip, rect) {
+    const margin = 16;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tw = tooltip.offsetWidth || 300;
+    const th = tooltip.offsetHeight || 140;
+    let top, left;
+    if (rect.right + margin + tw < vw) {
+      left = rect.right + margin;
+      top = Math.min(Math.max(rect.top, margin), Math.max(margin, vh - th - margin));
+    } else if (rect.top - margin - th > 0) {
+      top = rect.top - margin - th;
+      left = Math.min(Math.max(rect.left, margin), Math.max(margin, vw - tw - margin));
+    } else {
+      top = Math.min(rect.bottom + margin, vh - th - margin);
+      left = Math.min(Math.max(rect.left, margin), Math.max(margin, vw - tw - margin));
+    }
+    tooltip.style.top = Math.max(margin, top) + 'px';
+    tooltip.style.left = Math.max(margin, left) + 'px';
+  }
+
+  function startAppTour() {
+    let idx = 0;
+    const highlight = document.createElement('div');
+    highlight.className = 'tour-highlight';
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tour-tooltip';
+    document.body.appendChild(highlight);
+    document.body.appendChild(tooltip);
+
+    function cleanup() {
+      highlight.remove();
+      tooltip.remove();
+      localStorage.setItem(STORAGE.tourSeen, 'true');
+      window.removeEventListener('resize', reposition);
+    }
+    function reposition() { showStep(idx); }
+    window.addEventListener('resize', reposition);
+
+    function showStep(i) {
+      if (i < 0) i = 0;
+      if (i >= TOUR_STEPS.length) { cleanup(); return; }
+      const step = TOUR_STEPS[i];
+      const target = step.selector ? document.querySelector(step.selector) : null;
+      if (step.selector && !target) { showStep(i + 1); return; }
+      idx = i;
+
+      tooltip.innerHTML = `
+        <div class="tour-step-count">Step ${idx + 1} of ${TOUR_STEPS.length}</div>
+        <div class="tour-title">${escapeHtml(step.title)}</div>
+        <div class="tour-body">${escapeHtml(step.body)}</div>
+        <div class="tour-controls">
+          <button type="button" class="btn-text-clear" id="tour-skip">Skip tour</button>
+          <div style="display:flex;gap:8px">
+            ${idx > 0 ? '<button type="button" class="btn btn-secondary" id="tour-back">Back</button>' : ''}
+            <button type="button" class="btn btn-primary" id="tour-next">${idx === TOUR_STEPS.length - 1 ? 'Done' : 'Next'}</button>
+          </div>
+        </div>
+      `;
+      tooltip.querySelector('#tour-skip').addEventListener('click', cleanup);
+      tooltip.querySelector('#tour-next').addEventListener('click', () => showStep(idx + 1));
+      const backBtn = tooltip.querySelector('#tour-back');
+      if (backBtn) backBtn.addEventListener('click', () => showStep(idx - 1));
+
+      if (target) {
+        const rect = target.getBoundingClientRect();
+        highlight.style.display = '';
+        highlight.style.top = (rect.top - 6) + 'px';
+        highlight.style.left = (rect.left - 6) + 'px';
+        highlight.style.width = (rect.width + 12) + 'px';
+        highlight.style.height = (rect.height + 12) + 'px';
+        tooltip.classList.remove('tour-tooltip-centered');
+        positionTourTooltip(tooltip, rect);
+      } else {
+        highlight.style.display = 'none';
+        tooltip.classList.add('tour-tooltip-centered');
+        tooltip.style.top = '';
+        tooltip.style.left = '';
+      }
+    }
+
+    showStep(0);
+  }
+
+  function maybeStartTour() {
+    if (localStorage.getItem(STORAGE.tourSeen) === 'true') return;
+    setTimeout(() => startAppTour(), 500);
+  }
+
   function renderRail(route) {
     const el = document.getElementById('sidebar');
     const navItems = [
@@ -1194,14 +1302,17 @@
       setOnboarded();
       overlay.remove();
       render();
+      maybeStartTour();
     });
     overlay.querySelector('#onboarding-skip').addEventListener('click', () => {
       setOnboarded();
       overlay.remove();
+      maybeStartTour();
     });
     overlay.querySelector('#wizard-cover-skip').addEventListener('click', () => {
       setOnboarded();
       overlay.remove();
+      maybeStartTour();
     });
   }
 
@@ -1330,6 +1441,15 @@
               <div class="settings-row-desc">Add Longevity Compass to your home screen or dock for a standalone, full-screen experience — no browser chrome. On iPhone/iPad, use Share → Add to Home Screen instead; Safari doesn't support an in-page install button.</div>
             </div>
             <button class="btn btn-secondary" id="install-app-btn" ${deferredInstallPrompt ? '' : 'disabled'}>Install</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">App tour</div>
+              <div class="settings-row-desc">A 30-second spotlight walkthrough of what each tab does.</div>
+            </div>
+            <button class="btn btn-secondary" id="replay-tour-btn">Replay tour</button>
           </div>
         </div>
       </div>
@@ -1464,6 +1584,10 @@
       await deferredInstallPrompt.userChoice;
       deferredInstallPrompt = null;
       renderSettings();
+    });
+    main.querySelector('#replay-tour-btn').addEventListener('click', () => {
+      navigate('/today');
+      setTimeout(() => startAppTour(), 200);
     });
     main.querySelector('#export-data-btn').addEventListener('click', () => {
       const payload = {

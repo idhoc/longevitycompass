@@ -584,6 +584,28 @@ h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin
 .lc-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .lc-toast-celebrate { background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #fff; }
 
+/* ---------- First-login guided tour: a spotlight cutout (via a giant box-shadow, so one
+   element does the whole "dim everything except this" effect) plus a positioned tooltip. ---------- */
+.tour-highlight {
+  position: fixed; z-index: 301; border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(8, 9, 20, 0.6);
+  border: 2px solid var(--accent);
+  transition: top 0.3s cubic-bezier(0.2,0.8,0.3,1), left 0.3s cubic-bezier(0.2,0.8,0.3,1), width 0.3s ease, height 0.3s ease;
+  pointer-events: none;
+}
+.tour-tooltip {
+  position: fixed; z-index: 302; width: 300px; max-width: calc(100vw - 32px);
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px 18px; box-shadow: var(--shadow-lg);
+  animation: viewFadeIn 0.2s ease;
+}
+.tour-tooltip-centered { top: 50% !important; left: 50% !important; transform: translate(-50%, -50%); text-align: center; }
+.tour-step-count { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 6px; }
+.tour-title { font-family: var(--font-display); font-size: 16.5px; font-weight: 700; margin: 0 0 6px; }
+.tour-body { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px; }
+.tour-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-tooltip-centered .tour-controls { justify-content: center; flex-direction: column-reverse; gap: 12px; }
+
 .evidence-card-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .evidence-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; background: var(--page-plane); border: 1px solid var(--border); }
 .evidence-card.limitation { background: transparent; border-style: dashed; color: var(--text-muted); }
