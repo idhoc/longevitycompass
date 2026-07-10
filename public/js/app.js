@@ -350,6 +350,17 @@
 
   window.addEventListener('hashchange', render);
 
+  // PWA installability: Chrome/Edge/Android fire this instead of showing their own install UI
+  // when the page calls preventDefault(), so we can surface an "Install" button in Settings
+  // instead. Safari/iOS has no equivalent event — "Add to Home Screen" there is manual, so the
+  // button stays disabled with an explanatory note on browsers that never fire this.
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    document.getElementById('install-app-btn')?.removeAttribute('disabled');
+  });
+
   applyAppearance();
 
   async function boot() {
@@ -1297,6 +1308,18 @@
       </div>
 
       <div class="card" style="margin-top:18px">
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Install as an app</div>
+              <div class="settings-row-desc">Add Longevity Compass to your home screen or dock for a standalone, full-screen experience — no browser chrome. On iPhone/iPad, use Share → Add to Home Screen instead; Safari doesn't support an in-page install button.</div>
+            </div>
+            <button class="btn btn-secondary" id="install-app-btn" ${deferredInstallPrompt ? '' : 'disabled'}>Install</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
         <h2>Integrations</h2>
         <p class="subtitle" style="margin-bottom:10px">Real wearable/account integrations need backend infrastructure this local-only MVP doesn't have yet — shown here transparently as the roadmap, not faked.</p>
         <div class="integration-grid">
@@ -1419,6 +1442,13 @@
         e.stopPropagation();
         previewVoice(el.dataset.voicePreview);
       });
+    });
+    main.querySelector('#install-app-btn').addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      renderSettings();
     });
     main.querySelector('#export-data-btn').addEventListener('click', () => {
       const payload = {
