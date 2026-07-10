@@ -276,6 +276,28 @@
     speakNext();
   }
 
+  // Fetches TTS audio as raw bytes (Blob), not JSON+base64 — a data: URI needs the whole
+  // payload built into one giant string before an <audio> element can even be constructed;
+  // a Blob URL lets the browser start from bytes it already has in memory, one less
+  // encode/decode pass on the critical path between "text is ready" and "audio starts."
+  // Returns null (never throws) on anything short of a real audio response, so callers can
+  // fall straight through to the browser voice.
+  async function fetchTtsBlobUrl(text, voice) {
+    try {
+      const res = await fetch('/api/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'speech', text, voice }),
+      });
+      if (!res.ok || !(res.headers.get('content-type') || '').includes('audio')) return null;
+      const buf = await res.arrayBuffer();
+      if (!buf.byteLength) return null;
+      return URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
+    } catch (err) {
+      return null;
+    }
+  }
+
   // Real neural voice (OpenAI TTS via the Netlify function) with a silent, automatic fallback
   // to the browser's built-in speechSynthesis — never a dead end if there's no API key, the
   // network call fails, or playback is blocked. "browser" engine in Settings skips straight to
@@ -285,23 +307,13 @@
     stopSpeaking();
     const settings = getSettings();
     if (settings.voiceEngine !== 'browser') {
-      try {
-        const res = await fetch('/api/coach', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'speech', text, voice: settings.voice || 'nova' }),
-        });
-        const data = await res.json();
-        if (data.available && data.audio) {
-          const audio = new Audio(`data:audio/${data.format || 'mp3'};base64,${data.audio}`);
-          _ttsAudio = audio;
-          audio.onended = () => { _ttsAudio = null; if (onEnd) onEnd(); };
-          audio.onerror = () => { _ttsAudio = null; speakBrowser(text, onEnd); };
-          await audio.play();
-          return;
-        }
-      } catch (err) {
-        // Falls through to the browser voice below — a TTS hiccup should never block the coach.
+      const url = await fetchTtsBlobUrl(text, settings.voice || 'nova');
+      if (url) {
+        const audio = new Audio(url);
+        _ttsAudio = audio;
+        audio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; if (onEnd) onEnd(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); _ttsAudio = null; speakBrowser(text, onEnd); };
+        try { await audio.play(); return; } catch (err) { URL.revokeObjectURL(url); }
       }
     }
     speakBrowser(text, onEnd);
@@ -310,22 +322,12 @@
   async function previewVoice(voiceKey) {
     stopSpeaking();
     const sample = "Hi, I'm your longevity coach. This is what I sound like.";
-    try {
-      const res = await fetch('/api/coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'speech', text: sample, voice: voiceKey }),
-      });
-      const data = await res.json();
-      if (data.available && data.audio) {
-        const audio = new Audio(`data:audio/${data.format || 'mp3'};base64,${data.audio}`);
-        _ttsAudio = audio;
-        audio.onended = () => { _ttsAudio = null; };
-        await audio.play();
-        return;
-      }
-    } catch (err) {
-      // falls through to browser voice
+    const url = await fetchTtsBlobUrl(sample, voiceKey);
+    if (url) {
+      const audio = new Audio(url);
+      _ttsAudio = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; };
+      try { await audio.play(); return; } catch (err) { URL.revokeObjectURL(url); }
     }
     speakBrowser(sample);
   }
@@ -1051,6 +1053,10 @@
         const n = parseFloat(extracted.sleepHours);
         if (Number.isFinite(n)) form.elements.sleepHours.value = n;
       }
+      if (extracted.age && form.elements.age) {
+        const n = parseInt(extracted.age, 10);
+        if (Number.isFinite(n) && n > 0 && n < 120) form.elements.age.value = n;
+      }
       // These have no dedicated form field, but buildUserMessage() surfaces every non-empty
       // profile key to the coach automatically — so storing them here is enough to shape every
       // future workout/nutrition/sleep plan, not just a display-only summary.
@@ -1090,7 +1096,7 @@
         sendBtn.disabled = true;
         setOrbState('thinking');
         voiceStatus.textContent = 'Thinking…';
-        transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="intake-loading"><span class="loader"></span></div>`);
+        transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="intake-loading">${typingDots()}</div>`);
         transcript.scrollTop = transcript.scrollHeight;
         try {
           const res = await fetch('/api/coach', {
@@ -1499,13 +1505,13 @@
       reader.readAsText(file);
     });
     main.querySelector('#reset-data-btn').addEventListener('click', () => {
-      if (!confirm('Reset all local data? This clears your profile, genetic markers, and topic progress on this device.')) return;
-      localStorage.removeItem(STORAGE.profile);
-      localStorage.removeItem(STORAGE.topics);
-      localStorage.removeItem(STORAGE.onboarded);
-      localStorage.removeItem(STORAGE.journal);
-      localStorage.removeItem(STORAGE.synthesis);
-      navigate('/dashboard');
+      if (!confirm('Reset all local data? This clears everything on this device — profile, genetic markers, topic progress and plans, meal log, chat history, journal, and settings.')) return;
+      // Every key this app ever writes is under STORAGE (fixed keys, no per-topic dynamic
+      // names) — remove them all, plus a defensive sweep for any stray "lc_"-prefixed key from
+      // an older version, so "reset" really does mean everything, not "most things."
+      Object.values(STORAGE).forEach((key) => localStorage.removeItem(key));
+      Object.keys(localStorage).filter((k) => k.startsWith('lc_')).forEach((k) => localStorage.removeItem(k));
+      location.hash = '#/today';
       location.reload();
     });
   }
@@ -1937,7 +1943,7 @@
       input.disabled = true;
       sendBtn.disabled = true;
 
-      const loadingHtml = `<div class="chat-bubble coach" id="chat-loading"><span class="loader"></span></div>`;
+      const loadingHtml = `<div class="chat-bubble coach" id="chat-loading">${typingDots()}</div>`;
       messagesEl.insertAdjacentHTML('beforeend', loadingHtml);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -1985,11 +1991,22 @@
     btn.disabled = true;
     area.innerHTML = `
       <div class="card">
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px"><span class="loader"></span> Grounding in your research library, then formatting the plan…</div>
-        <div class="skeleton-line" style="width:70%;height:20px"></div>
-        <div class="skeleton-line" style="width:95%"></div>
-        <div class="skeleton-line" style="width:88%"></div>
-        <div class="skeleton-line" style="width:40%"></div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;display:flex;align-items:center;gap:8px">${typingDots()} Grounding in your research library, then formatting the plan…</div>
+        <div class="plan-card-grid">
+          <div class="plan-hero-skeleton">
+            <div class="skeleton-line" style="width:48px;height:48px;border-radius:14px;margin-bottom:16px"></div>
+            <div class="skeleton-line" style="width:60%;height:11px"></div>
+            <div class="skeleton-line" style="width:92%;height:19px;margin-top:8px"></div>
+            <div class="skeleton-line" style="width:75%;height:19px"></div>
+            <div class="skeleton-line" style="width:100%;height:38px;border-radius:10px;margin-top:18px"></div>
+          </div>
+          <div>
+            <div class="skeleton-line" style="width:30%"></div>
+            <div class="skeleton-line" style="width:95%"></div>
+            <div class="skeleton-line" style="width:88%"></div>
+            <div class="skeleton-line" style="width:70%"></div>
+          </div>
+        </div>
       </div>
     `;
     try {
@@ -2086,7 +2103,7 @@
 
     renderTodayActions(candidates);
     loadDailyBriefing(scores);
-    renderRadar(document.getElementById('today-mini-radar'), TOPICS, scores, { size: 240, padding: 30, labels: false });
+    renderRadar(document.getElementById('today-mini-radar'), TOPICS, scores, { size: 240, padding: 30, labels: false, readout: false, quiet: true });
     document.querySelectorAll('#today-mini-radar .radar-point').forEach((el) => {
       el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
     });
@@ -2100,7 +2117,7 @@
       const btn = e.currentTarget;
       btn.disabled = true;
       const wrap = document.getElementById('synthesis-body-wrap');
-      wrap.innerHTML = `<div style="margin-top:12px"><span class="loader"></span> <span style="font-size:13px;color:var(--text-muted)">Analyzing this week across all topics…</span></div>`;
+      wrap.innerHTML = `<div style="margin-top:12px;display:flex;align-items:center;gap:8px">${typingDots()} <span style="font-size:13px;color:var(--text-muted)">Analyzing this week across all topics…</span></div>`;
       try {
         const settings = getSettings();
         const topicsSummary = TOPICS.map((t, i) => ({ id: t.id, label: t.label, score: scores[i] }));
@@ -2221,7 +2238,7 @@
           <div class="meal-result">
             <div style="display:flex;align-items:center;gap:12px">
               <img src="${dataUrl}" class="meal-preview-thumb" alt="Uploaded meal photo"/>
-              <span style="font-size:13px;color:var(--text-muted)"><span class="loader"></span> Analyzing your photo…</span>
+              <span style="font-size:13px;color:var(--text-muted);display:inline-flex;align-items:center;gap:8px">${typingDots()} Analyzing your photo…</span>
             </div>
           </div>
         `;
@@ -2495,7 +2512,7 @@
       sendBtn.disabled = true;
       setOrbState('thinking');
       voiceStatus.textContent = 'Thinking…';
-      transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="coach-loading"><span class="loader"></span></div>`);
+      transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="coach-loading">${typingDots()}</div>`);
       transcript.scrollTop = transcript.scrollHeight;
 
       try {
@@ -2579,6 +2596,12 @@
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // The "AI is generating a response" indicator used everywhere a chat reply or plan is being
+  // produced — three softly bouncing dots instead of a plain spinner ring.
+  function typingDots() {
+    return '<span class="typing-dots"><span></span><span></span><span></span></span>';
   }
 
   // ---------- render dispatch ----------

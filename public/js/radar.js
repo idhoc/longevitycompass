@@ -8,6 +8,7 @@
 function renderRadar(svgEl, topics, scores, opts) {
   opts = opts || {};
   const size = opts.size || 480;
+  const quiet = !!opts.quiet;
   const center = size / 2;
   const maxR = center - (opts.padding || 96);
   const n = topics.length;
@@ -31,7 +32,7 @@ function renderRadar(svgEl, topics, scores, opts) {
   let svg = `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%" role="img" aria-label="Compass dial of adherence across ${n} topics">`;
   svg += `<defs>
     <radialGradient id="${gradId}" cx="50%" cy="50%" r="65%">
-      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.32"/>
+      <stop offset="0%" stop-color="var(--accent)" stop-opacity="${quiet ? 0.2 : 0.32}"/>
       <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.05"/>
     </radialGradient>
     <filter id="${glowId}" x="-60%" y="-60%" width="220%" height="220%">
@@ -41,17 +42,22 @@ function renderRadar(svgEl, topics, scores, opts) {
 
   // Outer bezel ring — the "instrument face" edge. Kept to a single hairline circle plus a
   // sparse set of tick marks (not a busy engraved-dial texture) for a calmer, more modern read.
+  // In "quiet" mode (small/dense contexts like the Today page mini chart) the tick marks are
+  // skipped entirely rather than just thinned, since at that size + 12 topics they read as
+  // visual noise rather than an instrument detail.
   svg += `<circle cx="${center}" cy="${center}" r="${maxR + 22}" fill="none" stroke="var(--gridline)" stroke-width="1"/>`;
 
-  const TICK_COUNT = 24;
-  for (let i = 0; i < TICK_COUNT; i++) {
-    const a = (Math.PI * 2 * i) / TICK_COUNT - Math.PI / 2;
-    const major = i % 6 === 0;
-    const outerR = maxR + 22;
-    const innerR = outerR - (major ? 8 : 4);
-    const x1 = center + Math.cos(a) * innerR, y1 = center + Math.sin(a) * innerR;
-    const x2 = center + Math.cos(a) * outerR, y2 = center + Math.sin(a) * outerR;
-    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compass-bezel-tick${major ? ' major' : ''}" stroke-width="${major ? 1.4 : 1}"/>`;
+  if (!quiet) {
+    const TICK_COUNT = 24;
+    for (let i = 0; i < TICK_COUNT; i++) {
+      const a = (Math.PI * 2 * i) / TICK_COUNT - Math.PI / 2;
+      const major = i % 6 === 0;
+      const outerR = maxR + 22;
+      const innerR = outerR - (major ? 8 : 4);
+      const x1 = center + Math.cos(a) * innerR, y1 = center + Math.sin(a) * innerR;
+      const x2 = center + Math.cos(a) * outerR, y2 = center + Math.sin(a) * outerR;
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compass-bezel-tick${major ? ' major' : ''}" stroke-width="${major ? 1.4 : 1}"/>`;
+    }
   }
 
   // Adherence gridlines (concentric rings) — hairline, recessive, one hue.
@@ -68,9 +74,9 @@ function renderRadar(svgEl, topics, scores, opts) {
   // Data polygon + vertex markers — start at the PREVIOUS shape; tweened below to the target.
   const startPts = topics.map((_, i) => pointFor(i, prevScores[i] / 100));
   svg += `<g class="radar-data-anim">`;
-  svg += `<polygon id="${gradId}-poly" points="${startPts.map((p) => p.join(',')).join(' ')}" fill="url(#${gradId})" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#${glowId})"/>`;
+  svg += `<polygon id="${gradId}-poly" points="${startPts.map((p) => p.join(',')).join(' ')}" fill="url(#${gradId})" stroke="var(--accent)" stroke-width="${quiet ? 1.5 : 2.5}" stroke-linejoin="round" stroke-linecap="round" ${quiet ? '' : `filter="url(#${glowId})"`}/>`;
   startPts.forEach(([x, y], i) => {
-    svg += `<circle cx="${x}" cy="${y}" r="6" fill="var(--accent)" stroke="var(--surface-1)" stroke-width="2" data-topic="${topics[i].id}" data-idx="${i}" class="radar-point"/>`;
+    svg += `<circle cx="${x}" cy="${y}" r="${quiet ? 4 : 6}" fill="var(--accent)" stroke="var(--surface-1)" stroke-width="2" data-topic="${topics[i].id}" data-idx="${i}" class="radar-point"/>`;
   });
   svg += `</g>`;
 
@@ -79,7 +85,7 @@ function renderRadar(svgEl, topics, scores, opts) {
   // stay single-hue; that's still the actual data channel).
   topics.forEach((t, i) => {
     const [sx, sy] = pointFor(i, (maxR + 22) / maxR);
-    svg += `<circle cx="${sx}" cy="${sy}" r="5" fill="${topicAccent(t.id)}" stroke="var(--surface-1)" stroke-width="1.5" data-topic="${t.id}" data-idx="${i}" class="radar-point compass-stud"/>`;
+    svg += `<circle cx="${sx}" cy="${sy}" r="${quiet ? 3.5 : 5}" fill="${topicAccent(t.id)}" stroke="var(--surface-1)" stroke-width="1.5" data-topic="${t.id}" data-idx="${i}" class="radar-point compass-stud"/>`;
   });
 
   // Axis labels with topic icon, via foreignObject so we can reuse the existing icon set.
@@ -102,16 +108,18 @@ function renderRadar(svgEl, topics, scores, opts) {
   // this exact center point, and without pointer-events:none here the pin/needle would sit on
   // top and silently swallow clicks meant for those (still-real, still-clickable) vertices.
   svg += `<g id="${gradId}-needle" class="compass-needle" style="pointer-events:none"></g>`;
-  svg += `<circle cx="${center}" cy="${center}" r="7" fill="var(--text-primary)" stroke="var(--surface-1)" stroke-width="1.5" style="pointer-events:none"/>`;
-  const prevAvg = Math.round(prevScores.reduce((a, b) => a + b, 0) / (n || 1));
-  const readoutY = center + maxR * 0.6;
-  svg += `<text x="${center}" y="${readoutY}" text-anchor="middle" class="radar-hero-num" id="${gradId}-hero">${prevAvg}%</text>`;
-  svg += `<text x="${center}" y="${readoutY + 19}" text-anchor="middle" class="radar-hero-label">STRONGEST: ${escapeXml(shortLabel(topics[bestIdx]).toUpperCase())}</text>`;
+  svg += `<circle cx="${center}" cy="${center}" r="${quiet ? 5 : 7}" fill="var(--text-primary)" stroke="var(--surface-1)" stroke-width="1.5" style="pointer-events:none"/>`;
+  if (opts.readout !== false) {
+    const prevAvg = Math.round(prevScores.reduce((a, b) => a + b, 0) / (n || 1));
+    const readoutY = center + maxR * 0.6;
+    svg += `<text x="${center}" y="${readoutY}" text-anchor="middle" class="radar-hero-num" id="${gradId}-hero">${prevAvg}%</text>`;
+    svg += `<text x="${center}" y="${readoutY + 19}" text-anchor="middle" class="radar-hero-label">STRONGEST: ${escapeXml(shortLabel(topics[bestIdx]).toUpperCase())}</text>`;
+  }
 
   svg += '</svg>';
   svgEl.innerHTML = svg;
 
-  tweenRadar(svgEl, gradId, topics, pointFor, prevScores, targetScores, prevAngle, targetAngle, center, maxR, bestIdx);
+  tweenRadar(svgEl, gradId, topics, pointFor, prevScores, targetScores, prevAngle, targetAngle, center, maxR, bestIdx, quiet);
   attachRadarTooltip(svgEl, topics, targetScores);
   svgEl._lcLastScores = targetScores;
   svgEl._lcLastNeedleAngle = targetAngle;
@@ -124,8 +132,8 @@ function shortestAngleDelta(from, to) {
   return d;
 }
 
-function buildNeedlePolygons(center, maxR, angle) {
-  const len = maxR * 0.88, tailLen = maxR * 0.3, w = 7, w2 = 5;
+function buildNeedlePolygons(center, maxR, angle, quiet) {
+  const len = maxR * 0.88, tailLen = maxR * 0.3, w = quiet ? 4.5 : 7, w2 = quiet ? 3.2 : 5;
   const perp = angle + Math.PI / 2;
   const tipX = center + Math.cos(angle) * len, tipY = center + Math.sin(angle) * len;
   const tailX = center - Math.cos(angle) * tailLen, tailY = center - Math.sin(angle) * tailLen;
@@ -138,7 +146,7 @@ function buildNeedlePolygons(center, maxR, angle) {
   return { front, back };
 }
 
-function tweenRadar(svgEl, gradId, topics, pointFor, fromScores, toScores, fromAngle, toAngle, center, maxR, bestIdx) {
+function tweenRadar(svgEl, gradId, topics, pointFor, fromScores, toScores, fromAngle, toAngle, center, maxR, bestIdx, quiet) {
   const poly = svgEl.querySelector(`#${gradId}-poly`);
   const hero = svgEl.querySelector(`#${gradId}-hero`);
   const needleG = svgEl.querySelector(`#${gradId}-needle`);
@@ -165,7 +173,7 @@ function tweenRadar(svgEl, gradId, topics, pointFor, fromScores, toScores, fromA
       // physically swinging to its heading rather than a UI element sliding.
       const overshoot = t > 0.7 ? Math.sin((t - 0.7) / 0.3 * Math.PI) * 0.06 * (1 - t) : 0;
       const angleNow = fromAngle + angleDelta * eased + overshoot;
-      const { front, back } = buildNeedlePolygons(center, maxR, angleNow);
+      const { front, back } = buildNeedlePolygons(center, maxR, angleNow, quiet);
       needleG.innerHTML = `<polygon points="${front}" fill="var(--accent)"/><polygon points="${back}" fill="var(--baseline)"/>`;
     }
     if (t < 1) requestAnimationFrame(frame);

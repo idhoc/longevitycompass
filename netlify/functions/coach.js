@@ -164,12 +164,13 @@ const INTAKE_TOOL = {
       },
       message: {
         type: 'string',
-        description: 'If done=false: your next single warm follow-up question — ONE question only, conversational, MI-style (reflect what they just said, then ask), plain text, no markdown. If done=true: a short 1-2 sentence warm closing acknowledgment, plain text.',
+        description: 'If done=false: your next single question — ONE question only, in plain, everyday language a person of any age can follow easily. Short sentences. Acknowledge what they just told you in a few plain words (not a formal "reflection"), then ask the next thing — never open with "Did you know" or a canned hook. If done=true: a short 1-2 sentence warm closing acknowledgment, plain text.',
       },
       extracted: {
         type: 'object',
         description: 'Best-effort structured extraction from the WHOLE conversation so far. Empty string for any field genuinely not mentioned — never invent or assume.',
         properties: {
+          age: { type: 'string', description: 'Their age as a plain number if given, e.g. "34". Empty string if not mentioned.' },
           primaryGoal: { type: 'string' },
           dietPattern: { type: 'string' },
           dietaryRestrictions: { type: 'string', description: 'Allergies, intolerances, or foods they avoid — used to keep every future nutrition plan and food guide safe/relevant for them. Empty string if none mentioned.' },
@@ -182,7 +183,7 @@ const INTAKE_TOOL = {
           mainStressor: { type: 'string' },
           selfDescription: { type: 'string', description: 'A 1-3 sentence natural-language summary of who this person is and what they want, in their own words/spirit — this personalizes every future response beyond the structured fields above.' },
         },
-        required: ['primaryGoal', 'dietPattern', 'dietaryRestrictions', 'activityLevel', 'workoutEnvironment', 'physicalLimitations', 'sleepHours', 'sleepDisruptor', 'stressLevel', 'mainStressor', 'selfDescription'],
+        required: ['age', 'primaryGoal', 'dietPattern', 'dietaryRestrictions', 'activityLevel', 'workoutEnvironment', 'physicalLimitations', 'sleepHours', 'sleepDisruptor', 'stressLevel', 'mainStressor', 'selfDescription'],
       },
     },
     required: ['done', 'message', 'extracted'],
@@ -545,10 +546,13 @@ async function handleBriefing(body) {
 }
 
 // Real neural TTS via OpenAI's audio/speech endpoint — the "sound genuine, not monotone" ask.
-// Runs server-side (the API key never reaches the browser) and returns base64 audio the client
-// plays through a normal <audio> element. Always responds 200 with available:false rather than
-// an error status when there's no key or the call fails, so the caller can silently fall back
-// to the browser's built-in speechSynthesis instead of treating this as a hard failure.
+// Runs server-side (the API key never reaches the browser). Returns raw audio bytes directly
+// (Content-Type: audio/mpeg, isBase64Encoded for the Lambda-style transport Netlify Functions
+// use) rather than wrapping base64 inside a JSON envelope — that extra layer meant paying for
+// a base64 encode AND a JSON.stringify/parse pass on top of it, all before the browser could
+// even start decoding audio. A 204 (no body) signals "not available" so the client can fall
+// back to the browser's built-in speechSynthesis instead of treating this as a hard failure —
+// a TTS hiccup should never block the coach.
 async function handleSpeech(body) {
   const text = (body.text || '').trim();
   if (!text) return respond(400, { error: 'Missing text' });
@@ -556,7 +560,7 @@ async function handleSpeech(body) {
   const clipped = text.length > 3000 ? text.slice(0, 3000) : text;
 
   if (!process.env.OPENAI_API_KEY) {
-    return respond(200, { mode: 'speech', available: false, reason: 'no_api_key' });
+    return { statusCode: 204, headers: { 'X-TTS-Status': 'no_api_key' }, body: '' };
   }
 
   try {
@@ -572,11 +576,15 @@ async function handleSpeech(body) {
       throw new Error(`OpenAI TTS ${res.status}: ${(await res.text()).slice(0, 300)}`);
     }
     const arrayBuffer = await res.arrayBuffer();
-    const audio = Buffer.from(arrayBuffer).toString('base64');
-    return respond(200, { mode: 'speech', available: true, audio, format: 'mp3', voice });
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'audio/mpeg', 'X-TTS-Voice': voice, 'Cache-Control': 'no-store' },
+      body: Buffer.from(arrayBuffer).toString('base64'),
+      isBase64Encoded: true,
+    };
   } catch (err) {
     console.error('TTS failed, client will fall back to browser speech synthesis:', err.message);
-    return respond(200, { mode: 'speech', available: false, reason: err.message });
+    return { statusCode: 204, headers: { 'X-TTS-Status': 'error' }, body: '' };
   }
 }
 
@@ -651,15 +659,15 @@ async function handleIntake(body) {
   }
 
   const instruction = [
-    MI_STYLE_TEXT,
+    "This is a brand-new user's very first conversation with you, before any profile exists. Talk like a friendly, down-to-earth person meeting someone new — not a chatbot running a script and not a therapist doing a formal intake. Short, plain sentences. No jargon, no clinical or therapy-sounding phrasing, nothing that requires a certain reading level or age to follow easily — a teenager and a 70-year-old should both find this easy and pleasant to answer. Vary how you open each message (a short plain acknowledgment of what they said, in different words each time) so it never reads as a template being filled in.",
     '',
-    "This is a brand-new user's very first conversation with you, before any profile exists. This app leans on guided workout sessions, nutrition guidance, and sleep coaching as its core daily use — so unlike a generic \"tell me about yourself\" intake, every question here should earn its place by directly shaping those three things. Ask AT MOST 4 of your own questions, one at a time, conversationally — never read out a form, never ask something you could reasonably infer from what they already said:",
-    '1) Their main goal, in their own words.',
+    "This app leans on guided workout sessions, nutrition guidance, and sleep coaching as its core daily use, so every question should earn its place by directly shaping those three things. Ask AT MOST 4 of your own questions, one at a time — never ask something you could reasonably infer from what they already said:",
+    '1) Their age, and their main goal — ask both together in one plain, friendly opener, e.g. "First off, how old are you, and what\'s the big thing you\'re hoping to get out of this?"',
     "2) Their real workout situation — do they train at a gym, at home, outdoors, with what (if any) equipment, and is there any injury or physical limitation a guided session needs to work around? This is the single most useful thing you can learn, since it directly determines whether a guided session can safely ask for lunges vs. needs a no-equipment substitute.",
-    '3) Their eating pattern AND any allergies/foods they avoid — both in one question if they let you, since the second is easy to fold into the first (\"and is there anything you avoid or are allergic to?\").',
+    '3) Their eating pattern AND any allergies/foods they avoid — both in one question if they let you, since the second is easy to fold into the first ("and is there anything you avoid or are allergic to?").',
     "4) Sleep: roughly how many hours, and the ONE biggest thing getting in the way of good sleep right now (if anything) — not stress in general unless that's genuinely what's disrupting sleep.",
     '',
-    "Do not ask about general life stress as a separate question — only surface stress if it comes up naturally while discussing sleep or their goal, and note it in mainStressor/stressLevel without spending a dedicated question on it. If the user says anything like \"stop\", \"skip\", \"I'd rather use the form\", or similar, set done=true immediately, thank them briefly, and stop — never push back on that. Once you have their goal, workout situation, and either diet or sleep info, or you've asked 4 questions, set done=true with a brief warm close. Call the intake_turn tool for every turn — never reply in plain text.",
+    "Do not ask about general life stress as a separate question — only surface stress if it comes up naturally while discussing sleep or their goal, and note it in mainStressor/stressLevel without spending a dedicated question on it. If the user says anything like \"stop\", \"skip\", \"I'd rather use the form\", or similar, set done=true immediately, thank them briefly, and stop — never push back on that. Once you have their age, goal, workout situation, and either diet or sleep info, or you've asked 4 questions, set done=true with a brief warm close. Call the intake_turn tool for every turn — never reply in plain text.",
     '',
     transcriptLines.length ? `Conversation so far:\n${transcriptLines.join('\n')}` : '(This is the very first turn — nothing said yet. Open with a warm, compass-themed greeting and your first question — their main goal.)',
   ].join('\n');
@@ -700,6 +708,7 @@ async function handleIntake(body) {
     done: !!input.done,
     message: cleanedMessage,
     extracted: {
+      age: stripMarkdown(ex.age || ''),
       primaryGoal: stripMarkdown(ex.primaryGoal || ''),
       dietPattern: stripMarkdown(ex.dietPattern || ''),
       dietaryRestrictions: stripMarkdown(ex.dietaryRestrictions || ''),
@@ -716,8 +725,8 @@ async function handleIntake(body) {
 }
 
 const MOCK_INTAKE_STEPS = [
-  "[MOCK — ANTHROPIC_API_KEY not set] Hi — I'm your coach. What's the main thing you're hoping to get out of this, in your own words?",
-  "[MOCK] Got it. What does your workout situation actually look like — gym, home, outdoors, any equipment — and is there anything I should work around, like an injury?",
+  "[MOCK — ANTHROPIC_API_KEY not set] Hi, I'm your coach! First off, how old are you, and what's the big thing you're hoping to get out of this?",
+  "[MOCK] Got it, thanks. What does your workout situation actually look like — gym, home, outdoors, any equipment — and is there anything I should work around, like an injury?",
   "[MOCK] Helpful, thanks. How would you describe how you eat day to day, and is there anything you avoid or are allergic to?",
   "[MOCK] Last one: roughly how many hours do you sleep, and what's the one thing most likely to get in the way of a good night?",
 ];
@@ -727,7 +736,7 @@ function mockIntakeTurn(turnCount) {
       mode: 'intake', escalation: false, done: true,
       message: "[MOCK] Thanks for sharing all that — once your API key is set, I'll use this to personalize every workout, meal, and sleep suggestion from here. Let's get started.",
       extracted: {
-        primaryGoal: '[MOCK] More energy', dietPattern: '[MOCK] Standard / omnivore', dietaryRestrictions: '',
+        age: '34', primaryGoal: '[MOCK] More energy', dietPattern: '[MOCK] Standard / omnivore', dietaryRestrictions: '',
         activityLevel: 'light', workoutEnvironment: '[MOCK] Home, light dumbbells', physicalLimitations: '',
         sleepHours: '6.5', sleepDisruptor: '[MOCK] Screen time before bed', stressLevel: 'moderate', mainStressor: '[MOCK] Work',
         selfDescription: '[MOCK] This is a placeholder summary — once ANTHROPIC_API_KEY is set, this becomes a real 1-3 sentence reflection of what you actually told the coach.',
@@ -736,7 +745,7 @@ function mockIntakeTurn(turnCount) {
   }
   return {
     mode: 'intake', escalation: false, done: false, message: MOCK_INTAKE_STEPS[turnCount],
-    extracted: { primaryGoal: '', dietPattern: '', dietaryRestrictions: '', activityLevel: '', workoutEnvironment: '', physicalLimitations: '', sleepHours: '', sleepDisruptor: '', stressLevel: '', mainStressor: '', selfDescription: '' },
+    extracted: { age: '', primaryGoal: '', dietPattern: '', dietaryRestrictions: '', activityLevel: '', workoutEnvironment: '', physicalLimitations: '', sleepHours: '', sleepDisruptor: '', stressLevel: '', mainStressor: '', selfDescription: '' },
   };
 }
 
