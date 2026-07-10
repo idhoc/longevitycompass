@@ -169,7 +169,7 @@ button { font-family: inherit; }
 .rail-level-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--accent); }
 
 /* ---------- Main content ---------- */
-.main { flex: 1; padding: 30px 40px 70px; max-width: 1040px; }
+.main { flex: 1; padding: 26px 34px 60px; max-width: 1000px; }
 
 h1 { font-family: var(--font-display); font-weight: 600; font-size: 27px; letter-spacing: -0.01em; margin: 0 0 4px; }
 h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin: 0 0 10px; }
@@ -179,10 +179,10 @@ h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 20px;
   box-shadow: var(--shadow-sm);
 }
-:root[data-density="compact"] .card { padding: 16px; }
+:root[data-density="compact"] .card { padding: 14px; }
 
 .grid-2 { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; align-items: start; }
 @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -319,6 +319,7 @@ h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin
 @keyframes dotPop { 0% { transform: scale(0.7); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
 .plan-card { display: flex; flex-direction: column; gap: 14px; }
+.plan-reflection { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; font-style: italic; color: var(--text-secondary); line-height: 1.5; }
 .evidence-chip { display: inline-block; font-size: 12.5px; padding: 4px 9px; border-radius: 999px; margin: 2px 6px 2px 0; background: var(--accent-wash); color: var(--accent); }
 .evidence-chip.limitation { background: var(--page-plane); color: var(--text-muted); border: 1px dashed var(--baseline); }
 
@@ -652,52 +653,60 @@ h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin
 .journal-entry-time { font-size: 11.5px; color: var(--text-muted); margin-left: 8px; }
 .journal-empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
 
-/* ---------- Global "Ask Compass" coach (cross-topic) ---------- */
-.global-fab {
-  position: fixed; bottom: 26px; right: 26px; z-index: 90;
-  width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
-  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--shadow-lg); transition: transform 0.15s ease;
+/* ---------- Coach (full-page immersive view — the orb is the center of the screen, not a
+   side panel) ---------- */
+.coach-view { display: flex; flex-direction: column; align-items: center; max-width: 640px; margin: 0 auto; }
+.coach-orb-stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 0 22px; }
+.coach-transcript {
+  width: 100%; max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  padding: 4px 2px 18px;
 }
-.global-fab:hover { transform: scale(1.06); }
-.global-chat-overlay {
-  position: fixed; inset: 0; z-index: 95; display: flex; align-items: flex-end; justify-content: flex-end;
-  padding: 26px; pointer-events: none;
-}
-.global-chat-panel {
-  pointer-events: auto; width: 380px; max-width: calc(100vw - 40px); max-height: 70vh;
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 18px;
-  box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
-  animation: modalPopIn 0.2s cubic-bezier(0.2, 0.8, 0.3, 1.1);
-}
-.global-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.global-chat-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.global-chat-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
-.global-chat-messages { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-.global-chat-input-row { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); }
-.global-chat-empty { font-size: 12.5px; color: var(--text-muted); text-align: center; padding: 20px 10px; line-height: 1.5; }
+.coach-input-row { display: flex; gap: 8px; width: 100%; }
+.coach-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 14px 10px 22px; line-height: 1.6; max-width: 440px; margin: 0 auto; }
 
-/* ---------- Voice coach: glowing orb ---------- */
-.voice-orb-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 0 14px; border-bottom: 1px solid var(--border); }
+/* ---------- Voice coach: fluid glowing orb (layered, independently-timed blobs rather than a
+   single scale-pulse, so idle/listening/thinking/speaking each read as a distinct organic motion
+   instead of a mechanical throb) ---------- */
+.voice-orb-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .voice-orb {
-  width: 92px; height: 92px; border-radius: 50%; cursor: pointer; border: none;
-  display: flex; align-items: center; justify-content: center; color: #fff;
-  background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--accent) 55%, #fff 18%), var(--accent) 65%);
-  box-shadow: 0 0 32px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 64px color-mix(in srgb, var(--accent) 20%, transparent);
-  animation: orbBreathe 3.2s ease-in-out infinite;
-  transition: box-shadow 0.2s ease;
+  --orb-speed: 1;
+  width: 100px; height: 100px; position: relative; border: none; cursor: pointer; background: transparent;
+  display: flex; align-items: center; justify-content: center; padding: 0;
 }
-@keyframes orbBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
-.voice-orb.listening { animation: orbListen 1s ease-in-out infinite; }
-@keyframes orbListen {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 34px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 70px color-mix(in srgb, var(--accent) 28%, transparent); }
-  50% { transform: scale(1.09); box-shadow: 0 0 50px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 100px color-mix(in srgb, var(--accent) 38%, transparent); }
+.voice-orb-lg { width: 200px; height: 200px; }
+.orb-layer { position: absolute; border-radius: 50%; filter: blur(16px); }
+.voice-orb-lg .orb-layer { filter: blur(26px); }
+.orb-layer-1 {
+  inset: 6%; opacity: 0.95;
+  background: radial-gradient(circle at 32% 30%, color-mix(in srgb, var(--accent) 88%, #fff 14%), var(--accent) 62%);
+  animation: orbFloat1 calc(6.2s / var(--orb-speed)) ease-in-out infinite;
 }
-.voice-orb.thinking { animation: orbThink 0.75s ease-in-out infinite; }
-@keyframes orbThink { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
-.voice-orb.speaking { animation: orbSpeak 0.42s ease-in-out infinite; }
-@keyframes orbSpeak { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-.voice-status { font-size: 12px; color: var(--text-muted); text-align: center; min-height: 15px; }
+.orb-layer-2 {
+  inset: 16%; opacity: 0.55;
+  background: radial-gradient(circle at 64% 62%, color-mix(in srgb, var(--accent-2) 85%, #fff 15%), transparent 72%);
+  animation: orbFloat2 calc(7.8s / var(--orb-speed)) ease-in-out infinite;
+}
+.orb-layer-3 {
+  inset: 24%; opacity: 0.22;
+  background: radial-gradient(circle at 50% 45%, #fff, transparent 72%);
+  animation: orbFloat3 calc(4.4s / var(--orb-speed)) ease-in-out infinite;
+}
+.orb-icon { position: relative; z-index: 2; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.25)); }
+@keyframes orbFloat1 {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  33% { transform: scale(1.09) translate(3%, -3%); }
+  66% { transform: scale(0.95) translate(-3%, 2%); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  40% { transform: scale(0.88) translate(-4%, 3%); }
+  75% { transform: scale(1.12) translate(3%, -2%); }
+}
+@keyframes orbFloat3 { 0%, 100% { transform: scale(1); opacity: 0.22; } 50% { transform: scale(1.3); opacity: 0.36; } }
+.voice-orb.listening { --orb-speed: 1.9; }
+.voice-orb.thinking { --orb-speed: 1.5; }
+.voice-orb.speaking { --orb-speed: 2.6; }
+.voice-status { font-size: 12.5px; color: var(--text-muted); text-align: center; min-height: 16px; }
 
 /* ---------- Meal photo logging (Thrive-inspired) ---------- */
 .meal-log-card { margin-top: 20px; }
@@ -743,6 +752,46 @@ h2 { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin
 .daily-briefing-icon { flex: none; color: var(--accent-2); margin-top: 2px; }
 .daily-briefing-text { font-size: 13.5px; line-height: 1.55; color: var(--text-primary); }
 .daily-briefing-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-2); margin-bottom: 4px; display: block; }
+
+/* ---------- Wellness age estimate (transparent, not a clinical claim) ---------- */
+.wellness-age-card { margin: 18px 0; }
+.wellness-age-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.wellness-age-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.wellness-age-num { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1; }
+.wellness-age-unit { font-size: 15px; color: var(--text-muted); margin-left: 4px; }
+.wellness-age-delta { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.wellness-age-delta-good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.wellness-age-delta-warn { background: color-mix(in srgb, var(--critical) 12%, transparent); color: var(--critical); }
+.wellness-age-delta-neutral { background: var(--page-plane); color: var(--text-muted); }
+.wellness-age-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.5; }
+.wellness-age-factors { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.wellness-age-factor { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; border-top: 1px solid var(--border); }
+.wellness-age-factor:first-child { border-top: none; }
+.wellness-age-factor-good { color: var(--good); font-weight: 600; }
+.wellness-age-factor-warn { color: var(--critical); font-weight: 600; }
+.wellness-age-empty { display: flex; align-items: flex-start; gap: 12px; color: var(--text-muted); }
+.wellness-age-empty-title { font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
+.wellness-age-empty-desc { font-size: 12.5px; margin-top: 2px; line-height: 1.5; }
+
+/* ---------- Domains grid (4 broad categories, replaces the old 10-card Topics grid) ---------- */
+.domains-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 8px; }
+.domain-card {
+  position: relative; overflow: hidden;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 20px;
+  padding: 20px; display: flex; flex-direction: column; gap: 10px; cursor: pointer;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+.domain-card:hover { box-shadow: var(--shadow-md); }
+.domain-card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.domain-card-chevron { display: inline-flex; transition: transform 0.15s ease; }
+.domain-topics-list { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; }
+.domain-topic-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-radius: 9px; font-size: 13px;
+  transition: background 0.12s ease;
+}
+.domain-topic-row:hover { background: var(--page-plane); }
+.domain-topic-row-label { flex: 1; font-weight: 600; }
+.domain-topic-row-pct { color: var(--text-muted); font-size: 12px; }
 
 /* ---------- Nutrition / Meal Log (dedicated page) ---------- */
 .nutrition-summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }

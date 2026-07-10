@@ -77,6 +77,26 @@
 
   let TOPICS = [];
 
+  // ---------- life domains: 4 broad categories the 10 grounded topics fold into ----------
+  // Humanity.health and Thrive both organize around 4-5 broad life domains (Movement/
+  // Nutrition/Mind/Recovery, or Activity/Nutrition/Sleep/Stress/Social) rather than a long flat
+  // topic list — this is the presentation layer that fixes "10 topics feels constricting"
+  // without touching the underlying grounded research mapping (each topic still has its own
+  // source library and prompt emphasis; a domain is just how they're grouped and browsed).
+  const DOMAINS = [
+    { key: 'movement', label: 'Movement', icon: 'walk', topics: ['activity'], blurb: 'Physical activity — the most consistently established lever for healthy aging.' },
+    { key: 'nutrition', label: 'Nutrition', icon: 'meal', topics: ['nutrition', 'gut-microbiome', 'micronutrient', 'weight', 'metabolic-cv'], blurb: 'What you eat, how your gut processes it, and how it shows up in your metabolic numbers.' },
+    { key: 'mind', label: 'Mind', icon: 'brain', topics: ['purpose', 'cognitive'], blurb: 'Sense of purpose, social connection, and cognitive health — the best-evidenced longevity lever there is.' },
+    { key: 'recovery', label: 'Recovery', icon: 'moon', topics: ['sleep', 'energy-mitochondrial'], blurb: 'Sleep, circadian rhythm, and the cellular energy systems that depend on real rest.' },
+  ];
+  function domainForTopic(topicId) {
+    return DOMAINS.find((d) => d.topics.includes(topicId)) || null;
+  }
+  function domainScore(domain, scoresById) {
+    const vals = domain.topics.map((tid) => scoresById[tid] || 0);
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  }
+
   // ---------- persistence ----------
   function getProfile() {
     try { return JSON.parse(localStorage.getItem(STORAGE.profile)) || {}; }
@@ -193,13 +213,51 @@
   function getSpeechRecognitionCtor() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
   }
+  // Voice quality is fundamentally capped by whatever TTS engine the browser/OS ships (there's
+  // no ElevenLabs-style neural voice wired in here — that would need its own API key) — but two
+  // honest, real improvements are possible with the built-in Web Speech API: (1) actually pick
+  // the best-sounding installed voice instead of whatever the browser defaults to, and (2) speak
+  // sentence-by-sentence with small natural rate/pitch variance per sentence instead of one flat
+  // utterance, which reads as noticeably less monotone than the single-utterance approach.
+  let _voicesCache = [];
+  if ('speechSynthesis' in window) {
+    const refreshVoices = () => { _voicesCache = window.speechSynthesis.getVoices(); };
+    refreshVoices();
+    window.speechSynthesis.onvoiceschanged = refreshVoices;
+  }
+  function pickBestVoice() {
+    if (!_voicesCache.length) return null;
+    const english = _voicesCache.filter((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
+    const pool = english.length ? english : _voicesCache;
+    const scored = pool.map((v) => {
+      const name = v.name.toLowerCase();
+      let score = 0;
+      if (/natural|neural|premium|enhanced|studio/.test(name)) score += 5;
+      if (/google/.test(name)) score += 3;
+      if (v.localService === false) score += 1;
+      if (/compact|robot|zarvox|whisper/.test(name)) score -= 5;
+      return { v, score };
+    }).sort((a, b) => b.score - a.score);
+    return scored[0].v;
+  }
   function speakText(text, onEnd) {
-    if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
+    if (!('speechSynthesis' in window) || !text) { if (onEnd) onEnd(); return; }
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 1.0;
-    if (onEnd) utter.onend = onEnd;
-    window.speechSynthesis.speak(utter);
+    const voice = pickBestVoice();
+    const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim());
+    if (!sentences.length) { if (onEnd) onEnd(); return; }
+    let i = 0;
+    function speakNext() {
+      if (i >= sentences.length) { if (onEnd) onEnd(); return; }
+      const utter = new SpeechSynthesisUtterance(sentences[i]);
+      if (voice) utter.voice = voice;
+      utter.rate = 0.97 + Math.random() * 0.08;
+      utter.pitch = 0.96 + Math.random() * 0.07;
+      utter.onend = () => { i += 1; speakNext(); };
+      utter.onerror = () => { i += 1; speakNext(); };
+      window.speechSynthesis.speak(utter);
+    }
+    speakNext();
   }
 
   // ---------- routing ----------
@@ -209,6 +267,7 @@
     if (hash === 'dashboard') return { view: 'dashboard' };
     if (hash === 'topics') return { view: 'topics' };
     if (hash === 'nutrition') return { view: 'nutrition' };
+    if (hash === 'coach') return { view: 'coach' };
     if (hash === 'journal') return { view: 'journal' };
     if (hash === 'profile') return { view: 'profile' };
     if (hash === 'settings') return { view: 'settings' };
@@ -232,7 +291,6 @@
       return;
     }
     render();
-    renderGlobalCoach();
     maybeFireDailyReminder();
     if (!isOnboarded()) renderOnboardingModal();
   }
@@ -242,9 +300,9 @@
     const el = document.getElementById('sidebar');
     const navItems = [
       { key: 'today', icon: 'bolt', label: 'Today' },
-      { key: 'coach', icon: 'mic', label: 'Coach', action: 'openCoach' },
+      { key: 'coach', icon: 'mic', label: 'Coach' },
       { key: 'dashboard', icon: 'home', label: 'Overview' },
-      { key: 'topics', icon: 'dna', label: 'Topics' },
+      { key: 'topics', icon: 'atom', label: 'Domains' },
       { key: 'nutrition', icon: 'meal', label: 'Meal Log' },
       { key: 'journal', icon: 'leaf', label: 'Journal' },
       { key: 'profile', icon: 'user', label: 'My profile' },
@@ -271,8 +329,69 @@
       </div>
     `;
     el.innerHTML = html;
-    const coachBtn = el.querySelector('[data-rail-action="openCoach"]');
-    if (coachBtn) coachBtn.addEventListener('click', () => { if (window._lcOpenCoach) window._lcOpenCoach(); });
+  }
+
+  // ---------- wellness age estimate (Humanity.health-inspired, but honestly scoped) ----------
+  // Humanity's "Biological Age" claims validation against real-world outcomes from wearable
+  // data + blood tests — this app has neither. This is deliberately NOT presented as that: a
+  // transparent, entirely client-side directional estimate from self-reported lifestyle
+  // factors and actual tracked adherence, with every point of adjustment shown, not a black box.
+  function computeWellnessAge(profile, avgAdherence) {
+    const age = Number(profile.age);
+    if (!Number.isFinite(age) || age <= 0) return null;
+    const factors = [];
+    const add = (label, pts) => { if (pts !== 0) factors.push({ label, pts }); };
+
+    const activityPts = { sedentary: 2, light: 0.5, moderate: -1, active: -2.5 }[profile.activityLevel];
+    if (activityPts !== undefined) add(`Activity level: ${profile.activityLevel}`, activityPts);
+
+    const sleep = Number(profile.sleepHours);
+    if (Number.isFinite(sleep)) {
+      if (sleep < 6) add(`Sleep: ${sleep}h/night`, 2);
+      else if (sleep < 7) add(`Sleep: ${sleep}h/night`, 0.5);
+      else if (sleep <= 9) add(`Sleep: ${sleep}h/night`, -1);
+      else add(`Sleep: ${sleep}h/night`, 0.5);
+    }
+
+    const smokingPts = { 'Current smoker': 4, 'Former smoker': 1, 'Never smoked': 0 }[profile.smokingStatus];
+    if (smokingPts !== undefined) add(`Smoking: ${profile.smokingStatus}`, smokingPts);
+
+    const stressPts = { high: 1.5, moderate: 0.5, low: -0.5 }[profile.stressLevel];
+    if (stressPts !== undefined) add(`Stress level: ${profile.stressLevel}`, stressPts);
+
+    if (['Mediterranean', 'DASH', 'Plant-based / vegetarian', 'Vegan'].includes(profile.dietPattern)) add(`Diet pattern: ${profile.dietPattern}`, -1.5);
+
+    const alcoholPts = { '8+ drinks/week': 1.5, '3-7 drinks/week': 0.5 }[profile.alcoholFrequency];
+    if (alcoholPts !== undefined) add(`Alcohol: ${profile.alcoholFrequency}`, alcoholPts);
+
+    if (typeof avgAdherence === 'number') {
+      if (avgAdherence >= 70) add('Real tracked adherence this week: high', -1.5);
+      else if (avgAdherence >= 40) add('Real tracked adherence this week: moderate', -0.5);
+    }
+
+    const delta = factors.reduce((s, f) => s + f.pts, 0);
+    const clamped = Math.max(-10, Math.min(15, delta));
+    const wellnessAge = Math.round((age + clamped) * 10) / 10;
+    return { age, wellnessAge, delta: Math.round(clamped * 10) / 10, factors };
+  }
+
+  function renderWellnessAgeHtml(result) {
+    if (!result) {
+      return `<div class="card wellness-age-card wellness-age-empty"><span>${lcIcon('dna', 18)}</span><div><div class="wellness-age-empty-title">Add your age in My Profile</div><div class="wellness-age-empty-desc">to see a transparent wellness-age estimate — not a lab test, just your own lifestyle factors shown plainly.</div></div></div>`;
+    }
+    const sign = result.delta > 0 ? '+' : '';
+    const tone = result.delta < 0 ? 'good' : result.delta > 0 ? 'warn' : 'neutral';
+    return `
+      <div class="card wellness-age-card">
+        <div class="wellness-age-label">${lcIcon('dna', 15)} Wellness age estimate</div>
+        <div class="wellness-age-row">
+          <div class="wellness-age-num">${result.wellnessAge}<span class="wellness-age-unit">yrs</span></div>
+          <div class="wellness-age-delta wellness-age-delta-${tone}">${sign}${result.delta} vs. your age (${result.age})</div>
+        </div>
+        <div class="wellness-age-note">A transparent, self-reported estimate — not a lab-validated biological age test. Every factor below is shown, nothing hidden:</div>
+        ${result.factors.length ? `<div class="wellness-age-factors">${result.factors.map((f) => `<div class="wellness-age-factor"><span>${escapeHtml(f.label)}</span><span class="${f.pts < 0 ? 'wellness-age-factor-good' : 'wellness-age-factor-warn'}">${f.pts > 0 ? '+' : ''}${f.pts}</span></div>`).join('')}</div>` : '<div class="wellness-age-note">No adjusting factors yet — fill in Lifestyle in My Profile.</div>'}
+      </div>
+    `;
   }
 
   // ---------- overview (full radar + stats) ----------
@@ -300,6 +419,8 @@
     const subline = profile.primaryGoal
       ? `Here's where things stand with your goal: ${escapeHtml(profile.primaryGoal)}.`
       : `Fills in as you complete each topic's daily action.`;
+    const avgAdherence = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const wellnessAge = computeWellnessAge(profile, avgAdherence);
 
     main.innerHTML = `
       <h1>Overview</h1>
@@ -309,6 +430,7 @@
         <div class="stat-tile"><div class="stat-value">${notStarted}</div><div class="stat-label">Not started this week</div></div>
         <div class="stat-tile"><div class="stat-value stat-value-text">${escapeHtml(bestLabel)}</div><div class="stat-label">Strongest topic</div></div>
       </div>
+      ${renderWellnessAgeHtml(wellnessAge)}
       <div class="grid-radar">
         <div class="card radar-wrap"><div id="radar-svg" class="radar-chart-host"></div></div>
         <div class="card">
@@ -344,28 +466,55 @@
   function renderTopicsGrid() {
     const main = document.getElementById('main');
     main.innerHTML = `
-      <h1>Topics</h1>
-      <p class="subtitle">Your 10 longevity topics. Open one for a fully-grounded plan and evidence — this is the real browsing surface now, not a cramped sidebar list.</p>
-      <div class="topics-grid" id="topics-grid"></div>
+      <h1>Domains</h1>
+      <p class="subtitle">Four broad areas, each backed by specific research-grounded topics underneath — open a domain to see (and act on) what's inside it.</p>
+      <div class="domains-grid" id="domains-grid"></div>
     `;
-    const grid = document.getElementById('topics-grid');
-    grid.innerHTML = TOPICS.map((t, i) => {
-      const pct = scoreForTopic(t.id);
-      const accent = topicAccent(t.id);
+    const grid = document.getElementById('domains-grid');
+    const scoresById = {};
+    TOPICS.forEach((t) => { scoresById[t.id] = scoreForTopic(t.id); });
+
+    grid.innerHTML = DOMAINS.map((d, i) => {
+      const pct = domainScore(d, scoresById);
+      const memberTopics = TOPICS.filter((t) => d.topics.includes(t.id));
       return `
-        <div class="topic-grid-card stagger-item" style="--i:${i};--tgc-accent:${accent}" data-topic="${t.id}">
-          <div class="topic-grid-top">
-            <span class="topic-grid-icon">${lcIcon(t.icon, 22)}</span>
-            ${renderMiniRing(pct, 28)}
+        <div class="domain-card stagger-item" style="--i:${i};--tgc-accent:var(--accent)" data-domain="${d.key}">
+          <div class="domain-card-top">
+            <span class="topic-grid-icon">${lcIcon(d.icon, 24)}</span>
+            ${renderMiniRing(pct, 30)}
           </div>
-          <div class="topic-grid-label">${escapeHtml(t.label)}</div>
-          <div class="topic-grid-desc">${escapeHtml(t.description || '')}</div>
-          <div class="topic-grid-footer"><span class="topic-grid-pct">${pct}% this week</span>${lcIcon('chevron', 14)}</div>
+          <div class="topic-grid-label">${escapeHtml(d.label)}</div>
+          <div class="topic-grid-desc">${escapeHtml(d.blurb)}</div>
+          <div class="topic-grid-footer"><span class="topic-grid-pct">${pct}% this week</span><span class="domain-card-chevron">${lcIcon('chevron', 14)}</span></div>
+          <div class="domain-topics-list" id="domain-topics-${d.key}" style="display:none">
+            ${memberTopics.map((t) => `
+              <div class="domain-topic-row" data-topic="${t.id}">
+                <span style="color:${topicAccent(t.id)}">${lcIcon(t.icon, 16)}</span>
+                <span class="domain-topic-row-label">${escapeHtml(t.label)}</span>
+                <span class="domain-topic-row-pct">${scoresById[t.id]}%</span>
+                ${lcIcon('chevron', 13)}
+              </div>
+            `).join('')}
+          </div>
         </div>
       `;
     }).join('');
-    grid.querySelectorAll('.topic-grid-card').forEach((el) => {
-      el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
+
+    grid.querySelectorAll('.domain-card').forEach((card) => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.domain-topic-row')) return;
+        const list = card.querySelector('.domain-topics-list');
+        const chevron = card.querySelector('.domain-card-chevron');
+        const open = list.style.display !== 'none';
+        list.style.display = open ? 'none' : 'block';
+        if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+      });
+      card.querySelectorAll('.domain-topic-row').forEach((row) => {
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigate(`/topic/${row.dataset.topic}`);
+        });
+      });
     });
   }
 
@@ -623,6 +772,24 @@
           </div>
           <button type="button" class="btn-text-clear" id="wizard-cover-skip" style="margin-top:18px">Skip intro, just take me in</button>
         </div>
+        <div id="wizard-intake" style="display:none">
+          <div class="coach-orb-stage" style="padding-top:4px">
+            <button type="button" class="voice-orb" id="intake-orb" aria-label="Talk to your coach">
+              <span class="orb-layer orb-layer-1"></span>
+              <span class="orb-layer orb-layer-2"></span>
+              <span class="orb-layer orb-layer-3"></span>
+              <span class="orb-icon">${lcIcon('mic', 22)}</span>
+            </button>
+            <div class="voice-status" id="intake-voice-status">Tap to speak, or type below</div>
+          </div>
+          <div class="coach-transcript" id="intake-transcript" style="max-height:32vh"></div>
+          <div class="coach-input-row">
+            <input type="text" class="chat-input" id="intake-input" placeholder="Type your answer…" maxlength="300"/>
+            <button class="btn btn-primary" id="intake-send">Send</button>
+          </div>
+          <p class="gene-hint" style="text-align:center;margin:14px 0 0">You can stop anytime and switch to the form below, or skip entirely — nothing here leaves your browser except to generate your plans.</p>
+          <button type="button" class="btn-text-clear" id="intake-use-form" style="display:block;margin:8px auto 0">Prefer a form instead?</button>
+        </div>
         <div id="wizard-body" style="display:none">
           <div class="wizard-progress">
             ${WIZARD_STEPS.map((_, i) => `<div class="wizard-dot" data-dot="${i + 1}"></div>`).join('')}
@@ -699,7 +866,6 @@
         : `<p class="subtitle">Nothing entered yet — that's fine, you can fill this in later from My Profile.</p>`;
     }
 
-    overlay.querySelector('#wizard-cover').addEventListener('click', () => {}); // no-op, cover has no internal click targets besides Begin below
     const beginBtn = document.createElement('button');
     beginBtn.type = 'button';
     beginBtn.className = 'btn btn-primary';
@@ -708,10 +874,150 @@
     overlay.querySelector('#wizard-cover').appendChild(beginBtn);
     beginBtn.addEventListener('click', () => {
       overlay.querySelector('#wizard-cover').style.display = 'none';
+      overlay.querySelector('#wizard-intake').style.display = '';
+      startIntake();
+    });
+
+    function goToForm(startAt) {
+      overlay.querySelector('#wizard-cover').style.display = 'none';
+      overlay.querySelector('#wizard-intake').style.display = 'none';
       overlay.querySelector('#wizard-body').style.display = '';
       overlay.querySelector('#wizard-actions').style.display = '';
-      showStep(1);
-    });
+      showStep(startAt || 1);
+    }
+
+    // Maps the AI's best-effort extraction onto the real form fields (not just localStorage)
+    // so Back/Review later in the wizard shows what was actually said, and the final submit's
+    // existing collectProfileFromForm() picks it up with zero special-casing.
+    function applyExtractedToForm(extracted) {
+      const selectOtherFields = ['primaryGoal', 'dietPattern', 'mainStressor'];
+      const plainFields = ['activityLevel', 'stressLevel'];
+      selectOtherFields.forEach((key) => {
+        const val = extracted[key];
+        if (!val) return;
+        const el = form.elements[key];
+        if (!el) return;
+        const opts = Array.from(el.options || []).map((o) => o.value);
+        if (opts.includes(val)) { el.value = val; return; }
+        el.value = 'Other';
+        const otherInput = form.elements[`${key}Other`];
+        if (otherInput) otherInput.value = val;
+        const otherRow = document.getElementById(`onboard-${key}-other-row`);
+        if (otherRow) otherRow.style.display = '';
+      });
+      plainFields.forEach((key) => {
+        const val = extracted[key];
+        const el = form.elements[key];
+        if (!val || !el) return;
+        const opts = Array.from(el.options || []).map((o) => o.value);
+        if (opts.includes(val)) el.value = val;
+      });
+      if (extracted.sleepHours && form.elements.sleepHours) {
+        const n = parseFloat(extracted.sleepHours);
+        if (Number.isFinite(n)) form.elements.sleepHours.value = n;
+      }
+      if (extracted.selfDescription) {
+        const merged = { ...getProfile(), selfDescription: extracted.selfDescription };
+        setProfile(merged);
+      }
+    }
+
+    function startIntake() {
+      const transcript = overlay.querySelector('#intake-transcript');
+      const input = overlay.querySelector('#intake-input');
+      const sendBtn = overlay.querySelector('#intake-send');
+      const orb = overlay.querySelector('#intake-orb');
+      const voiceStatus = overlay.querySelector('#intake-voice-status');
+      let history = [];
+      let finished = false;
+
+      function setOrbState(state) {
+        orb.classList.remove('listening', 'thinking', 'speaking');
+        if (state !== 'idle') orb.classList.add(state);
+      }
+      function addBubble(role, content) {
+        transcript.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role, content }));
+        transcript.scrollTop = transcript.scrollHeight;
+      }
+
+      async function turn(userText) {
+        if (userText) { history.push({ role: 'user', content: userText }); addBubble('user', userText); }
+        input.value = '';
+        input.disabled = true;
+        sendBtn.disabled = true;
+        setOrbState('thinking');
+        voiceStatus.textContent = 'Thinking…';
+        transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="intake-loading"><span class="loader"></span></div>`);
+        transcript.scrollTop = transcript.scrollHeight;
+        try {
+          const res = await fetch('/api/coach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'intake', history, message: '' }),
+          });
+          const data = await res.json();
+          document.getElementById('intake-loading')?.remove();
+          if (!res.ok) throw new Error(data.error || 'Request failed');
+          if (data.escalation) {
+            addBubble('coach', data.message);
+            setOrbState('idle');
+            voiceStatus.textContent = 'Tap to speak, or type below';
+            return;
+          }
+          history.push({ role: 'coach', content: data.message });
+          addBubble('coach', data.message);
+          setOrbState('speaking');
+          voiceStatus.textContent = 'Speaking…';
+          speakText(data.message, () => { setOrbState('idle'); voiceStatus.textContent = finished ? '' : 'Tap to speak, or type below'; });
+          if (data.extracted) applyExtractedToForm(data.extracted);
+          if (data.done) {
+            finished = true;
+            input.disabled = true;
+            sendBtn.disabled = true;
+            setTimeout(() => goToForm(3), 1400);
+          }
+        } catch (err) {
+          document.getElementById('intake-loading')?.remove();
+          addBubble('coach', `Something went wrong: ${err.message}`);
+          setOrbState('idle');
+          voiceStatus.textContent = 'Tap to speak, or type below';
+        } finally {
+          if (!finished) { input.disabled = false; sendBtn.disabled = false; input.focus(); }
+        }
+      }
+
+      sendBtn.addEventListener('click', () => { if (input.value.trim()) turn(input.value.trim()); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()) turn(input.value.trim()); });
+
+      const SR = getSpeechRecognitionCtor();
+      let recognition = null;
+      let listening = false;
+      if (SR) {
+        recognition = new SR();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (e) => turn(e.results[0][0].transcript);
+        recognition.onerror = () => { listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; };
+        recognition.onend = () => { listening = false; };
+      }
+      orb.addEventListener('click', () => {
+        if (finished) return;
+        if (!recognition) { voiceStatus.textContent = "Voice input isn't supported in this browser — type below instead."; return; }
+        window.speechSynthesis?.cancel();
+        if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; return; }
+        try { recognition.start(); listening = true; setOrbState('listening'); voiceStatus.textContent = 'Listening…'; }
+        catch { voiceStatus.textContent = 'Could not start the microphone — check browser permissions.'; }
+      });
+
+      overlay.querySelector('#intake-use-form').addEventListener('click', () => {
+        window.speechSynthesis?.cancel();
+        if (recognition && listening) recognition.stop();
+        goToForm(1);
+      });
+
+      turn(null); // opening turn — no user message yet, model greets and asks its first question
+    }
 
     overlay.querySelector('#wizard-next').addEventListener('click', () => showStep(Math.min(WIZARD_STEPS.length, step + 1)));
     overlay.querySelector('#wizard-back').addEventListener('click', () => showStep(Math.max(1, step - 1)));
@@ -1282,6 +1588,7 @@
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
+        ${result.personalizationNote ? `<div class="plan-reflection">${lcIcon('hands', 14)} ${escapeHtml(result.personalizationNote)}</div>` : ''}
         <div class="deliverable-box"${accentStyle}>
           <div class="deliverable-label">Today's deliverable</div>
           <div class="plan-headline-row">
@@ -1778,10 +2085,11 @@
     }
     list.innerHTML = candidates.map(({ t, state }, i) => {
       const accent = topicAccent(t.id);
+      const domain = domainForTopic(t.id);
       const result = state.lastResult;
       const hasPlan = result && !result.escalation;
       const headline = hasPlan ? (result.headline || deriveHeadline(result.doThis)) : t.label;
-      const sub = hasPlan ? (result.doThis || '') : (t.description || 'No plan yet for this topic.');
+      const sub = hasPlan ? (result.personalizationNote || result.doThis || '') : (t.description || 'No plan yet for this topic.');
       const allDone = state.days.every(Boolean);
       let cta;
       if (!hasPlan) {
@@ -1792,10 +2100,10 @@
         cta = `<button class="btn btn-primary today-mark-btn" data-topic="${t.id}">${lcIcon('bolt', 14)} Mark done <span class="xp-tag">+10 XP</span></button>`;
       }
       return `
-        <div class="today-action-card stagger-item" style="--i:${i}">
-          <span class="today-action-icon" style="color:${accent};background:${accent}22">${lcIcon(t.icon, 20)}</span>
+        <div class="today-action-card stagger-item" style="--i:${i}" data-topic="${t.id}">
+          <span class="today-action-icon" style="color:${accent};background:${accent}22">${lcIcon(domain ? domain.icon : t.icon, 20)}</span>
           <div class="today-action-body">
-            <div class="today-action-topic">${escapeHtml(t.label)}</div>
+            <div class="today-action-topic">${domain ? escapeHtml(domain.label.toUpperCase()) + ' · ' : ''}${escapeHtml(t.label)}</div>
             <div class="today-action-headline">${escapeHtml(headline)}</div>
             ${sub ? `<div class="today-action-sub">${escapeHtml(sub)}</div>` : ''}
           </div>
@@ -1884,52 +2192,42 @@
   }
 
   // ---------- global "Ask Compass" cross-topic coach ----------
-  function renderGlobalCoach() {
-    // Deliberately NOT a floating bottom-right bubble — that exact visual pattern (fixed
-    // circular button, bottom-right corner) is the signature shape ad blockers and privacy
-    // extensions commonly hide via generic "chat widget" cosmetic filters. The permanent
-    // "Coach" item in the icon rail (wired via window._lcOpenCoach, set below) is the
-    // guaranteed entry point instead.
-    const overlay = document.createElement('div');
-    overlay.className = 'global-chat-overlay';
-    overlay.style.display = 'none';
-    overlay.innerHTML = `
-      <div class="global-chat-panel">
-        <div class="global-chat-header">
-          <span class="global-chat-title">${lcIcon('hands', 17)} Ask Compass</span>
-          <button class="global-chat-close" id="global-chat-close">${lcIcon('close', 18)}</button>
+  // Full-page immersive Coach — the orb is the center of the screen, not a side panel, closer
+  // to Thrive's "coach calls" (real-time voice conversations) than a chat-widget bolt-on.
+  function renderCoachView() {
+    const main = document.getElementById('main');
+    main.innerHTML = `
+      <div class="coach-view">
+        <div class="coach-orb-stage">
+          <button type="button" class="voice-orb voice-orb-lg" id="voice-orb" aria-label="Talk to your coach">
+            <span class="orb-layer orb-layer-1"></span>
+            <span class="orb-layer orb-layer-2"></span>
+            <span class="orb-layer orb-layer-3"></span>
+            <span class="orb-icon">${lcIcon('mic', 30)}</span>
+          </button>
+          <div class="voice-status" id="voice-status">Tap to speak, or type below</div>
         </div>
-        <div class="voice-orb-wrap">
-          <button type="button" class="voice-orb" id="voice-orb" aria-label="Talk to your coach">${lcIcon('hands', 30)}</button>
-          <div class="voice-status" id="voice-status">Tap to speak</div>
-        </div>
-        <div class="global-chat-messages" id="global-chat-messages"></div>
-        <div class="global-chat-input-row">
-          <input type="text" class="chat-input" id="global-chat-input" placeholder="What should I focus on this week?" maxlength="300"/>
-          <button class="btn btn-primary" id="global-chat-send">Send</button>
+        <div class="coach-transcript" id="coach-transcript"></div>
+        <div class="coach-input-row">
+          <input type="text" class="chat-input" id="coach-input" placeholder="What should I focus on this week?" maxlength="300"/>
+          <button class="btn btn-primary" id="coach-send">Send</button>
         </div>
       </div>
     `;
-    document.body.appendChild(overlay);
 
     function renderMessages() {
       const history = getGlobalChat();
-      const messagesEl = document.getElementById('global-chat-messages');
-      messagesEl.innerHTML = history.length
+      const transcript = document.getElementById('coach-transcript');
+      transcript.innerHTML = history.length
         ? history.map((m) => renderChatBubbleHtml(m)).join('')
-        : `<div class="global-chat-empty">Ask anything that spans your topics — "what should I prioritize?", "how do my sleep and stress connect?". This has your full adherence picture, not just one topic's page.</div>`;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+        : `<div class="coach-empty">Ask anything that spans your topics — "what should I prioritize?", "how do my sleep and stress connect?". This has your full adherence picture, not just one topic's page. Tap the orb to talk instead of typing.</div>`;
+      transcript.scrollTop = transcript.scrollHeight;
     }
+    renderMessages();
 
-    window._lcOpenCoach = () => {
-      overlay.style.display = overlay.style.display === 'flex' ? 'none' : 'flex';
-      if (overlay.style.display === 'flex') renderMessages();
-    };
-    document.getElementById('global-chat-close').addEventListener('click', () => { overlay.style.display = 'none'; });
-
-    const input = document.getElementById('global-chat-input');
-    const sendBtn = document.getElementById('global-chat-send');
-    const messagesEl = document.getElementById('global-chat-messages');
+    const input = document.getElementById('coach-input');
+    const sendBtn = document.getElementById('coach-send');
+    const transcript = document.getElementById('coach-transcript');
     const orb = document.getElementById('voice-orb');
     const voiceStatus = document.getElementById('voice-status');
 
@@ -1948,9 +2246,10 @@
       input.value = '';
       input.disabled = true;
       sendBtn.disabled = true;
-      if (viaVoice) { setOrbState('thinking'); voiceStatus.textContent = 'Thinking…'; }
-      messagesEl.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="global-chat-loading"><span class="loader"></span></div>`);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      setOrbState('thinking');
+      voiceStatus.textContent = 'Thinking…';
+      transcript.insertAdjacentHTML('beforeend', `<div class="chat-bubble coach" id="coach-loading"><span class="loader"></span></div>`);
+      transcript.scrollTop = transcript.scrollHeight;
 
       try {
         const settings = getSettings();
@@ -1975,19 +2274,17 @@
         updated.push({ role: 'coach', content: reply });
         setGlobalChat(updated);
         renderMessages();
-        if (viaVoice) {
-          setOrbState('speaking');
-          voiceStatus.textContent = 'Speaking…';
-          speakText(reply, () => { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; });
-        }
+        setOrbState('speaking');
+        voiceStatus.textContent = 'Speaking…';
+        speakText(reply, () => { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; });
       } catch (err) {
-        document.getElementById('global-chat-loading')?.remove();
-        messagesEl.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: `Something went wrong: ${err.message}` }));
-        if (viaVoice) { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; }
+        document.getElementById('coach-loading')?.remove();
+        transcript.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: `Something went wrong: ${err.message}` }));
+        setOrbState('idle');
+        voiceStatus.textContent = 'Tap to speak, or type below';
       } finally {
         input.disabled = false;
         sendBtn.disabled = false;
-        input.focus();
       }
     }
     sendBtn.addEventListener('click', () => send());
@@ -2007,7 +2304,7 @@
         const text = e.results[0][0].transcript;
         send(text, true);
       };
-      recognition.onerror = () => { listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; };
+      recognition.onerror = () => { listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; };
       recognition.onend = () => { listening = false; };
     }
     orb.addEventListener('click', () => {
@@ -2016,7 +2313,7 @@
         return;
       }
       window.speechSynthesis?.cancel();
-      if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak'; return; }
+      if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; return; }
       try {
         recognition.start();
         listening = true;
@@ -2045,6 +2342,7 @@
     else if (route.view === 'dashboard') renderDashboard();
     else if (route.view === 'topics') renderTopicsGrid();
     else if (route.view === 'nutrition') renderNutritionLog();
+    else if (route.view === 'coach') renderCoachView();
     else if (route.view === 'journal') renderJournal();
     else if (route.view === 'profile') renderProfile();
     else if (route.view === 'settings') renderSettings();

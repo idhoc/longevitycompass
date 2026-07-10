@@ -51,6 +51,20 @@ const COACH_TONES = {
   clinical: 'Coaching tone for this response: CLINICAL. Lead with the mechanism or evidence before the instruction, as a clinician explaining rationale would. Use precise physiological terminology where the source supports it. Minimal motivational language.',
 };
 
+// The actual "how the AI coaches" rewrite (not a tweak): Motivational Interviewing (MI) is the
+// real, evidence-based counseling method behind apps like Thrive AI Health Coach (their own
+// materials describe "AI-Driven MI" specifically) — collaborative, evokes the person's own
+// motivation instead of lecturing them, reflects their situation back before advising. This
+// replaces the earlier generic "helpful assistant" framing everywhere a coaching turn happens.
+const MI_STYLE_TEXT = [
+  'Coach using Motivational Interviewing (MI), the same evidence-based method professional health coaches are trained in — not a search engine reciting facts. Concretely, every turn:',
+  '1) REFLECT before you ADVISE. If the profile or conversation gives you something specific to reflect (their stated goal, an actual number like sleep hours or adherence %, something they said), open by reflecting it back in one sentence, so the response reads as written for this specific person, not templated. Never open with a generic hook like "Did you know..." or "Studies show...".',
+  '2) ONE invitation, not a command. Frame the action as something to try, not an order — "one option that fits what you told me is..." rather than "you must...". The person stays in control of whether to take it.',
+  '3) Use their own numbers. If you have their actual profile values (age, adherence, sleep hours, resting heart rate, etc.), cite the specific number, not a vague quantifier ("more," "some," "regularly").',
+  '4) Affirm before correcting. If adherence is low or they are just starting, name the effort of showing up at all before anything else — MI calls this affirming; skipping it reads as judgmental, which is the single most common complaint about AI health tools.',
+  '5) Sound like one specific, warm, competent person talking, once — not a listicle, not a wall of hedges. Still follow every grounding/evidence rule above; MI changes the delivery, never the facts.',
+].join(' ');
+
 const FORMAT_TOOL = {
   name: 'format_plan',
   description: "Return the coach's response restructured for a UI card. Restructuring and removing markdown syntax is allowed; changing, adding, or softening any factual content is not.",
@@ -60,6 +74,10 @@ const FORMAT_TOOL = {
       headline: {
         type: 'string',
         description: 'A punchy, memorable, <=6-word imperative title that compresses do_this. E.g. "After plating dinner, add one fiber-rich food" -> "Add One Fiber Food Tonight". Never a new claim.',
+      },
+      personalization_note: {
+        type: ['string', 'null'],
+        description: 'One sentence, MI-style reflection of why THIS action fits THIS user right now — reference their actual stated goal, adherence number, or a specific profile fact if the source text/context gives you one. Null only if truly nothing in the context supports a personalized reflection (e.g. an empty profile). Never invent a fact to fill this in.',
       },
       do_this: {
         type: 'string',
@@ -122,11 +140,48 @@ const FORMAT_TOOL = {
         },
       },
     },
-    required: ['headline', 'do_this', 'why', 'evidence', 'watch_for', 'eat', 'avoid', 'steps'],
+    required: ['headline', 'personalization_note', 'do_this', 'why', 'evidence', 'watch_for', 'eat', 'avoid', 'steps'],
   },
 };
 
 const OPENAI_VISION_MODEL = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+
+// Conversational onboarding — replaces the old form-first wizard with a short, adaptive,
+// MI-style conversation (Google Health Coach's onboarding works the same way: goals, routine,
+// lifestyle, constraints, gathered conversationally rather than via a static form). The model
+// decides per turn whether it has enough to stop, and the user can end it at any point.
+const INTAKE_TOOL = {
+  name: 'intake_turn',
+  description: 'Return the next step of a short, warm onboarding conversation with a brand-new user.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      done: {
+        type: 'boolean',
+        description: 'true once you have a real goal plus at least two lifestyle facts, OR you have asked 4 of your own questions, OR the user asked to stop/skip/use the form instead. false otherwise.',
+      },
+      message: {
+        type: 'string',
+        description: 'If done=false: your next single warm follow-up question — ONE question only, conversational, MI-style (reflect what they just said, then ask), plain text, no markdown. If done=true: a short 1-2 sentence warm closing acknowledgment, plain text.',
+      },
+      extracted: {
+        type: 'object',
+        description: 'Best-effort structured extraction from the WHOLE conversation so far. Empty string for any field genuinely not mentioned — never invent or assume.',
+        properties: {
+          primaryGoal: { type: 'string' },
+          dietPattern: { type: 'string' },
+          activityLevel: { type: 'string', description: 'One of: sedentary, light, moderate, active — your best mapping of what they described, or empty string.' },
+          sleepHours: { type: 'string' },
+          stressLevel: { type: 'string', description: 'One of: low, moderate, high — or empty string.' },
+          mainStressor: { type: 'string' },
+          selfDescription: { type: 'string', description: 'A 1-3 sentence natural-language summary of who this person is and what they want, in their own words/spirit — this personalizes every future response beyond the structured fields above.' },
+        },
+        required: ['primaryGoal', 'dietPattern', 'activityLevel', 'sleepHours', 'stressLevel', 'mainStressor', 'selfDescription'],
+      },
+    },
+    required: ['done', 'message', 'extracted'],
+  },
+};
 
 const MEAL_FORMAT_TOOL = {
   name: 'format_meal',
@@ -193,6 +248,9 @@ exports.handler = async (event) => {
   if (body.mode === 'mealPhoto') {
     return handleMealPhoto(body);
   }
+  if (body.mode === 'intake') {
+    return handleIntake(body);
+  }
 
   const { topicId, profile } = body;
   const topic = bundle.topics.find((t) => t.id === topicId);
@@ -241,6 +299,7 @@ async function handlePlanRequest(topic, body) {
     escalation: false,
     generatedAt: new Date().toISOString(),
     headline: structured.headline || null,
+    personalizationNote: structured.personalization_note || null,
     doThis: structured.do_this || null,
     why: structured.why || null,
     evidence: Array.isArray(structured.evidence) ? structured.evidence : [],
@@ -331,12 +390,16 @@ async function handleGlobalChat(body) {
   const systemPrompt = [
     bundle.systemPrompt,
     '',
+    '## 9b. Coaching Method (This Deployment)',
+    '',
+    MI_STYLE_TEXT,
+    '',
     '## 10. Cross-Topic Coaching Mode (This Deployment)',
     '',
-    "You are answering from a global view across all of this user's tracked topics, not one topic's page. Here is the current state of all 10 topics:",
+    "You are answering from a global view across all of this user's tracked topics, not one topic's page. Here is the current state of all their topics:",
     summaryLines,
     '',
-    "Use this to reason about prioritization, tradeoffs, and connections between topics (e.g. poor sleep adherence undermining a cognitive-health goal) — that kind of cross-topic reasoning is exactly what this mode is for and the single-topic pages cannot do. You do NOT have the full research library for every topic loaded here. If the user's question needs the specific evidence/mechanism detail from one topic's dedicated library (not just its one-line summary above), say so plainly and suggest they open that specific topic for a fully-grounded plan, rather than inventing specifics you don't actually have loaded. Stay inside every rule from Sections 1-9 above (scope, escalation, evidence honesty). Answer in 2-5 sentences, plain text, no markdown.",
+    "Use this to reason about prioritization, tradeoffs, and connections between topics (e.g. poor sleep adherence undermining a cognitive-health goal) — that kind of cross-topic reasoning is exactly what this mode is for and the single-topic pages cannot do. You do NOT have the full research library for every topic loaded here. If the user's question needs the specific evidence/mechanism detail from one topic's dedicated library (not just its one-line summary above), say so plainly and suggest they open that specific topic for a fully-grounded plan, rather than inventing specifics you don't actually have loaded. Stay inside every rule from Sections 1-9 above (scope, escalation, evidence honesty). Answer in 2-5 sentences, plain text, no markdown — this is a spoken conversation (the user may be using voice), so write the way you'd actually talk, not the way you'd write a report.",
     context.coachTone && COACH_TONES[context.coachTone] ? COACH_TONES[context.coachTone] : '',
   ].filter(Boolean).join('\n');
 
@@ -382,9 +445,13 @@ async function handleSynthesis(body) {
   const systemPrompt = [
     bundle.systemPrompt,
     '',
+    '## 9b. Coaching Method (This Deployment)',
+    '',
+    MI_STYLE_TEXT,
+    '',
     '## 10. Weekly Synthesis Mode (This Deployment)',
     '',
-    'Write a short synthesis (150-250 words, plain text, no markdown, no headers, 3 short paragraphs separated by a blank line) of this user\'s week across ALL topics below — not a single-topic plan. Paragraph 1: name specifically what is working, citing the actual adherence numbers. Paragraph 2: identify ONE real connection between two of their topics (e.g. sleep adherence and cognitive-health goals, or purpose and stress-related topics) — only if the data actually supports a connection; if nothing genuinely connects, say the topics are currently independent rather than inventing a link. Paragraph 3: recommend ONE specific topic to focus on next week and why, referencing the adherence numbers. Stay inside every Section 1-9 rule (scope, escalation, evidence honesty) — this is still wellness coaching, not diagnosis.',
+    'Write a short synthesis (150-250 words, plain text, no markdown, no headers, 3 short paragraphs separated by a blank line) of this user\'s week across ALL topics below — not a single-topic plan, and not a report. Write it the way a coach would open a real check-in conversation. Paragraph 1: affirm what is actually working first, citing the actual adherence numbers — MI-style, name the effort before anything else. Paragraph 2: identify ONE real connection between two of their topics (e.g. sleep adherence and cognitive-health goals, or purpose and stress-related topics) — only if the data actually supports a connection; if nothing genuinely connects, say the topics are currently independent rather than inventing a link. Paragraph 3: offer ONE specific topic to focus on next week as an invitation, not an order, referencing the adherence numbers. Stay inside every Section 1-9 rule (scope, escalation, evidence honesty) — this is still wellness coaching, not diagnosis.',
     '',
     'This week\'s adherence across all topics:',
     summaryLines,
@@ -435,6 +502,10 @@ async function handleBriefing(body) {
 
   const systemPrompt = [
     bundle.systemPrompt,
+    '',
+    '## 9b. Coaching Method (This Deployment)',
+    '',
+    MI_STYLE_TEXT,
     '',
     '## 10. Daily Briefing Mode (This Deployment)',
     '',
@@ -514,6 +585,102 @@ async function handleMealPhoto(body) {
   });
 }
 
+// Conversational onboarding turn. Runs entirely on Claude (no web search needed — this is a
+// short getting-to-know-you conversation, not a grounded research answer) via the same
+// forced-tool-use pattern used everywhere else, so the model can never return anything malformed
+// for the UI to trip on. The user can end this at any point ("stop", "skip", "use the form") and
+// the model is explicitly told to respect that immediately rather than pushing back.
+async function handleIntake(body) {
+  const { history, message } = body;
+
+  const transcriptLines = [];
+  if (Array.isArray(history)) {
+    history.slice(-16).forEach((turn) => {
+      transcriptLines.push(`${turn.role === 'user' ? 'User' : 'Coach'}: ${turn.content}`);
+    });
+  }
+  if (message && message.trim()) transcriptLines.push(`User: ${message.trim()}`);
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return respond(200, mockIntakeTurn(transcriptLines.filter((l) => l.startsWith('User:')).length));
+  }
+
+  const instruction = [
+    MI_STYLE_TEXT,
+    '',
+    "This is a brand-new user's very first conversation with you, before any profile exists. Have a short, warm, natural conversation — at most 4 of your own questions total, fewer if they cover several things in one message — to learn their main goal, general lifestyle (diet pattern, activity level, rough sleep, stress), and what's actually going on in their life right now. Ask ONE question at a time, conversationally, the way a good coach's first session actually sounds — never read out a form. If the user says anything like \"stop\", \"skip\", \"I\\'d rather use the form\", or similar, set done=true immediately, thank them briefly, and stop — never push back on that. Once you have a real goal plus at least two lifestyle facts, or you have asked 4 questions, set done=true with a brief warm close. Call the intake_turn tool for every turn — never reply in plain text.",
+    '',
+    transcriptLines.length ? `Conversation so far:\n${transcriptLines.join('\n')}` : '(This is the very first turn — nothing said yet. Open with a warm, compass-themed greeting and your first question.)',
+  ].join('\n');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 500,
+      temperature: 0.6,
+      tools: [INTAKE_TOOL],
+      tool_choice: { type: 'tool', name: 'intake_turn' },
+      messages: [{ role: 'user', content: instruction }],
+    }),
+  });
+  if (!res.ok) {
+    return respond(502, { error: `Intake failed: Anthropic ${res.status}: ${await res.text()}` });
+  }
+  const data = await res.json();
+  const toolUse = (data.content || []).find((b) => b.type === 'tool_use' && b.name === 'intake_turn');
+  if (!toolUse || !toolUse.input) {
+    return respond(502, { error: 'Intake failed: no intake_turn tool_use block' });
+  }
+  const input = toolUse.input;
+  const cleanedMessage = stripMarkdown(input.message || '').trim();
+  if (ESCALATION_MARKERS.some((marker) => cleanedMessage.toLowerCase().includes(marker))) {
+    return respond(200, { mode: 'intake', escalation: true, message: cleanedMessage });
+  }
+  const ex = input.extracted || {};
+  return respond(200, {
+    mode: 'intake',
+    escalation: false,
+    done: !!input.done,
+    message: cleanedMessage,
+    extracted: {
+      primaryGoal: stripMarkdown(ex.primaryGoal || ''),
+      dietPattern: stripMarkdown(ex.dietPattern || ''),
+      activityLevel: stripMarkdown(ex.activityLevel || ''),
+      sleepHours: stripMarkdown(ex.sleepHours || ''),
+      stressLevel: stripMarkdown(ex.stressLevel || ''),
+      mainStressor: stripMarkdown(ex.mainStressor || ''),
+      selfDescription: stripMarkdown(ex.selfDescription || ''),
+    },
+  });
+}
+
+const MOCK_INTAKE_STEPS = [
+  "[MOCK — ANTHROPIC_API_KEY not set] Hi — I'm your coach. Before we dive into any topic, tell me a bit about yourself: what's the main thing you're hoping to get out of this, in your own words?",
+  "[MOCK] Got it, thanks for sharing that. What does a typical day look like for you right now — are you fairly active, or mostly sitting?",
+  "[MOCK] That's helpful. And how's your sleep been lately — roughly how many hours, and does it feel like enough?",
+  "[MOCK] One last one: what's the biggest source of stress in your life right now, if anything?",
+];
+function mockIntakeTurn(turnCount) {
+  if (turnCount >= MOCK_INTAKE_STEPS.length) {
+    return {
+      mode: 'intake', escalation: false, done: true,
+      message: "[MOCK] Thanks for sharing all that — once your API key is set, I'll use this to personalize everything from here. Let's get started.",
+      extracted: {
+        primaryGoal: '[MOCK] More energy', dietPattern: '[MOCK] Standard / omnivore', activityLevel: 'light',
+        sleepHours: '6.5', stressLevel: 'moderate', mainStressor: '[MOCK] Work',
+        selfDescription: '[MOCK] This is a placeholder summary — once ANTHROPIC_API_KEY is set, this becomes a real 1-3 sentence reflection of what you actually told the coach.',
+      },
+    };
+  }
+  return { mode: 'intake', escalation: false, done: false, message: MOCK_INTAKE_STEPS[turnCount], extracted: { primaryGoal: '', dietPattern: '', activityLevel: '', sleepHours: '', stressLevel: '', mainStressor: '', selfDescription: '' } };
+}
+
 function buildMealPrompt(profile) {
   return [
     "Look at this meal photo. Identify each distinct food you can actually see — do not guess at things you can't see (e.g. don't assume a sauce is present if you can't see it).",
@@ -530,7 +697,8 @@ function buildSystemPrompt(topic, context) {
   const sourceText = topic.sources.map((id) => bundle.sources[id]).join('\n\n---\n\n');
 
   const formattingRules = [
-    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    'Plain text only. Do not use markdown syntax of any kind — no **bold**, no *italics*, no # headers, no bullet dashes. Write "Reflect:", "Do this:", "Why:", and "Watch for:" as plain labels on their own line, exactly that spelling, followed by the content on the same line.',
+    `Before "Do this:", write a "Reflect:" line — one sentence, MI-style, reflecting the user's specific situation back to them using an actual value from their profile if one is available (their stated goal, an adherence number, a specific number like sleep hours) — never a generic opener. If the profile is genuinely empty, write "Reflect: none" instead of inventing something to reflect.`,
     'Whenever a source gives a specific number for the action you are recommending — grams, a percentage, a frequency, a timeframe — state that exact number. Never write "more," "some," or "a bit" when a source has already told you how much. If no source gives a number for this specific action, say so plainly rather than inventing one.',
     'If — and only if — the action you chose is naturally a short timed sequence rather than one instruction (a breathing pattern, a stretch routine, a walk with a warm-up/brisk/cool-down structure), add one more line: "Steps: Label one (seconds) ; Label two (seconds) ; ..." — e.g. "Steps: Inhale slowly through your nose (4) ; Hold (7) ; Exhale slowly through your mouth (8)". Most actions (eat this, message someone, journal one line) are NOT sequential — do not invent steps for a single-instruction action just to use this feature. Never more than 6 steps.',
   ];
@@ -545,6 +713,10 @@ function buildSystemPrompt(topic, context) {
 
   const sections = [
     bundle.systemPrompt,
+    '',
+    '## 9b. Coaching Method (This Deployment)',
+    '',
+    MI_STYLE_TEXT,
     '',
     '## 10. Source Library for This Turn',
     '',
@@ -887,6 +1059,7 @@ async function callClaudeDistill(stage1Text) {
   const instruction = [
     'Restructure the coach response below by calling the format_plan tool.',
     'Do NOT add, remove, soften, or invent any fact — restructure, split, and strip markdown formatting only.',
+    'If the response has a "Reflect:" line, that IS personalization_note verbatim (stripped of the label) — unless it says "Reflect: none", in which case personalization_note is null. Never write your own reflection; only extract theirs.',
     'If the response has an "Eat:" and/or "Avoid:" line (semicolon-separated items like "Food (quantity): reason"), split each on " ; " then split each item on the first ":" into food vs. detail. If a line is absent, or Avoid says "none specified", return an empty array for it.',
     'If the response has a "Steps:" line (semicolon-separated items like "Label (seconds)"), split each on " ; " then parse the parenthetical number as seconds. If absent, return an empty array — do not invent a step sequence for a non-sequential action.',
     'For each evidence item, infer a "strength" tier from the language used (see schema) and extract any quoted phrase as "source_quote" (null if none).',
@@ -930,6 +1103,7 @@ function sanitizeStructured(input) {
     : []);
   return {
     headline: stripMarkdown(input.headline || ''),
+    personalization_note: input.personalization_note ? stripMarkdown(input.personalization_note) : null,
     do_this: stripMarkdown(input.do_this || ''),
     why: stripMarkdown(input.why || ''),
     evidence: Array.isArray(input.evidence)
@@ -967,12 +1141,14 @@ function naiveFallbackParse(text) {
     const m = cleaned.match(re);
     return m ? m[1].trim() : null;
   };
+  const reflect = pick('Reflect', ['Do this', 'Why', 'Watch for', 'Eat', 'Avoid', 'Steps']);
   const doThis = pick('Do this', ['Why', 'Watch for', 'Eat', 'Avoid', 'Steps']);
   const why = pick('Why', ['Watch for', 'Eat', 'Avoid', 'Steps']);
   const watchFor = pick('Watch for', ['Eat', 'Avoid', 'Steps']);
   const eatLine = pick('Eat', ['Avoid', 'Steps']);
   const avoidLine = pick('Avoid', ['Steps']);
   const stepsLine = pick('Steps', []);
+  const personalizationNote = reflect && !/^none$/i.test(reflect.trim()) ? reflect : null;
   // Expected shape: "Food (quantity): reason ; Food2 (quantity): reason2 ; ..."
   const parseFoodItems = (line) => {
     if (!line || /^none specified$/i.test(line.trim())) return [];
@@ -993,7 +1169,7 @@ function naiveFallbackParse(text) {
   };
 
   if (doThis || why) {
-    return { headline: null, do_this: doThis, why, evidence: [], watch_for: watchFor, eat: parseFoodItems(eatLine), avoid: parseFoodItems(avoidLine), steps: parseSteps(stepsLine) };
+    return { headline: null, personalization_note: personalizationNote, do_this: doThis, why, evidence: [], watch_for: watchFor, eat: parseFoodItems(eatLine), avoid: parseFoodItems(avoidLine), steps: parseSteps(stepsLine) };
   }
 
   // No recognizable labels at all — surface the raw content rather than nothing.
@@ -1011,12 +1187,13 @@ function naiveFallbackParse(text) {
 }
 
 function mockFollowupReply(message) {
-  return `[MOCK — OPENAI_API_KEY not set] I don't have a live model to answer "${message.trim().slice(0, 80)}" right now, but once your API key is set, I'll answer this conversationally in a few sentences, grounded in the same source library and web search rules as your plan.`;
+  return `[MOCK — OPENAI_API_KEY not set] That's a fair question about "${message.trim().slice(0, 70)}" — I just don't have a live model wired up to actually answer it yet. Once OPENAI_API_KEY is set, I'll give you a real, specific answer grounded in your research library, the same way I would in a live coaching conversation.`;
 }
 
 function mockStage1(userMessage, foodRelevant) {
   const lines = [
     '[MOCK — OPENAI_API_KEY not set]',
+    "Reflect: You're building consistency here, and that's the part that actually compounds — one more real fiber source today keeps that going.",
     'Do this: After your next meal, add one 1/2-cup serving of a fiber-rich food you did not eat earlier today — beans, lentils, oats, or a whole grain.',
     'Why: The uploaded source library associates a roughly 25g/day increase in fiber intake with measurable microbiome changes within two weeks, and links diverse fiber sources to improved SCFA production and healthier aging markers (mock data — set OPENAI_API_KEY for a real, grounded response).',
     'Watch for: This is placeholder content and is not grounded in your actual research library.',
@@ -1034,6 +1211,7 @@ function mockDistill(stage1Text) {
   const foodRelevant = stage1Text.includes('\nEat:');
   return {
     headline: '[MOCK] Add One Fiber Serving',
+    personalization_note: "[MOCK] You're building consistency here, and that's the part that actually compounds — one more real fiber source today keeps that going.",
     do_this: '[MOCK — ANTHROPIC_API_KEY not set] After your next meal, add one 1/2-cup serving of a fiber-rich food you did not eat earlier today — beans, lentils, oats, or a whole grain.',
     why: 'This is a mock distillation. Set ANTHROPIC_API_KEY to get a real Stage 2 response. The uploaded source library associates a roughly 25g/day increase in fiber intake with measurable microbiome changes within two weeks.',
     evidence: [{ text: stage1Text.slice(0, 160), type: 'limitation', strength: 'moderate', sourceQuote: null }],

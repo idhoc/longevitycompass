@@ -6,6 +6,87 @@ Claude restructures it into clean JSON for the UI) built around a literal
 compass instrument — a needle that swings to your strongest topic — instead of
 a generic dashboard.
 
+## A fourth pass: Motivational Interviewing, 4 life domains, conversational onboarding
+
+This pass followed direct research into Humanity.health, Thrive AI Health Coach,
+and Google Health Coach (see the "Sources" list at the end of this section) and
+two specific pieces of feedback: the AI still sounded generic, and the app
+itself still felt "the same" despite real underlying changes.
+
+- **The coaching method actually changed, not just the prompt wording.**
+  Thrive's own materials describe "AI-Driven Motivational Interviewing (MI)" —
+  a real, evidence-based counseling method (collaborative, evokes the
+  person's own motivation, reflects before it advises) rather than a
+  generic assistant reciting facts. `MI_STYLE_TEXT` in `coach.js` is now
+  injected into every coaching surface (plans, follow-ups, the global coach,
+  synthesis, briefings): reflect the person's specific situation back before
+  advising, frame the action as an invitation not a command, cite their
+  actual numbers, affirm effort before correcting course. Stage 1 now emits
+  a `Reflect:` line before `Do this:`, which Stage 2 extracts verbatim into
+  a new `personalization_note` field — shown at the top of every plan card
+  and on Today's action cards, so the response visibly reads as written for
+  that person, not templated.
+- **10 topics → 4 life domains.** Both Humanity (Movement/Nutrition/Mind/
+  Recovery) and Thrive (5 similarly broad categories) organize around a
+  small number of broad domains, not a long flat list — which is exactly
+  the "feels constricting" complaint. The `DOMAINS` map in `app.js` groups
+  the 10 grounded topics into 4 domains for browsing (the new "Domains"
+  nav item, replacing "Topics") and for how Today's action cards are
+  labeled. The underlying 10 topics and their distinct source libraries are
+  untouched — grounding integrity didn't get sacrificed for a simpler
+  mental model, it's a presentation-layer regrouping.
+- **Conversational onboarding, Google Health Coach-style.** The onboarding
+  modal no longer opens on a static form. After the cover screen, a
+  conversation starts (`mode: 'intake'` in `coach.js`, backed by
+  forced tool-use so it can never return anything malformed): the coach
+  asks about your goal and lifestyle one question at a time, up to 4
+  questions, extracting structured fields as it goes. Two explicit exits
+  exist at every point — "Prefer a form instead?" (jumps straight to the
+  classic structured wizard) and just telling the AI to stop/skip (the
+  model is instructed to respect that immediately, never push back) —
+  with a static privacy line always visible: nothing here leaves your
+  browser except to generate plans. Once done, extracted answers are
+  written into the real form fields (so Back/Review reflect them
+  correctly) and the wizard skips straight to Genetics, since Basics/
+  Lifestyle were just covered conversationally.
+- **Coach is now a full-page destination, not a side panel.** A permanent
+  "Coach" item in the rail opens a dedicated route with the orb centered
+  and large — closer to Thrive's real-time voice "coach calls" than a
+  chat-widget bolt-on.
+- **The orb itself is a different animation technique**, not a faster
+  version of the old one: three independently-timed blurred radial-gradient
+  layers (`orbFloat1/2/3` in `style.css`) rather than a single CSS
+  scale-pulse, so idle/listening/thinking/speaking read as genuinely
+  different organic motions instead of the same throb sped up.
+- **Voice quality — two honest, real improvements, one honest limit.**
+  `pickBestVoice()` now scores installed system voices and picks the best
+  one instead of the browser's silent default; replies are spoken
+  sentence-by-sentence with small natural rate/pitch variance per sentence
+  instead of one flat utterance, which is measurably less monotone. The
+  limit: there's no neural TTS engine wired in here (that would need its
+  own API key, e.g. ElevenLabs) — voice quality is still ultimately capped
+  by whatever engine your OS/browser ships. Said plainly rather than
+  oversold.
+- **A transparent Wellness Age estimate**, Humanity-inspired but honestly
+  scoped: Humanity's Biological Age claims validation against real-world
+  wearable/blood-test outcomes, which this app has neither of. What's on
+  Overview instead is a plain, entirely client-side, self-reported
+  estimate (`computeWellnessAge()` in `app.js`) — chronological age plus
+  named point-adjustments from activity level, sleep, smoking, stress,
+  diet pattern, alcohol, and real tracked adherence, every factor shown,
+  nothing hidden, explicitly labeled "not a lab-validated biological age
+  test."
+- **A lighter compaction pass**: card padding and page margins reduced,
+  the compass bezel already thinned last round.
+
+Sources: [Humanity](https://humanity.health/), [HUMANITY App Store listing](https://apps.apple.com/us/app/humanity-ai-health-coach/id1519091344), [Thrive AI Health](https://www.thriveaihealth.com/), [Thrive FAQs](https://www.thriveaihealth.com/faq), [Google Health Coach](https://healthapp.google/google-health-coach/), [Google Health Coach blog post](https://blog.google/products-and-platforms/products/google-health/google-health-coach/)
+
+**Deferred, flagged honestly, not silently dropped**: bloodwork upload/lab-panel
+analysis and real wearable OAuth (Oura/WHOOP/Apple Health) both need
+infrastructure and credentials only you can provision — the Settings page
+already lists them transparently as "Coming soon" rather than faking a
+connection.
+
 ## A third pass: competitor-inspired features, voice, and a calmer UI
 
 The brief for this round was explicit: look at Thrive AI Health Coach, the
