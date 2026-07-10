@@ -977,10 +977,19 @@
             setTimeout(() => goToForm(3), 1400);
           }
         } catch (err) {
+          // A brand-new user's very first interaction with the app is the worst possible place
+          // to strand someone on a raw API error (billing lapse, rate limit, outage) — rather
+          // than leaving them stuck typing into a broken chat, fail safe straight to the
+          // structured form after a moment, so onboarding can always be completed regardless.
           document.getElementById('intake-loading')?.remove();
-          addBubble('coach', `Something went wrong: ${err.message}`);
+          addBubble('coach', "I'm having trouble connecting right now, so let's use the quick form instead — nothing you've said is lost, just switching how the rest is collected.");
           setOrbState('idle');
-          voiceStatus.textContent = 'Tap to speak, or type below';
+          voiceStatus.textContent = '';
+          finished = true;
+          input.disabled = true;
+          sendBtn.disabled = true;
+          console.error('Intake turn failed:', err.message);
+          setTimeout(() => goToForm(1), 2200);
         } finally {
           if (!finished) { input.disabled = false; sendBtn.disabled = false; input.focus(); }
         }
