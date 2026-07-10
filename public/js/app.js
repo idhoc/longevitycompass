@@ -1813,30 +1813,41 @@
     return `
       <div class="card plan-card">
         ${result.mock ? '<span class="mock-badge">Mock response — set API keys for a real, grounded plan</span>' : ''}
-        ${result.personalizationNote ? `<div class="plan-reflection">${lcIcon('hands', 14)} ${escapeHtml(result.personalizationNote)}</div>` : ''}
-        <div class="deliverable-box"${accentStyle}>
-          <div class="deliverable-label">Today's deliverable</div>
-          <div class="plan-headline-row">
-            <span class="plan-headline-icon">${lcIcon(topic ? topic.icon : 'leaf', 22)}</span>
-            <div class="plan-headline-text">
-              <p class="plan-headline">${escapeHtml(headline)}</p>
-              ${result.doThis ? `<p class="plan-subaction">${escapeHtml(result.doThis)}</p>` : ''}
+        <div class="plan-card-grid">
+          <div class="plan-hero glass"${accentStyle}>
+            <div class="plan-hero-icon">${lcIcon(topic ? topic.icon : 'leaf', 26)}</div>
+            <div class="plan-hero-label">Today's deliverable</div>
+            <h3 class="plan-hero-headline">${escapeHtml(headline)}</h3>
+            ${result.doThis ? `<p class="plan-hero-sub">${escapeHtml(result.doThis)}</p>` : ''}
+            ${result.personalizationNote ? `<div class="plan-reflection">${lcIcon('hands', 13)} ${escapeHtml(result.personalizationNote)}</div>` : ''}
+            <div class="plan-hero-actions">
+              <button class="btn btn-primary" id="mark-done-btn"></button>
+              ${Array.isArray(result.steps) && result.steps.length ? `<button class="btn btn-secondary" id="start-session-btn">${lcIcon('bolt', 14)} Start guided session (${result.steps.length} steps)</button>` : ''}
             </div>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
-            <button class="btn btn-primary" id="mark-done-btn"></button>
-            ${Array.isArray(result.steps) && result.steps.length ? `<button class="btn btn-secondary" id="start-session-btn">${lcIcon('bolt', 14)} Start guided session (${result.steps.length} steps)</button>` : ''}
+          <div class="plan-body">
+            ${result.why ? `
+              <div class="plan-body-section">
+                <div class="plan-section-label">Why it matters</div>
+                <div class="plan-why">${escapeHtml(result.why)}</div>
+                ${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}
+              </div>
+            ` : ''}
+            ${foodGuideHtml ? `<div class="plan-body-section">${foodGuideHtml}</div>` : ''}
+            ${result.watchFor ? `
+              <div class="plan-watchfor-card">
+                <span class="plan-watchfor-icon">${lcIcon('chevron', 14)}</span>
+                <div><div class="plan-section-label" style="margin:0 0 3px">Heads up</div>${escapeHtml(result.watchFor)}</div>
+              </div>
+            ` : ''}
+            <div class="plan-sources-footer">
+              ${lcIcon('dna', 13)} ${topic && topic.sourceLabel ? escapeHtml(topic.sourceLabel) : 'Curated research library'}
+              ${result.usedWebSearch ? `<span class="web-search-badge">${lcIcon('atom', 11)} Includes live web search</span>` : ''}
+              ${citationsHtml}
+            </div>
+            ${buildChatPanelHtml(topic)}
           </div>
         </div>
-        ${result.why ? `<div class="plan-section-label">Why it matters</div><div class="plan-why">${escapeHtml(result.why)}</div>${evidenceHtml ? `<div class="evidence-card-list">${evidenceHtml}</div>` : ''}` : ''}
-        ${foodGuideHtml}
-        ${result.watchFor ? `<div class="plan-section-label">Heads up</div><div class="plan-watchfor">${lcIcon('chevron', 12)} ${escapeHtml(result.watchFor)}</div>` : ''}
-        <div class="plan-sources-footer">
-          ${lcIcon('dna', 13)} ${topic && topic.sourceLabel ? escapeHtml(topic.sourceLabel) : 'Curated research library'}
-          ${result.usedWebSearch ? `<span class="web-search-badge">${lcIcon('atom', 11)} Includes live web search</span>` : ''}
-          ${citationsHtml}
-        </div>
-        ${buildChatPanelHtml(topic)}
       </div>
     `;
   }
