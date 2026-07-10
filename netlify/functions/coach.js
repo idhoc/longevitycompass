@@ -43,7 +43,13 @@ const ESCALATION_MARKERS = [
   'contact a licensed',
 ];
 
-const TRUSTED_DOMAINS_TEXT = 'government health agencies (nih.gov, ncbi.nlm.nih.gov/pubmed, cdc.gov, who.int, fda.gov), academic/medical institutions (harvard.edu, mayoclinic.org, stanford.edu, and similar .edu or major hospital domains), and peer-reviewed journals or their DOI/PubMed pages (nature.com, nejm.org, jamanetwork.com, thelancet.com, bmj.com, cell.com)';
+const TRUSTED_DOMAINS_TEXT = 'government health agencies (nih.gov, ncbi.nlm.nih.gov/pubmed, cdc.gov, who.int, fda.gov, medlineplus.gov), academic/medical institutions (harvard.edu, health.harvard.edu, mayoclinic.org, stanford.edu, hopkinsmedicine.org, clevelandclinic.org, and similar .edu or major nonprofit hospital domains), and peer-reviewed journals or their DOI/PubMed pages (nature.com, nejm.org, jamanetwork.com, thelancet.com, bmj.com, cell.com, cell.com/cell-metabolism, sciencedirect.com)';
+
+const COACH_TONES = {
+  direct: 'Coaching tone for this response: DIRECT. Skip preamble and hedging. Lead with the instruction in the first sentence. Short sentences. No motivational framing.',
+  encouraging: 'Coaching tone for this response: ENCOURAGING. Open by acknowledging effort or progress before the instruction. Frame any low adherence as normal and recoverable, never as failure. Still concise — warmth is not verbosity.',
+  clinical: 'Coaching tone for this response: CLINICAL. Lead with the mechanism or evidence before the instruction, as a clinician explaining rationale would. Use precise physiological terminology where the source supports it. Minimal motivational language.',
+};
 
 const FORMAT_TOOL = {
   name: 'format_plan',
@@ -123,15 +129,22 @@ exports.handler = async (event) => {
     return respond(400, { error: 'Invalid JSON body' });
   }
 
+  const localFlag = checkLocalRedFlags(body.profile || {});
+  if (localFlag) {
+    return respond(200, { topicId: body.topicId || null, escalation: true, message: localFlag });
+  }
+
+  if (body.mode === 'global') {
+    return handleGlobalChat(body);
+  }
+  if (body.mode === 'synthesis') {
+    return handleSynthesis(body);
+  }
+
   const { topicId, profile } = body;
   const topic = bundle.topics.find((t) => t.id === topicId);
   if (!topic) {
     return respond(400, { error: `Unknown topicId: ${topicId}` });
-  }
-
-  const localFlag = checkLocalRedFlags(profile || {});
-  if (localFlag) {
-    return respond(200, { topicId, escalation: true, message: localFlag });
   }
 
   if (body.mode === 'followup') {
@@ -144,12 +157,12 @@ exports.handler = async (event) => {
 async function handlePlanRequest(topic, body) {
   const { topicId, profile } = body;
   const context = body.context || {};
-  const systemPrompt = buildSystemPrompt(topic);
+  const systemPrompt = buildSystemPrompt(topic, context);
   const userMessage = buildUserMessage(topic, profile || {}, context);
 
   let stage1;
   try {
-    stage1 = await callOpenAI(systemPrompt, userMessage, topic.foodRelevant);
+    stage1 = await callOpenAI(systemPrompt, userMessage, topic.foodRelevant, context.allowWebSearch);
   } catch (err) {
     return respond(502, { error: `Stage 1 (grounding) failed: ${err.message}` });
   }
@@ -182,6 +195,7 @@ async function handlePlanRequest(topic, body) {
     eat: Array.isArray(structured.eat) ? structured.eat : [],
     avoid: Array.isArray(structured.avoid) ? structured.avoid : [],
     usedWebSearch: !!stage1.usedWebSearch,
+    sources: Array.isArray(stage1.sources) ? stage1.sources : [],
     raw: stage1.text,
   });
 }
@@ -192,12 +206,13 @@ async function handlePlanRequest(topic, body) {
 // eligible for the same web-search grounding.
 async function handleFollowup(topic, body) {
   const { topicId, profile, planContext, history, message } = body;
+  const context = body.context || {};
   if (!message || !message.trim()) {
     return respond(400, { error: 'Missing follow-up message' });
   }
 
   const systemPrompt = [
-    buildSystemPrompt(topic),
+    buildSystemPrompt(topic, context),
     '',
     '## 14. Follow-Up Conversation Mode',
     '',
@@ -220,7 +235,7 @@ async function handleFollowup(topic, body) {
     stage1 = { text: mockFollowupReply(message), usedWebSearch: false };
   } else {
     try {
-      stage1 = await callOpenAI(systemPrompt, userMessage, false);
+      stage1 = await callOpenAI(systemPrompt, userMessage, false, context.allowWebSearch);
     } catch (err) {
       return respond(502, { error: `Follow-up failed: ${err.message}` });
     }
@@ -240,7 +255,120 @@ async function handleFollowup(topic, body) {
   });
 }
 
-function buildSystemPrompt(topic) {
+// Cross-topic "Ask Compass" coach — a genuinely different surface from the per-topic plan/
+// follow-up flow: it sees the user's adherence across ALL 10 topics at once and can reason
+// about prioritization ("what should I focus on this week?") instead of only ever answering
+// about whichever single topic's card it was opened from. It does NOT get the full source
+// libraries for all 10 topics in context (that would be an enormous, mostly-irrelevant prompt)
+// — instead it gets each topic's one-line description/emphasis-summary plus the live adherence
+// numbers, and is explicitly told to defer to "open that topic for a fully-grounded plan" when
+// a question needs a specific topic's actual research library rather than cross-topic reasoning.
+async function handleGlobalChat(body) {
+  const { profile, topicsSummary, history, message } = body;
+  const context = body.context || {};
+  if (!message || !message.trim()) {
+    return respond(400, { error: 'Missing message' });
+  }
+
+  const summaryLines = (Array.isArray(topicsSummary) ? topicsSummary : [])
+    .map((t) => `- ${t.label} (${t.id}): ${Math.round(t.score || 0)}% adherence this week${t.description ? ' — ' + t.description : ''}`)
+    .join('\n');
+
+  const systemPrompt = [
+    bundle.systemPrompt,
+    '',
+    '## 10. Cross-Topic Coaching Mode (This Deployment)',
+    '',
+    "You are answering from a global view across all of this user's tracked topics, not one topic's page. Here is the current state of all 10 topics:",
+    summaryLines,
+    '',
+    "Use this to reason about prioritization, tradeoffs, and connections between topics (e.g. poor sleep adherence undermining a cognitive-health goal) — that kind of cross-topic reasoning is exactly what this mode is for and the single-topic pages cannot do. You do NOT have the full research library for every topic loaded here. If the user's question needs the specific evidence/mechanism detail from one topic's dedicated library (not just its one-line summary above), say so plainly and suggest they open that specific topic for a fully-grounded plan, rather than inventing specifics you don't actually have loaded. Stay inside every rule from Sections 1-9 above (scope, escalation, evidence honesty). Answer in 2-5 sentences, plain text, no markdown.",
+    context.coachTone && COACH_TONES[context.coachTone] ? COACH_TONES[context.coachTone] : '',
+  ].filter(Boolean).join('\n');
+
+  const transcriptLines = [];
+  if (Array.isArray(history)) {
+    history.slice(-6).forEach((turn) => {
+      transcriptLines.push(`${turn.role === 'user' ? 'User' : 'Coach'}: ${turn.content}`);
+    });
+  }
+  transcriptLines.push(`User: ${message.trim()}`);
+  transcriptLines.push('Coach:');
+  const userMessage = transcriptLines.join('\n');
+
+  let stage1;
+  if (!process.env.OPENAI_API_KEY) {
+    stage1 = { text: mockFollowupReply(message), usedWebSearch: false, sources: [] };
+  } else {
+    try {
+      stage1 = await callOpenAI(systemPrompt, userMessage, false, context.allowWebSearch);
+    } catch (err) {
+      return respond(502, { error: `Ask Compass failed: ${err.message}` });
+    }
+  }
+
+  const cleaned = stripMarkdown(stage1.text).trim();
+  if (ESCALATION_MARKERS.some((marker) => cleaned.toLowerCase().includes(marker))) {
+    return respond(200, { mode: 'global', escalation: true, message: cleaned });
+  }
+  return respond(200, { mode: 'global', escalation: false, reply: cleaned, usedWebSearch: !!stage1.usedWebSearch, sources: stage1.sources || [] });
+}
+
+// On-demand AI Weekly Synthesis: a short cross-topic narrative connecting what's actually
+// happening across all topics (not a per-topic plan), generated only when the user asks for it
+// (not on every page load) so it reads as a real analysis moment, not filler content.
+async function handleSynthesis(body) {
+  const { profile, topicsSummary, journalSummary } = body;
+  const context = body.context || {};
+
+  const summaryLines = (Array.isArray(topicsSummary) ? topicsSummary : [])
+    .map((t) => `- ${t.label}: ${Math.round(t.score || 0)}% adherence this week`)
+    .join('\n');
+
+  const systemPrompt = [
+    bundle.systemPrompt,
+    '',
+    '## 10. Weekly Synthesis Mode (This Deployment)',
+    '',
+    'Write a short synthesis (150-250 words, plain text, no markdown, no headers, 3 short paragraphs separated by a blank line) of this user\'s week across ALL topics below — not a single-topic plan. Paragraph 1: name specifically what is working, citing the actual adherence numbers. Paragraph 2: identify ONE real connection between two of their topics (e.g. sleep adherence and cognitive-health goals, or purpose and stress-related topics) — only if the data actually supports a connection; if nothing genuinely connects, say the topics are currently independent rather than inventing a link. Paragraph 3: recommend ONE specific topic to focus on next week and why, referencing the adherence numbers. Stay inside every Section 1-9 rule (scope, escalation, evidence honesty) — this is still wellness coaching, not diagnosis.',
+    '',
+    'This week\'s adherence across all topics:',
+    summaryLines,
+    journalSummary ? `\nRecent activity log:\n${journalSummary}` : '',
+  ].filter(Boolean).join('\n');
+
+  const userMessage = "Write this week's synthesis.";
+
+  let stage1;
+  if (!process.env.OPENAI_API_KEY) {
+    stage1 = {
+      text: '[MOCK — OPENAI_API_KEY not set] This is a placeholder synthesis. Once your API key is set, this will be a real 150-250 word cross-topic analysis grounded in your actual adherence numbers and activity log, naming what is working, one real connection between two of your topics, and one specific recommendation for next week.',
+      usedWebSearch: false,
+      sources: [],
+    };
+  } else {
+    try {
+      stage1 = await callOpenAI(systemPrompt, userMessage, false, context.allowWebSearch);
+    } catch (err) {
+      return respond(502, { error: `Synthesis failed: ${err.message}` });
+    }
+  }
+
+  const cleaned = stripMarkdown(stage1.text).trim();
+  if (ESCALATION_MARKERS.some((marker) => cleaned.toLowerCase().includes(marker))) {
+    return respond(200, { mode: 'synthesis', escalation: true, message: cleaned });
+  }
+  return respond(200, {
+    mode: 'synthesis',
+    escalation: false,
+    synthesis: cleaned,
+    generatedAt: new Date().toISOString(),
+    usedWebSearch: !!stage1.usedWebSearch,
+  });
+}
+
+function buildSystemPrompt(topic, context) {
+  context = context || {};
   const sourceText = topic.sources.map((id) => bundle.sources[id]).join('\n\n---\n\n');
 
   const formattingRules = [
@@ -270,15 +398,19 @@ function buildSystemPrompt(topic) {
     ...formattingRules,
   ];
 
-  if (WEB_SEARCH_ENABLED) {
+  if (WEB_SEARCH_ENABLED && context.allowWebSearch !== false) {
     sections.push(
       '',
       '## 12. Extended Grounding (This Deployment)',
       '',
-      `In addition to the static source library below, you have web search available this turn. Use it only to find additional, specific support from ${TRUSTED_DOMAINS_TEXT}. Never cite blogs, commercial wellness sites, forums, or unsourced health content, even if search surfaces them.`,
-      `When you use a web-found source, say so plainly (e.g. "A 2023 NIH-funded study found...") and give the specific finding with its number/timeframe, exactly as you would for a library source — never blend a web claim into a library claim as if they were the same source. The static library below is still the primary, default source; reach for web search specifically when the library is thin for this topic (that is flagged in the Emphasis line above when true), when the user's question needs more specific support than the library has, or to add genuine variety across repeated requests — not by default on every single turn. If web search finds nothing better than the library already has, rely on the library alone; do not pad the response with a redundant citation just to prove search ran.`,
+      `You have live web search available this turn, and you are explicitly encouraged to use it — this deployment's user has given standing permission to branch beyond the static library whenever it makes the answer more specific or current. Use it to find additional, specific support from ${TRUSTED_DOMAINS_TEXT}. Never cite blogs, commercial wellness sites, forums, or unsourced health content, even if search surfaces them.`,
+      `When you use a web-found source, say so plainly (e.g. "A 2023 NIH-funded study found...") and give the specific finding with its number/timeframe, exactly as you would for a library source — never blend a web claim into a library claim as if they were the same source. The static library below is still the anchor for this topic's core mechanism, but you should actively reach for web search whenever: the library is thin for this topic (flagged in the Emphasis line above when true), the user's profile includes something the static library does not cover at all (a genetic variant, a specific number like resting heart rate or blood pressure), the user's question needs more specific/current support than the library has, or to add genuine variety across repeated requests. Do not treat web search as a last resort — treat the static library as the floor, not the ceiling, of what you can ground a claim in.`,
       `Search suggestion for this topic specifically: ${topic.webSearchHint || 'peer-reviewed research from PubMed, NIH, or a major academic medical center'}.`
     );
+  }
+
+  if (context.coachTone && COACH_TONES[context.coachTone]) {
+    sections.push('', '## 13. Coaching Tone (User Preference, This Deployment)', '', COACH_TONES[context.coachTone]);
   }
 
   sections.push('', sourceText);
@@ -339,6 +471,17 @@ function buildUserMessage(topic, profile, context) {
     );
   }
 
+  if (context.timeBudget) {
+    const budgetInstructions = {
+      '2min': 'The user says they realistically have about 2 minutes today. The action must be completable in 2 minutes or less, no prep, no equipment, no leaving the room. Scale ambition down hard rather than picking an action that technically fits in 2 minutes but assumes momentum.',
+      '10min': 'The user says they realistically have about 10 minutes today. Size the action to fill that window meaningfully without overshooting into something that needs 30+ minutes.',
+      '30min': 'The user says they have a real 30-minute window today. It is safe to suggest something with more depth or a short sequence of steps than your smallest default action, since they have room for it.',
+    };
+    if (budgetInstructions[context.timeBudget]) {
+      parts.push('', budgetInstructions[context.timeBudget]);
+    }
+  }
+
   parts.push('', `Build today's action plan for ${topic.label}.`);
   return parts.join('\n');
 }
@@ -366,26 +509,27 @@ function stripMarkdown(s) {
     .trim();
 }
 
-// Returns { text, usedWebSearch }. Tries the web-search-enabled Responses API path first (if
-// enabled); on ANY failure (unsupported model, API shape drift, rate limit), falls back to the
-// plain Chat Completions call that has been proven to work, rather than erroring the request.
-async function callOpenAI(systemPrompt, userMessage, foodRelevant) {
+// Returns { text, usedWebSearch, sources }. Tries the web-search-enabled Responses API path
+// first (if enabled and not overridden off for this request); on ANY failure (unsupported
+// model, API shape drift, rate limit), falls back to the plain Chat Completions call that has
+// been proven to work, rather than erroring the request.
+async function callOpenAI(systemPrompt, userMessage, foodRelevant, allowWebSearch) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return { text: mockStage1(userMessage, foodRelevant), usedWebSearch: false };
+    return { text: mockStage1(userMessage, foodRelevant), usedWebSearch: false, sources: [] };
   }
 
-  if (WEB_SEARCH_ENABLED) {
+  if (WEB_SEARCH_ENABLED && allowWebSearch !== false) {
     try {
-      const text = await callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage);
-      if (text && text.trim()) return { text: text.trim(), usedWebSearch: true };
+      const { text, sources } = await callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage);
+      if (text && text.trim()) return { text: text.trim(), usedWebSearch: true, sources };
     } catch (err) {
       console.error('Web-search-enabled OpenAI call failed, falling back to standard call:', err.message);
     }
   }
 
   const text = await callOpenAIChatCompletions(apiKey, systemPrompt, userMessage);
-  return { text, usedWebSearch: false };
+  return { text, usedWebSearch: false, sources: [] };
 }
 
 async function callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage) {
@@ -409,13 +553,41 @@ async function callOpenAIResponsesWithSearch(apiKey, systemPrompt, userMessage) 
     throw new Error(`OpenAI Responses ${res.status}: ${await res.text()}`);
   }
   const data = await res.json();
+  const sources = extractCitations(data);
   if (typeof data.output_text === 'string' && data.output_text.trim()) {
-    return data.output_text;
+    return { text: data.output_text, sources };
   }
   const messageItem = (data.output || []).find((item) => item.type === 'message');
   const textBlock = messageItem?.content?.find((c) => c.type === 'output_text' || c.type === 'text');
-  if (textBlock?.text) return textBlock.text;
+  if (textBlock?.text) return { text: textBlock.text, sources };
   throw new Error('No output text found in OpenAI Responses payload');
+}
+
+// Defensive, best-effort: the Responses API's web_search_preview tool is documented to attach
+// url_citation annotations to output text blocks, but this has never been verified here against
+// a live successful call (no live key/network in this environment) — if the shape is anything
+// other than expected, this simply returns an empty array rather than throwing, so a wrong
+// assumption never breaks the actual response.
+function extractCitations(data) {
+  try {
+    const messageItem = (data.output || []).find((item) => item.type === 'message');
+    const blocks = messageItem?.content || [];
+    const seen = new Set();
+    const out = [];
+    for (const block of blocks) {
+      for (const ann of block.annotations || []) {
+        if (ann.type !== 'url_citation' || !ann.url) continue;
+        if (seen.has(ann.url)) continue;
+        seen.add(ann.url);
+        let domain = ann.url;
+        try { domain = new URL(ann.url).hostname.replace(/^www\./, ''); } catch {}
+        out.push({ title: ann.title || domain, domain, url: ann.url });
+      }
+    }
+    return out.slice(0, 5);
+  } catch {
+    return [];
+  }
 }
 
 async function callOpenAIChatCompletions(apiKey, systemPrompt, userMessage) {

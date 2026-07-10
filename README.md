@@ -1,9 +1,57 @@
 # Longevity Compass
 
-An MVP AI longevity wellness coach: a Netlify site with a two-stage LLM pipeline
-(ChatGPT grounds the answer in a curated research library, Claude restructures it
-into clean JSON for the UI) and a dashboard that visualizes adherence across 10
-longevity topics as a radar chart instead of a generic XP bar.
+An AI longevity wellness coach: a Netlify site with a two-stage LLM pipeline
+(ChatGPT grounds the answer in a curated research library plus live web search,
+Claude restructures it into clean JSON for the UI) built around a literal
+compass instrument — a needle that swings to your strongest topic — instead of
+a generic dashboard.
+
+## A second, major pass: new identity, new AI surfaces, deeper profile
+
+After the first working version shipped, the brief changed from "make it work
+and look decent" to "make it unmistakably different and admirable, not an
+incremental add-on." This pass touched nearly every file rather than adding a
+layer on top:
+
+- **Visual identity, not a font swap**: every color token was retired and
+  replaced — a warm brass/ink/parchment palette (`public/css/style.css`)
+  instead of the earlier generic blue-SaaS look, plus 4 selectable accent
+  themes (Brass/Sage/Rose/Indigo) in Settings. Because the whole UI was already
+  built on CSS custom properties, this cascades through literally every
+  component — buttons, focus rings, badges, the compass, all of it.
+- **The compass is now a real instrument** (`public/js/radar.js`, fully
+  rewritten): a brass bezel with tick marks, topic points as inlaid rim studs
+  colored by topic identity, and — the centerpiece — an actual needle that
+  physically swings (with a small overshoot-and-settle spring) to point at
+  whichever topic is currently your strongest. The adherence "field" itself
+  stays one sequential hue on purpose (that's still one series' magnitude, not
+  ten) — the color and life got added everywhere *around* that honest data
+  encoding, not by turning it into a rainbow.
+- **Navigation was restructured, not restyled**: the old 260px sidebar that
+  listed all 10 topics is gone. In its place: a slim icon rail (Today /
+  Overview / Topics / Journal / Profile / Settings) and a new **Topics** view
+  — a real card grid (icon, description, live adherence ring per topic) that
+  replaces "scroll a cramped list" with an actual browsing surface.
+- **Genetic profile: 10 variants → 20, across 8 categories, in a searchable
+  panel** — see "Genetic profile" below.
+- **A much deeper intake**: profile fields grew from ~12 to include caffeine,
+  alcohol, smoking status, screen time before bed, daily steps, main
+  stressor, and supplement use — see "Personalization & settings" below.
+- **Settings grew from 5 controls to a real panel**: AI coaching tone (wired
+  into the actual system prompt, not cosmetic), a user-facing web-search
+  on/off toggle, accent themes, density, reduced motion, a daily reminder, and
+  a transparent "integrations coming soon" section — see "Settings" below.
+- **Onboarding is a real landing moment first**: a full-screen cover (brand
+  mark, value pillars, "Begin") now precedes the field-collection wizard,
+  which grew to 5 steps including a coaching-style preference.
+- **Three genuinely new AI surfaces**, not just a bigger prompt — see "New AI
+  surfaces" below: a cross-topic "Ask Compass" coach, an on-demand AI Weekly
+  Synthesis, and an adaptive time-budget question that actually resizes the
+  generated action instead of decorating the same one-shot request.
+- **Web search grounding was made assertive, not opportunistic** — the prompt
+  now treats the static library as the floor, not the ceiling, and the trusted
+  domain list grew (medlineplus.gov, health.harvard.edu, hopkinsmedicine.org,
+  clevelandclinic.org added).
 
 ## How it works
 
@@ -79,27 +127,29 @@ GPT — those aren't addressable via the API. Two real options if you want that:
 ## The experience layer (motivation, without fake pressure)
 
 - **Lifetime XP & levels** (`public/js/effects.js`): every day marked done awards
-  +10 XP toward a level that only ever goes up — shown as a badge + progress bar
-  at the top of the sidebar. This is deliberately separate from the adherence
-  percentages (radar, sidebar rings, topic pages), which stay honest and can go
-  down if you uncheck a day. The split matters: adherence tells you the truth
-  about this week, XP rewards effort you've already put in and can never be taken
-  away — the intentional replacement for streaks, which reward "not missing a
-  day" and end up pressuring people to fake compliance rather than recover from
-  a missed one.
+  +10 XP toward a level that only ever goes up — shown as a compact ring badge
+  at the bottom of the icon rail. This is deliberately separate from the
+  adherence percentages (compass, topic-grid rings, topic pages), which stay
+  honest and can go down if you uncheck a day. The split matters: adherence
+  tells you the truth about this week, XP rewards effort you've already put in
+  and can never be taken away — the intentional replacement for streaks, which
+  reward "not missing a day" and end up pressuring people to fake compliance
+  rather than recover from a missed one.
 - **Confetti + toasts**: marking a day done bursts a small confetti animation at
   the button; completing a topic's full week or leveling up triggers a bigger
   burst and a toast notification.
-- **Topic identity colors**: each of the 10 topics has its own accent color
-  (from the same validated, colorblind-safe categorical palette used for the
-  sidebar icons, plan-card headers, and topic badges) — used for *identity*
-  contexts. The radar chart deliberately keeps a single hue, because it's one
-  series' magnitude across categories, not 10 different series — mixing the two
-  color jobs is a common charting mistake.
-- **Radar v2**: renders ~40% larger, morphs smoothly between old and new values
-  on every change (rather than snapping), has a soft glow on the data line, and
-  a rich hover tooltip (icon, name, exact %, "click to open") instead of a bare
-  browser tooltip.
+- **Topic identity colors**: each of the 10 topics has its own bespoke jewel-tone
+  accent (terracotta/teal/plum/indigo/ochre/garnet/moss/violet/amber/rose — a
+  deliberate move away from the earlier generic blue/green/red/purple set),
+  used for the compass rim studs, topic-grid tiles, plan-card headers, and
+  badges — *identity* contexts. The compass field/vertices deliberately keep a
+  single hue, because that's one series' magnitude across categories, not ten
+  different series — mixing the two color jobs is a common charting mistake.
+- **The compass** (`public/js/radar.js`): a brass bezel with tick marks, a
+  needle that swings (with a small spring-overshoot) to whichever topic is
+  currently strongest, topic rim studs colored by identity, and a rich hover
+  tooltip (icon, name, exact %, "click to open") instead of a bare browser
+  tooltip. See "A second, major pass" above for the full rationale.
 
 ## Food guide (Eat / Limit) and specificity
 
@@ -128,21 +178,47 @@ empty box waiting for content.
 
 ## Personalization & settings
 
-- **Onboarding**: on a browser's first visit, a modal collects the profile fields
-  and (optionally) a genetic-markers checklist before showing the dashboard.
-  "Skip for now" is always available — it won't ask again either way.
-- **Genetic markers**: the checklist only lists variants that actually appear in
-  `data/sources/micronutrient.md` (MTHFR, VDR, APOE4, HFE, TRPM6, FADS1/ELOVL2,
-  PEMT, BCMO1, GPX1, zinc transporter). Reported markers are wired into the
-  **Micronutrient & Vitamin Status** and **Cognitive Health** topics' prompts
-  specifically (the two topics whose source library actually covers genetics) —
-  other topics receive the data but have no genetic source to ground it in, so
-  they correctly ignore it rather than fabricate a connection.
-- **Settings tab**: theme (System/Light/Dark, persisted, no flash on reload),
-  units (metric/imperial — profile is always stored internally in kg/cm, only
-  the displayed number and label convert), "always show full plan detail"
-  (overrides the default collapse-after-first-view behavior), a JSON
-  export/import of everything stored locally, and "reset all local data."
+- **Onboarding**: a full-screen cover (brand mark, three value pillars, "Begin")
+  now precedes a 5-step wizard — Basics, Lifestyle, Genetics, Coaching style,
+  Review — rather than dropping straight into a form. "Skip intro, just take
+  me in" on the cover and "Skip for now" on every later step both bail out
+  immediately; neither asks again.
+- **Genetic profile — 20 variants across 8 categories**, in a searchable,
+  collapsible panel (`GENE_VARIANTS` in `public/js/app.js`) instead of a flat
+  10-item, 3-category checkbox grid: Vitamins & minerals, Heart & brain, Iron
+  regulation (the original 10, grounded in `data/sources/micronutrient.md`),
+  plus new real, well-established gene-trait categories — Metabolism & weight
+  (FTO, MC4R, APOA2), Muscle & performance (ACTN3, ACE I/D), Circadian & sleep
+  (CLOCK, PER3), Stress & cognition (COMT, BDNF), and Caffeine & stimulant
+  metabolism (CYP1A2). The newer ones are **not** in any static source
+  document — each relevant topic's `emphasis` in `data/topics.json` explicitly
+  instructs the model to reach for live web search (NIH/PubMed/etc.) to ground
+  them when reported, framed as general-population research, never a
+  diagnosis, exactly like the original micronutrient-doc variants. Each row
+  shows which topic(s) it's actually wired into, so nothing implies coverage
+  the coach doesn't have.
+- **A much deeper intake**: profile fields grew from ~12 to include caffeine
+  intake, alcohol frequency, smoking status, screen time before bed, typical
+  daily steps, main current stressor, and current supplement use, organized
+  into Basics / Lifestyle / Cardio-metabolic / Goal sections on the profile
+  page. These flow into the coaching prompt automatically (it already lists
+  every non-empty profile field generically) — no backend change was needed to
+  make plans noticeably more specific from a fuller profile.
+- **Settings — real depth, not just theme + units**:
+  - *Appearance*: System/Light/Dark, 4 accent themes (Brass/Sage/Rose/Indigo,
+    live-swappable), Comfortable/Compact density, reduced-motion toggle, units.
+  - *AI coaching behavior*: a **coaching tone** selector (Balanced/Direct/
+    Encouraging/Clinical) that's actually wired into `buildSystemPrompt()`'s
+    new Section 13 — this changes the real model output, it isn't cosmetic —
+    plus a user-facing "allow live web search" toggle that overrides the
+    server default per request, and "always show full plan detail."
+  - *Daily reminder*: an honestly-scoped opt-in browser Notification once a day
+    if nothing's been marked done yet — explicitly documented as tab-open-only,
+    not a real push service, since there's no backend to deliver one.
+  - *Integrations*: Oura/Whoop/Apple Health/Google Fit shown as "Coming soon"
+    — a transparent roadmap card, not a fake working toggle.
+  - *Backup/Reset*: unchanged — JSON export/import of everything local, and a
+    full reset.
 - **Plan card headline**: Stage 2 (Claude) now also produces a short, punchy
   headline that's a compression of `do_this` — never a new claim — so each
   topic's card leads with something memorable instead of a plain label/value row.
@@ -153,6 +229,38 @@ empty box waiting for content.
   deliverable box marks the next incomplete day directly — no need to scroll
   down to the dot row separately, though it's still there for correcting a
   specific day.
+
+## New AI surfaces (not just a bigger prompt on the same one-shot flow)
+
+The first pass's "generate a plan, then ask it a follow-up question" loop was
+a real critique: every interaction still started from the same single-topic,
+single-shot request. This pass adds three genuinely different ways to talk to
+the coach, all in `netlify/functions/coach.js`:
+
+- **"Ask Compass" — a cross-topic coach** (`mode: 'global'`, a persistent
+  floating button on every page, `renderGlobalCoach()` in `app.js`). It has
+  the user's full profile and every topic's current adherence % at once and
+  can reason about prioritization and cross-topic tradeoffs ("how do my sleep
+  and stress connect?") that no single topic's page can answer. It does *not*
+  load all 10 topics' full research libraries into context (that would be a
+  huge, mostly-irrelevant prompt) — it's told plainly to defer to "open that
+  topic for a fully-grounded plan" when a question needs a specific library's
+  actual evidence rather than cross-topic reasoning.
+- **AI Weekly Synthesis** (`mode: 'synthesis'`, a card on the Today view,
+  generated only on request via a button — not on every page load, so it
+  reads as a real analysis moment). A 150-250 word, three-paragraph AI
+  analysis connecting what's actually happening across all topics: what's
+  working (citing real adherence numbers), one genuine connection between two
+  topics if the data supports one, and one specific recommendation for next
+  week.
+- **Adaptive time-budget question** (a chip row — "~2 minutes / ~10 minutes /
+  ~30 minutes" — on every topic page, threaded into `context.timeBudget`).
+  This is the fix for "one hit regenerate plan and boom": the answer isn't
+  decorative, it's a real instruction to `buildUserMessage()` that measurably
+  changes the sizing of the generated action, not just its wording.
+- **Coaching tone** (Settings, `context.coachTone`) is the fourth lever, wired
+  into every one of the above plus the standard plan/follow-up requests via a
+  new prompt Section 13.
 
 ## Verifying the live two-stage pipeline
 
