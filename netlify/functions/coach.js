@@ -34,6 +34,8 @@ const OPENAI_WEB_SEARCH_MODEL = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-4o';
 const WEB_SEARCH_ENABLED = process.env.ENABLE_WEB_SEARCH !== 'false';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 const ANTHROPIC_VERSION = '2023-06-01';
+const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'tts-1';
+const TTS_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
 const ESCALATION_MARKERS = [
   'outside wellness coaching',
@@ -250,6 +252,9 @@ exports.handler = async (event) => {
   }
   if (body.mode === 'intake') {
     return handleIntake(body);
+  }
+  if (body.mode === 'speech') {
+    return handleSpeech(body);
   }
 
   const { topicId, profile } = body;
@@ -533,6 +538,42 @@ async function handleBriefing(body) {
     return respond(200, { mode: 'briefing', escalation: true, message: cleaned });
   }
   return respond(200, { mode: 'briefing', escalation: false, briefing: cleaned, generatedAt: new Date().toISOString() });
+}
+
+// Real neural TTS via OpenAI's audio/speech endpoint — the "sound genuine, not monotone" ask.
+// Runs server-side (the API key never reaches the browser) and returns base64 audio the client
+// plays through a normal <audio> element. Always responds 200 with available:false rather than
+// an error status when there's no key or the call fails, so the caller can silently fall back
+// to the browser's built-in speechSynthesis instead of treating this as a hard failure.
+async function handleSpeech(body) {
+  const text = (body.text || '').trim();
+  if (!text) return respond(400, { error: 'Missing text' });
+  const voice = TTS_VOICES.includes(body.voice) ? body.voice : 'nova';
+  const clipped = text.length > 3000 ? text.slice(0, 3000) : text;
+
+  if (!process.env.OPENAI_API_KEY) {
+    return respond(200, { mode: 'speech', available: false, reason: 'no_api_key' });
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: OPENAI_TTS_MODEL, voice, input: clipped, response_format: 'mp3' }),
+    });
+    if (!res.ok) {
+      throw new Error(`OpenAI TTS ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    }
+    const arrayBuffer = await res.arrayBuffer();
+    const audio = Buffer.from(arrayBuffer).toString('base64');
+    return respond(200, { mode: 'speech', available: true, audio, format: 'mp3', voice });
+  } catch (err) {
+    console.error('TTS failed, client will fall back to browser speech synthesis:', err.message);
+    return respond(200, { mode: 'speech', available: false, reason: err.message });
+  }
 }
 
 // Meal photo analysis (Thrive-inspired): a vision-capable Stage 1 look at an uploaded photo,

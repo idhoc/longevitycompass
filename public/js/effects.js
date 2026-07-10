@@ -1,35 +1,5 @@
-// Confetti bursts, a lifetime XP/level system, and small animation helpers. Kept separate from
-// app.js since these are pure presentation/motivation layers with no bearing on the coaching
-// data model — the radar/adherence percentages are always the honest current-state numbers;
-// XP is a separate, deliberately-never-decreasing "effort so far" track layered on top, so
-// unchecking a day (correcting a mistake) never feels punishing, and checking one always feels
-// good. This is the intentional replacement for classic "streaks" (which reward not missing a
-// day, pressuring fake compliance) — XP rewards total real actions taken, permanently.
-
-const LC_XP_KEY = 'lc_xp_v1';
-const XP_PER_ACTION = 10;
-const XP_PER_LEVEL = 100;
-const LEVEL_TITLES = ['Newcomer', 'Explorer', 'Builder', 'Momentum Builder', 'Consistent', 'Dedicated', 'Compass Master'];
-
-function getXP() {
-  const n = Number(localStorage.getItem(LC_XP_KEY));
-  return Number.isFinite(n) ? n : 0;
-}
-function setXP(n) { localStorage.setItem(LC_XP_KEY, String(n)); }
-function levelForXP(xp) { return Math.floor(xp / XP_PER_LEVEL) + 1; }
-function levelTitle(level) { return LEVEL_TITLES[Math.min(level, LEVEL_TITLES.length) - 1]; }
-function xpIntoLevel(xp) { return xp % XP_PER_LEVEL; }
-
-// Call when a day transitions from not-done to done. Returns { xp, level, leveledUp } so the
-// caller can decide whether to show a level-up celebration.
-function awardXP() {
-  const before = getXP();
-  const beforeLevel = levelForXP(before);
-  const after = before + XP_PER_ACTION;
-  setXP(after);
-  const afterLevel = levelForXP(after);
-  return { xp: after, level: afterLevel, leveledUp: afterLevel > beforeLevel };
-}
+// Confetti bursts and small animation helpers. Kept separate from app.js since these are pure
+// presentation layers with no bearing on the coaching data model.
 
 // ---------- number count-up ----------
 function animateNumber(el, from, to, duration, suffix) {

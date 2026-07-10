@@ -64,10 +64,10 @@
     { key: 'clinical', title: 'Clinical', desc: 'Leads with mechanism/evidence, precise terminology, minimal motivational language.' },
   ];
   const ACCENT_THEMES = [
-    { key: 'brass', label: 'Brass', swatch: '#a9701f' },
-    { key: 'sage', label: 'Sage', swatch: '#3f6b53' },
-    { key: 'rose', label: 'Rose', swatch: '#a8456f' },
-    { key: 'indigo', label: 'Indigo', swatch: '#3a5a99' },
+    { key: 'indigo', label: 'Indigo', swatch: '#5b5fef' },
+    { key: 'teal', label: 'Teal', swatch: '#14b8a6' },
+    { key: 'rose', label: 'Rose', swatch: '#ec4899' },
+    { key: 'sunset', label: 'Sunset', swatch: '#f97316' },
   ];
   const TIME_BUDGET_OPTIONS = [
     { key: '2min', label: '~2 minutes' },
@@ -107,8 +107,9 @@
   function getSettings() {
     const defaults = {
       theme: 'system', alwaysExpandPlans: false, units: 'metric',
-      accentTheme: 'brass', coachTone: 'balanced', allowWebSearch: true,
+      accentTheme: 'indigo', coachTone: 'balanced', allowWebSearch: true,
       density: 'comfortable', reducedMotion: false, dailyReminder: false,
+      voiceEngine: 'neural', voice: 'nova', autoSpeak: true,
     };
     try { return { ...defaults, ...(JSON.parse(localStorage.getItem(STORAGE.settings)) || {}) }; }
     catch { return defaults; }
@@ -121,7 +122,7 @@
     else if (s.theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
 
-    document.documentElement.setAttribute('data-accent-theme', s.accentTheme || 'brass');
+    document.documentElement.setAttribute('data-accent-theme', s.accentTheme || 'indigo');
     document.documentElement.setAttribute('data-density', s.density || 'comfortable');
     if (s.reducedMotion) document.documentElement.setAttribute('data-motion', 'reduced');
     else document.documentElement.removeAttribute('data-motion');
@@ -240,7 +241,22 @@
     }).sort((a, b) => b.score - a.score);
     return scored[0].v;
   }
-  function speakText(text, onEnd) {
+  const TTS_VOICE_OPTIONS = [
+    { key: 'nova', label: 'Nova', desc: 'Bright and friendly — the default' },
+    { key: 'echo', label: 'Echo', desc: 'Warm and conversational' },
+    { key: 'alloy', label: 'Alloy', desc: 'Neutral and balanced' },
+    { key: 'fable', label: 'Fable', desc: 'Expressive, storyteller-like' },
+    { key: 'onyx', label: 'Onyx', desc: 'Deep and calm' },
+    { key: 'shimmer', label: 'Shimmer', desc: 'Soft and gentle' },
+  ];
+
+  let _ttsAudio = null;
+  function stopSpeaking() {
+    window.speechSynthesis?.cancel();
+    if (_ttsAudio) { try { _ttsAudio.pause(); } catch {} _ttsAudio = null; }
+  }
+
+  function speakBrowser(text, onEnd) {
     if (!('speechSynthesis' in window) || !text) { if (onEnd) onEnd(); return; }
     window.speechSynthesis.cancel();
     const voice = pickBestVoice();
@@ -258,6 +274,60 @@
       window.speechSynthesis.speak(utter);
     }
     speakNext();
+  }
+
+  // Real neural voice (OpenAI TTS via the Netlify function) with a silent, automatic fallback
+  // to the browser's built-in speechSynthesis — never a dead end if there's no API key, the
+  // network call fails, or playback is blocked. "browser" engine in Settings skips straight to
+  // the fallback path (useful offline or for users who prefer the free/local voice).
+  async function speakText(text, onEnd) {
+    if (!text) { if (onEnd) onEnd(); return; }
+    stopSpeaking();
+    const settings = getSettings();
+    if (settings.voiceEngine !== 'browser') {
+      try {
+        const res = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'speech', text, voice: settings.voice || 'nova' }),
+        });
+        const data = await res.json();
+        if (data.available && data.audio) {
+          const audio = new Audio(`data:audio/${data.format || 'mp3'};base64,${data.audio}`);
+          _ttsAudio = audio;
+          audio.onended = () => { _ttsAudio = null; if (onEnd) onEnd(); };
+          audio.onerror = () => { _ttsAudio = null; speakBrowser(text, onEnd); };
+          await audio.play();
+          return;
+        }
+      } catch (err) {
+        // Falls through to the browser voice below — a TTS hiccup should never block the coach.
+      }
+    }
+    speakBrowser(text, onEnd);
+  }
+
+  async function previewVoice(voiceKey) {
+    stopSpeaking();
+    const sample = "Hi, I'm your longevity coach. This is what I sound like.";
+    try {
+      const res = await fetch('/api/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'speech', text: sample, voice: voiceKey }),
+      });
+      const data = await res.json();
+      if (data.available && data.audio) {
+        const audio = new Audio(`data:audio/${data.format || 'mp3'};base64,${data.audio}`);
+        _ttsAudio = audio;
+        audio.onended = () => { _ttsAudio = null; };
+        await audio.play();
+        return;
+      }
+    } catch (err) {
+      // falls through to browser voice
+    }
+    speakBrowser(sample);
   }
 
   // ---------- routing ----------
@@ -308,26 +378,21 @@
       { key: 'profile', icon: 'user', label: 'My profile' },
       { key: 'settings', icon: 'settings', label: 'Settings' },
     ];
-    const xp = getXP();
-    const level = levelForXP(xp);
-    const into = xpIntoLevel(xp);
-
-    let html = `<div class="rail-brand">${lcIcon('heart', 22)}</div>`;
+    let html = `
+      <div class="rail-brand">
+        <span class="rail-brand-mark">${lcIcon('heart', 18)}</span>
+        <span class="rail-brand-word">Longevity Compass</span>
+      </div>
+    `;
     for (const item of navItems) {
       const active = route.view === item.key ? 'active' : '';
       if (item.action) {
-        html += `<button type="button" class="rail-link ${active}" data-rail-action="${item.action}">${lcIcon(item.icon, 20)}<span class="rail-tooltip">${item.label}</span></button>`;
+        html += `<button type="button" class="rail-link ${active}" data-rail-action="${item.action}">${lcIcon(item.icon, 20)}<span class="rail-label">${item.label}</span></button>`;
       } else {
-        html += `<a class="rail-link ${active}" href="#/${item.key}">${lcIcon(item.icon, 20)}<span class="rail-tooltip">${item.label}</span></a>`;
+        html += `<a class="rail-link ${active}" href="#/${item.key}">${lcIcon(item.icon, 20)}<span class="rail-label">${item.label}</span></a>`;
       }
     }
     html += '<div class="rail-spacer"></div>';
-    html += `
-      <div class="rail-link rail-level" title="Lv.${level} ${escapeHtml(levelTitle(level))} — ${into}/100 XP">
-        <span class="rail-level-ring">${renderMiniRing(into, 32)}<span class="rail-level-num">${level}</span></span>
-        <span class="rail-tooltip">Lv.${level} ${escapeHtml(levelTitle(level))} — ${into}/100 XP</span>
-      </div>
-    `;
     el.innerHTML = html;
   }
 
@@ -403,6 +468,54 @@
     return 'Good evening';
   }
 
+  // Mounts the 3D globe compass into #sphere-host once the module has loaded, falling back to
+  // the flat SVG dial (radar.js) if WebGL isn't available. Guards every async continuation with
+  // a DOM-attachment check since the user may navigate away before the module resolves.
+  let dashboardSphere = null;
+  function mountCompass(scores) {
+    const host = document.getElementById('sphere-host');
+    const radarHost = document.getElementById('radar-svg');
+    const readout = document.getElementById('sphere-readout');
+    if (!host || !window.LC_sphereReady) {
+      if (radarHost) { radarHost.style.display = ''; renderRadar(radarHost, TOPICS, scores, { size: 480 }); wireRadarClicks(); }
+      return;
+    }
+    window.LC_sphereReady.then((api) => {
+      if (!document.body.contains(host)) return;
+      if (!api || !api.supportsWebGL()) {
+        if (readout) readout.style.display = 'none';
+        radarHost.style.display = '';
+        renderRadar(radarHost, TOPICS, scores, { size: 480 });
+        wireRadarClicks();
+        return;
+      }
+      dashboardSphere = api.init(host, TOPICS, scores, {
+        onTopicClick: (topicId) => navigate(`/topic/${topicId}`),
+        onTopicHover: (topicId) => {
+          if (readout) readout.classList.toggle('sphere-readout-dim', !!topicId);
+        },
+      });
+    });
+  }
+
+  // Mounts the WebGL shader orb into a `.orb-3d-host` span inside a `.voice-orb` button, falling
+  // back to the existing CSS blurred-gradient layers (already in the markup, untouched) if
+  // WebGL isn't available. onReady receives the controller (or null on fallback) so the caller
+  // can start forwarding state changes to it.
+  function mountOrb3D(hostEl, onReady) {
+    if (!hostEl || !window.LC_orbReady) { onReady(null); return; }
+    window.LC_orbReady.then((api) => {
+      if (!document.body.contains(hostEl) || !api || !api.supportsWebGL()) { onReady(null); return; }
+      onReady(api.mount(hostEl));
+    });
+  }
+
+  function wireRadarClicks() {
+    document.querySelectorAll('.radar-point').forEach((el) => {
+      el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
+    });
+  }
+
   function renderDashboard() {
     const main = document.getElementById('main');
     const profile = getProfile();
@@ -432,7 +545,16 @@
       </div>
       ${renderWellnessAgeHtml(wellnessAge)}
       <div class="grid-radar">
-        <div class="card radar-wrap"><div id="radar-svg" class="radar-chart-host"></div></div>
+        <div class="card radar-wrap">
+          <div id="sphere-host" class="sphere-compass-host">
+            <div class="sphere-readout" id="sphere-readout">
+              <div class="sphere-readout-num">${Math.round(avgAdherence)}%</div>
+              <div class="sphere-readout-label">Strongest: ${escapeHtml(bestLabel)}</div>
+              <div class="sphere-readout-hint">Drag to rotate · click a marker to open</div>
+            </div>
+            <div id="radar-svg" class="radar-chart-host" style="display:none"></div>
+          </div>
+        </div>
         <div class="card">
           <h2>Focus today</h2>
           <p class="subtitle" style="margin-bottom:0">Your three lowest-adherence topics right now.</p>
@@ -441,7 +563,7 @@
       </div>
     `;
 
-    renderRadar(document.getElementById('radar-svg'), TOPICS, scores, { size: 480 });
+    mountCompass(scores);
 
     const focusList = document.getElementById('focus-list');
     focusList.innerHTML = focusOrder.map(({ t, score }) => `
@@ -455,9 +577,6 @@
       </div>
     `).join('');
     focusList.querySelectorAll('.focus-item').forEach((el) => {
-      el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
-    });
-    document.querySelectorAll('.radar-point').forEach((el) => {
       el.addEventListener('click', () => navigate(`/topic/${el.dataset.topic}`));
     });
   }
@@ -778,6 +897,7 @@
               <span class="orb-layer orb-layer-1"></span>
               <span class="orb-layer orb-layer-2"></span>
               <span class="orb-layer orb-layer-3"></span>
+              <span class="orb-3d-host" id="intake-orb-3d"></span>
               <span class="orb-icon">${lcIcon('mic', 22)}</span>
             </button>
             <div class="voice-status" id="intake-voice-status">Tap to speak, or type below</div>
@@ -930,10 +1050,13 @@
       const voiceStatus = overlay.querySelector('#intake-voice-status');
       let history = [];
       let finished = false;
+      let orb3d = null;
+      mountOrb3D(overlay.querySelector('#intake-orb-3d'), (ctrl) => { orb3d = ctrl; if (ctrl) orb.classList.add('orb-3d-active'); });
 
       function setOrbState(state) {
         orb.classList.remove('listening', 'thinking', 'speaking');
         if (state !== 'idle') orb.classList.add(state);
+        if (orb3d) orb3d.setState(state);
       }
       function addBubble(role, content) {
         transcript.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role, content }));
@@ -966,9 +1089,14 @@
           }
           history.push({ role: 'coach', content: data.message });
           addBubble('coach', data.message);
-          setOrbState('speaking');
-          voiceStatus.textContent = 'Speaking…';
-          speakText(data.message, () => { setOrbState('idle'); voiceStatus.textContent = finished ? '' : 'Tap to speak, or type below'; });
+          if (getSettings().autoSpeak !== false) {
+            setOrbState('speaking');
+            voiceStatus.textContent = 'Speaking…';
+            speakText(data.message, () => { setOrbState('idle'); voiceStatus.textContent = finished ? '' : 'Tap to speak, or type below'; });
+          } else {
+            setOrbState('idle');
+            voiceStatus.textContent = finished ? '' : 'Tap to speak, or type below';
+          }
           if (data.extracted) applyExtractedToForm(data.extracted);
           if (data.done) {
             finished = true;
@@ -1013,14 +1141,14 @@
       orb.addEventListener('click', () => {
         if (finished) return;
         if (!recognition) { voiceStatus.textContent = "Voice input isn't supported in this browser — type below instead."; return; }
-        window.speechSynthesis?.cancel();
+        stopSpeaking();
         if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; return; }
         try { recognition.start(); listening = true; setOrbState('listening'); voiceStatus.textContent = 'Listening…'; }
         catch { voiceStatus.textContent = 'Could not start the microphone — check browser permissions.'; }
       });
 
       overlay.querySelector('#intake-use-form').addEventListener('click', () => {
-        window.speechSynthesis?.cancel();
+        stopSpeaking();
         if (recognition && listening) recognition.stop();
         goToForm(1);
       });
@@ -1134,6 +1262,41 @@
       </div>
 
       <div class="card" style="margin-top:18px">
+        <h2>Voice</h2>
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Coach speaks its replies aloud</div>
+              <div class="settings-row-desc">Turn off to keep the Coach text-only.</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="autospeak-toggle" ${settings.autoSpeak !== false ? 'checked' : ''}/><span class="switch-track"></span></label>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row-label">Voice engine</div>
+          <div class="settings-row-desc" style="margin-bottom:10px">Neural sounds natural and human, closer to ChatGPT's voice — routed through the server. Browser voice is free, works offline, and never leaves your device, but sounds more robotic.</div>
+          <div class="theme-options" id="voice-engine-options">
+            ${[['neural', 'Neural (recommended)'], ['browser', 'Browser']].map(([k, label]) => `<div class="theme-option ${(settings.voiceEngine || 'neural') === k ? 'active' : ''}" data-voice-engine-choice="${k}">${label}</div>`).join('')}
+          </div>
+        </div>
+        <div class="settings-section" id="voice-picker-section" style="${(settings.voiceEngine || 'neural') === 'browser' ? 'opacity:0.4;pointer-events:none' : ''}">
+          <div class="settings-row-label">Voice</div>
+          <div class="voice-options" id="voice-options">
+            ${TTS_VOICE_OPTIONS.map((v) => `
+              <div class="voice-option ${(settings.voice || 'nova') === v.key ? 'active' : ''}" data-voice-choice="${v.key}">
+                <div>
+                  <div class="tone-option-title">${escapeHtml(v.label)}</div>
+                  <div class="tone-option-desc">${escapeHtml(v.desc)}</div>
+                </div>
+                <button type="button" class="btn-text-clear voice-preview-btn" data-voice-preview="${v.key}">${lcIcon('mic', 13)} Preview</button>
+              </div>
+            `).join('')}
+          </div>
+          <div class="settings-row-desc" style="margin-top:8px">Needs an OpenAI API key configured on the server — falls back to your browser's voice automatically if one isn't set.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
         <h2>Integrations</h2>
         <p class="subtitle" style="margin-bottom:10px">Real wearable/account integrations need backend infrastructure this local-only MVP doesn't have yet — shown here transparently as the roadmap, not faked.</p>
         <div class="integration-grid">
@@ -1228,6 +1391,34 @@
       }
       s.dailyReminder = e.target.checked;
       setSettings(s);
+    });
+    main.querySelector('#autospeak-toggle').addEventListener('change', (e) => {
+      const s = getSettings();
+      s.autoSpeak = e.target.checked;
+      setSettings(s);
+    });
+    main.querySelectorAll('[data-voice-engine-choice]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const s = getSettings();
+        s.voiceEngine = el.dataset.voiceEngineChoice;
+        setSettings(s);
+        renderSettings();
+      });
+    });
+    main.querySelectorAll('[data-voice-choice]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-voice-preview]')) return;
+        const s = getSettings();
+        s.voice = el.dataset.voiceChoice;
+        setSettings(s);
+        renderSettings();
+      });
+    });
+    main.querySelectorAll('[data-voice-preview]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        previewVoice(el.dataset.voicePreview);
+      });
     });
     main.querySelector('#export-data-btn').addEventListener('click', () => {
       const payload = {
@@ -1363,19 +1554,14 @@
     });
   }
 
-  // Single source of truth for "a day just got marked done": awards lifetime XP (which never
-  // decreases — unchecking a day later does not claw XP back), bursts confetti at the
+  // Single source of truth for "a day just got marked done": bursts confetti at the
   // triggering element, and celebrates louder if the whole week just completed.
   function celebrateCompletion(triggerEl, topicId, state) {
     burstConfetti(triggerEl);
     const topic = TOPICS.find((t) => t.id === topicId);
     addJournalEntry({ type: 'done', topicId, text: `Completed today's action for ${topic ? topic.label : 'a topic'}` });
-    const { level, leveledUp } = awardXP();
     const allDone = state.days.every(Boolean);
-    if (leveledUp) {
-      addJournalEntry({ type: 'levelup', text: `Leveled up to Lv.${level} ${levelTitle(level)}` });
-      showToast(`${lcIcon('bolt', 16)} Level up! You're now <strong>${escapeHtml(levelTitle(level))}</strong> (Lv.${level})`, { celebrate: true, duration: 3600 });
-    } else if (allDone) {
+    if (allDone) {
       addJournalEntry({ type: 'week', topicId, text: `Completed a full week of ${topic ? topic.label : 'this topic'}` });
       showToast(`${lcIcon('check', 16)} Full week on ${escapeHtml(topic ? topic.label : 'this topic')}!`, { celebrate: true });
       burstConfetti(triggerEl, { count: 40 });
@@ -1397,7 +1583,7 @@
       btn.innerHTML = `${lcIcon('check', 15)} This week complete`;
       btn.disabled = true;
     } else {
-      btn.innerHTML = `${lcIcon('bolt', 15)} Mark day ${nextIdx + 1} done <span class="xp-tag">+10 XP</span>`;
+      btn.innerHTML = `${lcIcon('bolt', 15)} Mark day ${nextIdx + 1} done`;
       btn.disabled = false;
     }
   }
@@ -1522,7 +1708,7 @@
 
     function finish() {
       clearInterval(timer);
-      window.speechSynthesis?.cancel();
+      stopSpeaking();
       overlay.remove();
       const s = markNextDayDone(topicId, document.body);
       if (s) { onTrackerChanged(topicId, s); showToast(`${lcIcon('check', 16)} Guided session complete!`, { celebrate: true }); }
@@ -1530,7 +1716,7 @@
 
     overlay.querySelector('#session-close').addEventListener('click', () => {
       clearInterval(timer);
-      window.speechSynthesis?.cancel();
+      stopSpeaking();
       overlay.remove();
     });
     pauseBtn.addEventListener('click', () => {
@@ -1800,8 +1986,6 @@
     const candidates = TOPICS.map((t, i) => ({ t, score: scores[i], state: getTopicState(t.id) }))
       .sort((a, b) => a.score - b.score)
       .slice(0, 3);
-    const xp = getXP();
-    const level = levelForXP(xp);
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const recent = getJournal().slice(0, 5);
     const synthesis = getSynthesis();
@@ -1814,7 +1998,7 @@
         <div class="today-date">${dateStr}</div>
         <h1 class="today-greeting">${greeting()}</h1>
         <div id="daily-briefing-slot"></div>
-        <p class="today-sub">Lv.${level} ${escapeHtml(levelTitle(level))} so far. Here${candidates.length > 1 ? "'re" : "'s"} your ${candidates.length > 1 ? 'lowest-adherence topics' : 'topic that needs the most attention'} right now.</p>
+        <p class="today-sub">Here${candidates.length > 1 ? "'re" : "'s"} your ${candidates.length > 1 ? 'lowest-adherence topics' : 'topic that needs the most attention'} right now.</p>
         <div class="today-actions-list" id="today-actions-list"></div>
       </div>
 
@@ -2106,7 +2290,7 @@
       } else if (allDone) {
         cta = `<span class="evidence-strength strength-strong">${lcIcon('check', 11)} Week done</span>`;
       } else {
-        cta = `<button class="btn btn-primary today-mark-btn" data-topic="${t.id}">${lcIcon('bolt', 14)} Mark done <span class="xp-tag">+10 XP</span></button>`;
+        cta = `<button class="btn btn-primary today-mark-btn" data-topic="${t.id}">${lcIcon('bolt', 14)} Mark done</button>`;
       }
       return `
         <div class="today-action-card stagger-item" style="--i:${i}" data-topic="${t.id}">
@@ -2133,7 +2317,7 @@
   }
 
   // Marks the next not-done day for a topic (used by both the topic page's mark-done button
-  // and Today's inline cards) so both entry points share one celebration/XP/journal path.
+  // and Today's inline cards) so both entry points share one celebration/journal path.
   function markNextDayDone(topicId, triggerEl) {
     const s = getTopicState(topicId);
     const nextIdx = s.days.findIndex((d) => !d);
@@ -2212,6 +2396,7 @@
             <span class="orb-layer orb-layer-1"></span>
             <span class="orb-layer orb-layer-2"></span>
             <span class="orb-layer orb-layer-3"></span>
+            <span class="orb-3d-host" id="voice-orb-3d"></span>
             <span class="orb-icon">${lcIcon('mic', 30)}</span>
           </button>
           <div class="voice-status" id="voice-status">Tap to speak, or type below</div>
@@ -2239,10 +2424,13 @@
     const transcript = document.getElementById('coach-transcript');
     const orb = document.getElementById('voice-orb');
     const voiceStatus = document.getElementById('voice-status');
+    let orb3d = null;
+    mountOrb3D(document.getElementById('voice-orb-3d'), (ctrl) => { orb3d = ctrl; if (ctrl) orb.classList.add('orb-3d-active'); });
 
     function setOrbState(state) {
       orb.classList.remove('listening', 'thinking', 'speaking');
       if (state !== 'idle') orb.classList.add(state);
+      if (orb3d) orb3d.setState(state);
     }
 
     async function send(text, viaVoice) {
@@ -2283,9 +2471,14 @@
         updated.push({ role: 'coach', content: reply });
         setGlobalChat(updated);
         renderMessages();
-        setOrbState('speaking');
-        voiceStatus.textContent = 'Speaking…';
-        speakText(reply, () => { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; });
+        if (getSettings().autoSpeak !== false) {
+          setOrbState('speaking');
+          voiceStatus.textContent = 'Speaking…';
+          speakText(reply, () => { setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; });
+        } else {
+          setOrbState('idle');
+          voiceStatus.textContent = 'Tap to speak, or type below';
+        }
       } catch (err) {
         document.getElementById('coach-loading')?.remove();
         transcript.insertAdjacentHTML('beforeend', renderChatBubbleHtml({ role: 'coach', content: `Something went wrong: ${err.message}` }));
@@ -2321,7 +2514,7 @@
         voiceStatus.textContent = "Voice input isn't supported in this browser — type below instead.";
         return;
       }
-      window.speechSynthesis?.cancel();
+      stopSpeaking();
       if (listening) { recognition.stop(); listening = false; setOrbState('idle'); voiceStatus.textContent = 'Tap to speak, or type below'; return; }
       try {
         recognition.start();
