@@ -172,13 +172,17 @@ const INTAKE_TOOL = {
         properties: {
           primaryGoal: { type: 'string' },
           dietPattern: { type: 'string' },
+          dietaryRestrictions: { type: 'string', description: 'Allergies, intolerances, or foods they avoid — used to keep every future nutrition plan and food guide safe/relevant for them. Empty string if none mentioned.' },
           activityLevel: { type: 'string', description: 'One of: sedentary, light, moderate, active — your best mapping of what they described, or empty string.' },
+          workoutEnvironment: { type: 'string', description: 'Where/how they actually train — e.g. "full gym", "home, dumbbells only", "outdoors, no equipment", "no regular workout yet". This directly shapes what a guided workout session can realistically ask them to do.' },
+          physicalLimitations: { type: 'string', description: 'Injuries, pain, or movements to avoid/modify in a workout — e.g. "bad left knee, avoid deep lunges". Empty string if none mentioned. Never invent one.' },
           sleepHours: { type: 'string' },
+          sleepDisruptor: { type: 'string', description: 'The single biggest thing getting in the way of good sleep, in their words — e.g. "screen time before bed", "racing thoughts", "inconsistent schedule". Empty string if not mentioned.' },
           stressLevel: { type: 'string', description: 'One of: low, moderate, high — or empty string.' },
           mainStressor: { type: 'string' },
           selfDescription: { type: 'string', description: 'A 1-3 sentence natural-language summary of who this person is and what they want, in their own words/spirit — this personalizes every future response beyond the structured fields above.' },
         },
-        required: ['primaryGoal', 'dietPattern', 'activityLevel', 'sleepHours', 'stressLevel', 'mainStressor', 'selfDescription'],
+        required: ['primaryGoal', 'dietPattern', 'dietaryRestrictions', 'activityLevel', 'workoutEnvironment', 'physicalLimitations', 'sleepHours', 'sleepDisruptor', 'stressLevel', 'mainStressor', 'selfDescription'],
       },
     },
     required: ['done', 'message', 'extracted'],
@@ -649,9 +653,15 @@ async function handleIntake(body) {
   const instruction = [
     MI_STYLE_TEXT,
     '',
-    "This is a brand-new user's very first conversation with you, before any profile exists. Have a short, warm, natural conversation — at most 4 of your own questions total, fewer if they cover several things in one message — to learn their main goal, general lifestyle (diet pattern, activity level, rough sleep, stress), and what's actually going on in their life right now. Ask ONE question at a time, conversationally, the way a good coach's first session actually sounds — never read out a form. If the user says anything like \"stop\", \"skip\", \"I\\'d rather use the form\", or similar, set done=true immediately, thank them briefly, and stop — never push back on that. Once you have a real goal plus at least two lifestyle facts, or you have asked 4 questions, set done=true with a brief warm close. Call the intake_turn tool for every turn — never reply in plain text.",
+    "This is a brand-new user's very first conversation with you, before any profile exists. This app leans on guided workout sessions, nutrition guidance, and sleep coaching as its core daily use — so unlike a generic \"tell me about yourself\" intake, every question here should earn its place by directly shaping those three things. Ask AT MOST 4 of your own questions, one at a time, conversationally — never read out a form, never ask something you could reasonably infer from what they already said:",
+    '1) Their main goal, in their own words.',
+    "2) Their real workout situation — do they train at a gym, at home, outdoors, with what (if any) equipment, and is there any injury or physical limitation a guided session needs to work around? This is the single most useful thing you can learn, since it directly determines whether a guided session can safely ask for lunges vs. needs a no-equipment substitute.",
+    '3) Their eating pattern AND any allergies/foods they avoid — both in one question if they let you, since the second is easy to fold into the first (\"and is there anything you avoid or are allergic to?\").',
+    "4) Sleep: roughly how many hours, and the ONE biggest thing getting in the way of good sleep right now (if anything) — not stress in general unless that's genuinely what's disrupting sleep.",
     '',
-    transcriptLines.length ? `Conversation so far:\n${transcriptLines.join('\n')}` : '(This is the very first turn — nothing said yet. Open with a warm, compass-themed greeting and your first question.)',
+    "Do not ask about general life stress as a separate question — only surface stress if it comes up naturally while discussing sleep or their goal, and note it in mainStressor/stressLevel without spending a dedicated question on it. If the user says anything like \"stop\", \"skip\", \"I'd rather use the form\", or similar, set done=true immediately, thank them briefly, and stop — never push back on that. Once you have their goal, workout situation, and either diet or sleep info, or you've asked 4 questions, set done=true with a brief warm close. Call the intake_turn tool for every turn — never reply in plain text.",
+    '',
+    transcriptLines.length ? `Conversation so far:\n${transcriptLines.join('\n')}` : '(This is the very first turn — nothing said yet. Open with a warm, compass-themed greeting and your first question — their main goal.)',
   ].join('\n');
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -692,8 +702,12 @@ async function handleIntake(body) {
     extracted: {
       primaryGoal: stripMarkdown(ex.primaryGoal || ''),
       dietPattern: stripMarkdown(ex.dietPattern || ''),
+      dietaryRestrictions: stripMarkdown(ex.dietaryRestrictions || ''),
       activityLevel: stripMarkdown(ex.activityLevel || ''),
+      workoutEnvironment: stripMarkdown(ex.workoutEnvironment || ''),
+      physicalLimitations: stripMarkdown(ex.physicalLimitations || ''),
       sleepHours: stripMarkdown(ex.sleepHours || ''),
+      sleepDisruptor: stripMarkdown(ex.sleepDisruptor || ''),
       stressLevel: stripMarkdown(ex.stressLevel || ''),
       mainStressor: stripMarkdown(ex.mainStressor || ''),
       selfDescription: stripMarkdown(ex.selfDescription || ''),
@@ -702,24 +716,28 @@ async function handleIntake(body) {
 }
 
 const MOCK_INTAKE_STEPS = [
-  "[MOCK — ANTHROPIC_API_KEY not set] Hi — I'm your coach. Before we dive into any topic, tell me a bit about yourself: what's the main thing you're hoping to get out of this, in your own words?",
-  "[MOCK] Got it, thanks for sharing that. What does a typical day look like for you right now — are you fairly active, or mostly sitting?",
-  "[MOCK] That's helpful. And how's your sleep been lately — roughly how many hours, and does it feel like enough?",
-  "[MOCK] One last one: what's the biggest source of stress in your life right now, if anything?",
+  "[MOCK — ANTHROPIC_API_KEY not set] Hi — I'm your coach. What's the main thing you're hoping to get out of this, in your own words?",
+  "[MOCK] Got it. What does your workout situation actually look like — gym, home, outdoors, any equipment — and is there anything I should work around, like an injury?",
+  "[MOCK] Helpful, thanks. How would you describe how you eat day to day, and is there anything you avoid or are allergic to?",
+  "[MOCK] Last one: roughly how many hours do you sleep, and what's the one thing most likely to get in the way of a good night?",
 ];
 function mockIntakeTurn(turnCount) {
   if (turnCount >= MOCK_INTAKE_STEPS.length) {
     return {
       mode: 'intake', escalation: false, done: true,
-      message: "[MOCK] Thanks for sharing all that — once your API key is set, I'll use this to personalize everything from here. Let's get started.",
+      message: "[MOCK] Thanks for sharing all that — once your API key is set, I'll use this to personalize every workout, meal, and sleep suggestion from here. Let's get started.",
       extracted: {
-        primaryGoal: '[MOCK] More energy', dietPattern: '[MOCK] Standard / omnivore', activityLevel: 'light',
-        sleepHours: '6.5', stressLevel: 'moderate', mainStressor: '[MOCK] Work',
+        primaryGoal: '[MOCK] More energy', dietPattern: '[MOCK] Standard / omnivore', dietaryRestrictions: '',
+        activityLevel: 'light', workoutEnvironment: '[MOCK] Home, light dumbbells', physicalLimitations: '',
+        sleepHours: '6.5', sleepDisruptor: '[MOCK] Screen time before bed', stressLevel: 'moderate', mainStressor: '[MOCK] Work',
         selfDescription: '[MOCK] This is a placeholder summary — once ANTHROPIC_API_KEY is set, this becomes a real 1-3 sentence reflection of what you actually told the coach.',
       },
     };
   }
-  return { mode: 'intake', escalation: false, done: false, message: MOCK_INTAKE_STEPS[turnCount], extracted: { primaryGoal: '', dietPattern: '', activityLevel: '', sleepHours: '', stressLevel: '', mainStressor: '', selfDescription: '' } };
+  return {
+    mode: 'intake', escalation: false, done: false, message: MOCK_INTAKE_STEPS[turnCount],
+    extracted: { primaryGoal: '', dietPattern: '', dietaryRestrictions: '', activityLevel: '', workoutEnvironment: '', physicalLimitations: '', sleepHours: '', sleepDisruptor: '', stressLevel: '', mainStressor: '', selfDescription: '' },
+  };
 }
 
 function buildMealPrompt(profile) {

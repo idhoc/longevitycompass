@@ -84,10 +84,10 @@
   // without touching the underlying grounded research mapping (each topic still has its own
   // source library and prompt emphasis; a domain is just how they're grouped and browsed).
   const DOMAINS = [
-    { key: 'movement', label: 'Movement', icon: 'walk', topics: ['activity'], blurb: 'Physical activity — the most consistently established lever for healthy aging.' },
+    { key: 'movement', label: 'Movement', icon: 'walk', topics: ['activity', 'strength-training'], blurb: 'Physical activity and guided strength training — the most consistently established lever for healthy aging.' },
     { key: 'nutrition', label: 'Nutrition', icon: 'meal', topics: ['nutrition', 'gut-microbiome', 'micronutrient', 'weight', 'metabolic-cv'], blurb: 'What you eat, how your gut processes it, and how it shows up in your metabolic numbers.' },
     { key: 'mind', label: 'Mind', icon: 'brain', topics: ['purpose', 'cognitive'], blurb: 'Sense of purpose, social connection, and cognitive health — the best-evidenced longevity lever there is.' },
-    { key: 'recovery', label: 'Recovery', icon: 'moon', topics: ['sleep', 'energy-mitochondrial'], blurb: 'Sleep, circadian rhythm, and the cellular energy systems that depend on real rest.' },
+    { key: 'recovery', label: 'Recovery', icon: 'moon', topics: ['sleep', 'energy-mitochondrial', 'recovery-mobility'], blurb: 'Sleep, circadian rhythm, mobility, and the cellular energy systems that depend on real rest.' },
   ];
   function domainForTopic(topicId) {
     return DOMAINS.find((d) => d.topics.includes(topicId)) || null;
@@ -655,8 +655,12 @@
     { key: 'weightKg', label: 'Weight', type: 'weight', section: 'basics' },
     { key: 'heightCm', label: 'Height', type: 'height', section: 'basics' },
     { key: 'dietPattern', label: 'Current diet pattern', type: 'select-other', options: DIET_OPTIONS, section: 'lifestyle' },
+    { key: 'dietaryRestrictions', label: 'Allergies / foods you avoid', type: 'text', section: 'lifestyle' },
     { key: 'activityLevel', label: 'Activity level', type: 'select', options: ['', 'sedentary', 'light', 'moderate', 'active'], section: 'lifestyle' },
+    { key: 'workoutEnvironment', label: 'Where/how you actually train', type: 'text', section: 'lifestyle' },
+    { key: 'physicalLimitations', label: 'Injuries or movements to avoid', type: 'text', section: 'lifestyle' },
     { key: 'sleepHours', label: 'Typical sleep (hrs/night)', type: 'number', step: '0.5', section: 'lifestyle' },
+    { key: 'sleepDisruptor', label: 'Biggest thing disrupting your sleep', type: 'text', section: 'lifestyle' },
     { key: 'stressLevel', label: 'Typical stress level', type: 'select', options: ['', 'low', 'moderate', 'high'], section: 'lifestyle' },
     { key: 'caffeineIntake', label: 'Caffeine intake', type: 'select', options: CAFFEINE_OPTIONS, section: 'lifestyle' },
     { key: 'alcoholFrequency', label: 'Alcohol frequency', type: 'select', options: ALCOHOL_OPTIONS, section: 'lifestyle' },
@@ -713,7 +717,7 @@
         </div>
       `;
     }
-    return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${val}"/></div>`;
+    return `<div class="field"><label>${f.label}</label><input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${escapeHtml(String(val))}"/></div>`;
   }
 
   function buildFieldsHtml(sectionKey, profile, idPrefix) {
@@ -1047,9 +1051,14 @@
         const n = parseFloat(extracted.sleepHours);
         if (Number.isFinite(n)) form.elements.sleepHours.value = n;
       }
-      if (extracted.selfDescription) {
-        const merged = { ...getProfile(), selfDescription: extracted.selfDescription };
-        setProfile(merged);
+      // These have no dedicated form field, but buildUserMessage() surfaces every non-empty
+      // profile key to the coach automatically — so storing them here is enough to shape every
+      // future workout/nutrition/sleep plan, not just a display-only summary.
+      const freeTextFields = ['dietaryRestrictions', 'workoutEnvironment', 'physicalLimitations', 'sleepDisruptor', 'selfDescription'];
+      const toMerge = {};
+      freeTextFields.forEach((key) => { if (extracted[key]) toMerge[key] = extracted[key]; });
+      if (Object.keys(toMerge).length) {
+        setProfile({ ...getProfile(), ...toMerge });
       }
     }
 

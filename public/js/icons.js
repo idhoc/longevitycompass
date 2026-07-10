@@ -22,6 +22,8 @@ window.LC_ICONS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   meal: '<path d="M7 3v6a2 2 0 0 0 4 0V3M9 9v12"/><path d="M16 3c-1.6 0-2.6 2.2-2.6 5s1 5 2.6 5v9"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3M9 21h6"/>',
+  dumbbell: '<path d="M4 9v6M20 9v6"/><rect x="6" y="7" width="3" height="10" rx="1"/><rect x="15" y="7" width="3" height="10" rx="1"/><path d="M9 12h6"/>',
+  refresh: '<path d="M20 11A8 8 0 1 0 18.5 16"/><path d="M20 5v6h-6"/>',
 };
 
 function lcIcon(name, size) {

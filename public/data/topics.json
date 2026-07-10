@@ -40,6 +40,22 @@
     "sourceLabel": "Sense of Purpose & Longevity research ladder (movement-adjacent findings only)"
   },
   {
+    "id": "strength-training",
+    "label": "Strength Training & Guided Workouts",
+    "icon": "dumbbell",
+    "knownLimitation": "This topic has no static source in the library at all — every claim here is web-sourced and restricted to the credible domains listed above.",
+    "description": "Resistance training is one of the few interventions shown to directly counter age-related muscle loss (sarcopenia) — this topic is for an actual workout, not general movement.",
+    "sourceLabel": "Live web search (no dedicated static source — see limitation)"
+  },
+  {
+    "id": "recovery-mobility",
+    "label": "Recovery & Mobility",
+    "icon": "refresh",
+    "knownLimitation": "This topic has no static source in the library at all — every claim here is web-sourced and restricted to the credible domains listed above.",
+    "description": "Rest days, mobility work, and how well you recover between efforts determine whether training actually makes you fitter or just breaks you down further.",
+    "sourceLabel": "Live web search (no dedicated static source — see limitation)"
+  },
+  {
     "id": "metabolic-cv",
     "label": "Metabolic & Cardiovascular Risk",
     "icon": "heartpulse",

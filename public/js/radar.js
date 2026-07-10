@@ -214,6 +214,8 @@ const RADAR_SHORT_LABELS = {
   cognitive: 'Cognitive',
   'energy-mitochondrial': 'Energy',
   weight: 'Weight',
+  'strength-training': 'Strength',
+  'recovery-mobility': 'Recovery',
 };
 function shortLabel(topic) {
   return RADAR_SHORT_LABELS[topic.id] || topic.label.split(' & ')[0];
@@ -235,6 +237,8 @@ const TOPIC_ACCENTS = {
   cognitive: { light: '#4a3a99', dark: '#8a7de0' },
   'energy-mitochondrial': { light: '#b8901f', dark: '#dbb84c' },
   weight: { light: '#a8456f', dark: '#d97a9c' },
+  'strength-training': { light: '#1f6b8a', dark: '#4ba0c9' },
+  'recovery-mobility': { light: '#5a8a3a', dark: '#8ac266' },
 };
 function topicAccent(topicId) {
   const pair = TOPIC_ACCENTS[topicId] || TOPIC_ACCENTS.nutrition;

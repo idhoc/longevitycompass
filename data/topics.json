@@ -60,6 +60,30 @@
     "knownLimitation": "This topic has no dedicated adult exercise-science source in the static library — it borrows one behavioral finding from the Purpose document and is expected to lean on live web search (restricted to credible domains) for topic-specific depth."
   },
   {
+    "id": "strength-training",
+    "label": "Strength Training & Guided Workouts",
+    "icon": "dumbbell",
+    "sources": [],
+    "sourceLabel": "Live web search (no dedicated static source — see limitation)",
+    "description": "Resistance training is one of the few interventions shown to directly counter age-related muscle loss (sarcopenia) — this topic is for an actual workout, not general movement.",
+    "foodRelevant": false,
+    "webSearchHint": "peer-reviewed resistance-training and sarcopenia research from PubMed, NIH, the American College of Sports Medicine's position stands, or a major exercise-science journal",
+    "emphasis": "This topic has no dedicated static source at all — treat live web search as the ONLY source and be explicit that every claim is web-sourced. Prioritize resistance-training-specific mechanisms distinct from the general Physical Activity topic: sarcopenia prevention, progressive overload, protein synthesis timing, and bone density. If the user's profile lists a workoutEnvironment (home/gym/outdoors/equipment) or physicalLimitations (an injury or movement to avoid), the action MUST be realistic for that exact setting and MUST work around any stated limitation — do not prescribe a barbell squat to someone who told you they train at home with no equipment, and do not prescribe a knee-loading movement to someone who flagged a bad knee. This is exactly the kind of action that should use the Steps: timed-sequence format (a short circuit with sets/reps or timed holds) rather than a single instruction, since a real guided workout session is the natural deliverable here. If the user's profile reports an ACTN3 variant (fast-twitch/power vs. endurance fiber composition) or an ACE I/D variant (strength/power response to resistance training), these are real exercise-genomics findings — use web search to confirm the specific peer-reviewed association before incorporating it, framed as general-population research on training response, never a personalized prescription.",
+    "knownLimitation": "This topic has no static source in the library at all — every claim here is web-sourced and restricted to the credible domains listed above."
+  },
+  {
+    "id": "recovery-mobility",
+    "label": "Recovery & Mobility",
+    "icon": "refresh",
+    "sources": [],
+    "sourceLabel": "Live web search (no dedicated static source — see limitation)",
+    "description": "Rest days, mobility work, and how well you recover between efforts determine whether training actually makes you fitter or just breaks you down further.",
+    "foodRelevant": false,
+    "webSearchHint": "peer-reviewed recovery-science research on DOMS, mobility training, or overtraining from PubMed, NIH, or a major sports-medicine journal",
+    "emphasis": "This topic has no dedicated static source at all — treat live web search as the ONLY source and be explicit that every claim is web-sourced. Distinct mechanisms to rotate across: active recovery/blood flow, mobility and range-of-motion work, sleep's role in muscle repair (cross-reference the Sleep topic's mechanism rather than duplicating it wholesale), and overtraining/deload signals. If the user's profile lists physicalLimitations or a workoutEnvironment, tailor the mobility work to be realistic for that (e.g. floor-based stretches need no equipment). This is a strong candidate for the Steps: timed-sequence format — a short mobility flow or stretch sequence with per-movement timing.",
+    "knownLimitation": "This topic has no static source in the library at all — every claim here is web-sourced and restricted to the credible domains listed above."
+  },
+  {
     "id": "metabolic-cv",
     "label": "Metabolic & Cardiovascular Risk",
     "icon": "heartpulse",
