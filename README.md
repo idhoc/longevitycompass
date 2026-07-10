@@ -6,6 +6,79 @@ Claude restructures it into clean JSON for the UI) built around a literal
 compass instrument — a needle that swings to your strongest topic — instead of
 a generic dashboard.
 
+## A fifth pass: real 3D, a real voice, a real standalone app
+
+The brief for this round was blunt: the UI still read as unfinished, the
+compass and coach orb were flat CSS gradients rather than anything with a
+"wow factor," the voice was monotone, and the whole thing needed to feel
+elevated enough to stand on its own — not incremental changes, a full
+visual and functional overhaul.
+
+- **Real WebGL, not more CSS.** Three.js is vendored locally
+  (`public/js/vendor/three.module.min.js` — no CDN dependency, so the app
+  has no third-party runtime host to fail against) and loaded as an ES
+  module (`public/js/sphere3d.js`, `public/js/orb3d.js`), exposing
+  `window.LC_sphereReady`/`window.LC_orbReady` promises so the classic
+  non-module `app.js` can consume them safely regardless of load order.
+  - **The compass is now a literal sphere.** The Overview page replaces the
+    flat SVG dial with a real WebGL globe: topic markers placed via a
+    Fibonacci sphere distribution, glow/scale driven by that topic's real
+    adherence, drag-to-rotate, slow auto-rotate when idle, click-to-navigate,
+    and a glass/atmosphere-glow material built from layered transparent
+    shells (no full bloom postprocessing pass needed). Falls back to the
+    original flat SVG dial (`radar.js`, untouched) if WebGL isn't available.
+  - **The coach orb is a real shader mesh**, not a blurred gradient that
+    fades into nothing: a custom `ShaderMaterial` (`orb3d.js`) displaces an
+    icosahedron's vertices with a time-varying noise field, with amplitude/
+    frequency/rotation-speed/color all driven by idle/listening/thinking/
+    speaking state. Same CSS-gradient fallback pattern if WebGL fails.
+- **Real neural voice, not the monotone browser default.** A new `speech`
+  mode in `coach.js` calls OpenAI's `/v1/audio/speech` endpoint server-side
+  (the API key never reaches the browser) and returns base64 audio the
+  client plays through a normal `<audio>` element — 6 curated voices
+  (alloy/echo/fable/onyx/nova/shimmer), picked and previewable from a new
+  Voice section in Settings, with an engine toggle (Neural/Browser) and an
+  "auto-speak replies" toggle. Always responds `200 {available:false}`
+  rather than an error status on missing key/failure, so it falls back to
+  the existing sentence-by-sentence browser `speechSynthesis` path silently
+  — a voice hiccup should never block the coach.
+- **New cool indigo/teal visual identity**, replacing the earlier warm
+  brass/parchment palette entirely: new color tokens, glassmorphism
+  (`--glass-bg`/`--glass-border`, a `.glass` utility), and the curated
+  accent-theme picker updated to match (Indigo/Teal/Rose/Sunset).
+- **Nav rail rebuilt as a wide, always-labeled side nav** (Google/Humanity-
+  style), not the earlier icon-only hover-tooltip rail — and, caught in a
+  mobile-viewport regression pass, collapses to a fixed icon-only bottom
+  tab bar below 720px instead of eating half a phone screen.
+- **The XP/leveling system is gone entirely** — rail badge, mark-done
+  `+10 XP` tags, level-up toasts and journal entries, and the underlying
+  `effects.js` helpers have all been removed. It wasn't adding anything a
+  transparent adherence percentage didn't already say more honestly.
+- **The plan/deliverable card is a new two-column layout**: a sticky,
+  topic-accented hero panel (icon, headline, actions) beside a detail
+  column (why it matters, evidence, food guide, heads-up, sources,
+  follow-up chat) — a real layout change, not a restyle of the same stack.
+- **The onboarding conversation is tightened and workout/nutrition/sleep-
+  specific**, since guided workouts, nutrition, and sleep are this app's
+  core daily surface, not generic "tell me about yourself" chit-chat: at
+  most 4 questions — goal, real workout situation (environment + any
+  physical limitation, so a guided session can actually be realistic for
+  the person), diet pattern + restrictions, and sleep hours + the single
+  biggest disruptor. General life stress is no longer a dedicated question.
+  The new fields (`workoutEnvironment`, `physicalLimitations`,
+  `dietaryRestrictions`, `sleepDisruptor`) are both stored on the profile
+  (auto-surfaced into every future plan prompt via `buildUserMessage`) and
+  editable afterward in My Profile.
+- **Two new topics**: Strength Training & Guided Workouts, and Recovery &
+  Mobility — both web-search-primary (no dedicated static source, the same
+  honest pattern already used for Sleep/Activity) and explicitly
+  instructed to respect the user's stated workout environment and physical
+  limitations. 10 topics → 12.
+- **Installable as a real standalone app**: `manifest.json` + a generated
+  icon set + a stale-while-revalidate service worker (`public/sw.js` —
+  static assets only; `/api/*` always goes to network) + an in-app Install
+  button in Settings wired to `beforeinstallprompt`.
+
 ## A fourth pass: Motivational Interviewing, 4 life domains, conversational onboarding
 
 This pass followed direct research into Humanity.health, Thrive AI Health Coach,
@@ -431,6 +504,7 @@ Stage 1 can now also use OpenAI's hosted `web_search_preview` tool, controlled b
 - `ENABLE_WEB_SEARCH` (default `true` — set to `"false"` to disable)
 - `OPENAI_WEB_SEARCH_MODEL` (default `gpt-4o` — the model that carries the search tool; the plain-text model in `OPENAI_MODEL` is unchanged and still used for the no-search fallback path)
 - `OPENAI_VISION_MODEL` (default `gpt-4o` — used only by meal photo analysis, `mode: 'mealPhoto'` in `coach.js`)
+- `OPENAI_TTS_MODEL` (default `tts-1` — used only by the neural voice, `mode: 'speech'` in `coach.js`; falls back to browser `speechSynthesis` client-side if `OPENAI_API_KEY` is unset or the call fails)
 
 The static source library is still the primary, default source. Web search is
 scoped by **prompt instruction, not an API-level domain filter**, to a named
@@ -559,13 +633,16 @@ genuinely separate feature scope from this pass:
 ```
 data/
   system-prompt.md      the coaching system prompt (Sections 1-9)
-  topics.json            the 10 topics: source mapping + per-topic emphasis
+  topics.json             the 12 topics: source mapping + per-topic emphasis
   sources/*.md           cleaned research libraries, one per source document
 docs/research/           original uploaded PDFs/docx, kept for provenance
 netlify/functions/
-  coach.js               the two-stage pipeline + escalation checks
+  coach.js               the two-stage pipeline + escalation checks + TTS proxy
   lib/sources-bundle.json   generated — do not hand-edit, run npm run build:sources
 public/                  the static frontend (vanilla HTML/CSS/JS, no build step)
+  js/sphere3d.js, orb3d.js  WebGL compass/orb (ES modules, vendored Three.js)
+  js/vendor/three.module.min.js  vendored locally — no CDN runtime dependency
+  manifest.json, sw.js, icons/   PWA: installable standalone app
 scripts/build-sources.js  bundles data/ into the function-safe JSON + public topic list
 ```
 
@@ -575,9 +652,10 @@ scripts/build-sources.js  bundles data/ into the function-safe JSON + public top
   Fine for a single-device demo; a real account system is a follow-up.
 - No **streaks** specifically — deliberately excluded (see the original design
   discussion: streak mechanics reward "not missing a day," which pressures users
-  to fake compliance rather than recover from a missed one). Lifetime XP/levels
-  *are* built (see "The experience layer" above) as the intentional replacement:
-  they reward total real actions taken and never decrease.
+  to fake compliance rather than recover from a missed one). An earlier pass
+  built lifetime XP/levels as a streak-free replacement; that was removed in
+  the fifth pass (see above) in favor of just showing the honest adherence
+  percentage, with no separate progress-gamification layer at all.
 - No rate limiting on `/api/coach` — acceptable for an internal demo, not for a
   public link. Add it (per-IP or per-session) before sharing broadly, since every
   request costs real OpenAI + Anthropic API spend.
