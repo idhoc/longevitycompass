@@ -433,9 +433,16 @@
       tooltip.remove();
       localStorage.setItem(STORAGE.tourSeen, 'true');
       window.removeEventListener('resize', reposition);
+      window.removeEventListener('hashchange', onNavigateAway);
     }
     function reposition() { showStep(idx); }
+    // Every tour step targets a nav link but never calls navigate() itself — so any hashchange
+    // while the tour is open means the user clicked a link directly instead of using Next,
+    // taking control of navigation themselves. Without this, the tooltip/spotlight would stay
+    // stuck on screen, floating over whatever page they navigated to.
+    function onNavigateAway() { cleanup(); }
     window.addEventListener('resize', reposition);
+    window.addEventListener('hashchange', onNavigateAway);
 
     function showStep(i) {
       if (i < 0) i = 0;
@@ -484,7 +491,11 @@
 
   function maybeStartTour() {
     if (localStorage.getItem(STORAGE.tourSeen) === 'true') return;
-    setTimeout(() => startAppTour(), 500);
+    // A double rAF (not a fixed setTimeout) waits for exactly one real paint — enough for the
+    // just-closed modal's render() to have laid out the nav — without leaving an artificial
+    // delay window where a fast navigation could happen before the tour (and its own
+    // hashchange listener) exists, which would leave it starting stuck on the wrong page.
+    requestAnimationFrame(() => requestAnimationFrame(() => startAppTour()));
   }
 
   function renderRail(route) {
