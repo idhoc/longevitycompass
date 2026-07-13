@@ -1,0 +1,126 @@
+/* ============================================================
+   Design tokens — grounded in the vocabulary of longevity science
+   itself: survival curves, lab instrumentation, field notation.
+   Deliberately not the AI-default cream+serif+terracotta, not
+   near-black+neon, not a broadsheet grid. See app/page.tsx for the
+   design rationale.
+   ============================================================ */
+:root {
+  /* -- palette -- */
+  --paper: #f1eee6;         /* base ground: warm bone paper, cooler/greyer than cliche cream */
+  --paper-raised: #e9e4d7;  /* a half-step down, for recessed/inset surfaces */
+  --ink: #191a16;           /* near-black warm charcoal-olive */
+  --ink-soft: #55584c;      /* secondary text, same warm-olive family as ink */
+  --ink-faint: #8b8d7e;     /* tertiary / placeholder */
+  --signal: #3e6b4f;        /* the one accent: muted monitor/phosphor green */
+  --signal-bright: #6fcb8f; /* brighter variant, reserved for the WebGL scene + glow only */
+  --caution: #a6631f;       /* muted clay amber, used sparingly like a hazard label */
+  --caution-wash: #f0e2cf;
+  --line: #d9d2c2;          /* hairline rule colour */
+  --line-strong: #c3baa4;
+
+  /* -- type families (wired to next/font variables in layout.tsx) -- */
+  --font-display: var(--font-stix), Georgia, serif;
+  --font-body: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* -- type scale: perfect-fourth-ish steps, intentionally not the
+     usual 14/16/18/24/32/48 ladder -- */
+  --text-xs: 0.7rem;
+  --text-sm: 0.85rem;
+  --text-base: 1.0625rem;
+  --text-md: 1.3rem;
+  --text-lg: 1.7rem;
+  --text-xl: 2.4rem;
+  --text-2xl: 3.4rem;
+  --text-3xl: 4.8rem;
+
+  /* -- space scale: a Fibonacci-derived progression rather than a
+     4/8px grid — a deliberate nod to biological growth curves, the
+     same idea the Trajectory visual is built on -- */
+  --space-1: 0.4rem;
+  --space-2: 0.65rem;
+  --space-3: 1rem;
+  --space-4: 1.6rem;
+  --space-5: 2.6rem;
+  --space-6: 4.2rem;
+  --space-7: 6.8rem;
+  --space-8: 11rem;
+
+  --radius-sm: 3px;
+  --radius-md: 7px;
+  --max-measure: 62ch;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+}
+
+::selection {
+  background: var(--signal);
+  color: var(--paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,189 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+
+.instrument {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  height: fit-content;
+  position: sticky;
+  top: var(--space-4);
+}
+
+.instrumentTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.stateLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.waveform {
+  width: 100%;
+  height: 96px;
+  margin: var(--space-3) 0;
+  display: block;
+}
+
+.stateButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.stateButton {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5em 0.85em;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.stateButton:hover {
+  border-color: var(--signal);
+  color: var(--ink);
+}
+
+.stateButtonActive {
+  border-color: var(--signal);
+  color: var(--ink);
+  background: var(--paper-raised);
+}
+
+.instrumentNote {
+  margin-top: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+.transcript {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  min-height: 60vh;
+}
+
+.log {
+  flex: 1;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.entry {
+  max-width: 62ch;
+}
+
+.entryMeta {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  margin-bottom: 0.35em;
+}
+
+.entryWho {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+}
+
+.entryWhoUser {
+  color: var(--ink-soft);
+}
+
+.entryWhoCoach {
+  color: var(--signal);
+}
+
+.entryTime {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.entryText {
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.composer {
+  display: flex;
+  gap: var(--space-3);
+  border-top: 1px solid var(--line);
+  padding: var(--space-4);
+}
+
+.input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.75em 1em;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.input:focus {
+  border-color: var(--signal);
+}
+
+.sendButton {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0 1.4em;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sendButton:hover {
+  background: var(--signal);
+}
+
+.sendButton:disabled {
+  background: var(--line-strong);
+  cursor: not-allowed;
+}
+
+@media (max-width: 860px) {
+  .body {
+    grid-template-columns: 1fr;
+    padding: var(--space-4);
+  }
+  .instrument {
+    position: static;
+  }
+}

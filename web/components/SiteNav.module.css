@@ -1,0 +1,52 @@
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+
+.mark {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.markDot {
+  color: var(--signal);
+}
+
+.links {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.link {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding-bottom: 3px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.linkActive {
+  color: var(--ink);
+  border-bottom-color: var(--signal);
+}
+
+@media (max-width: 720px) {
+  .nav {
+    padding: var(--space-3) var(--space-4);
+  }
+  .links {
+    gap: var(--space-3);
+  }
+}
