@@ -64,66 +64,24 @@
 .grid {
   padding: 0 var(--space-6) var(--space-7);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
-}
-
-.card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-}
-
-.cardTop {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.cardLabel {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
-.cardPct {
-  font-family: var(--font-mono);
-  font-size: var(--text-md);
-}
-
-.cardScene {
-  height: 120px;
-  margin: var(--space-3) 0;
-}
-
-.cardScene :global(canvas) {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.cardText {
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
-  line-height: 1.55;
+  align-items: start;
 }
 
 @media (max-width: 900px) {
   .overview {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 720px) {
   .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 520px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
   .header, .overview, .grid {
     padding-left: var(--space-4);
     padding-right: var(--space-4);

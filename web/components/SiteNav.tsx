@@ -3,7 +3,7 @@ import styles from "./SiteNav.module.css";
 
 const LINKS = [
   { href: "/", label: "Trajectory" },
-  { href: "/dashboard", label: "Domains" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/coach", label: "Coach" },
 ];
 

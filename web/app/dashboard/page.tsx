@@ -1,59 +1,67 @@
+"use client";
+
 import { SiteNav } from "@/components/SiteNav";
 import { TrajectoryScene } from "@/components/TrajectoryScene";
+import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { minutesBetween } from "@/lib/sleepEstimate";
+import {
+  weekKey,
+  computeStreak,
+  fitnessReachFromDays,
+  nutritionReachFromMealsToday,
+  sleepReachFromMinutes,
+  mindReachFromStreak,
+} from "@/lib/domainReach";
+import { SleepPanel } from "@/components/panels/SleepPanel";
+import { NutritionPanel } from "@/components/panels/NutritionPanel";
+import { FitnessPanel } from "@/components/panels/FitnessPanel";
+import { MindPanel } from "@/components/panels/MindPanel";
 import styles from "./page.module.css";
 
-// Sample data standing in for real weekly-adherence numbers — in the shipped
-// product this comes from the same tracked-completion data the current app
-// already stores, not a new data model.
-const DOMAINS = [
-  {
-    label: "Movement",
-    reach: 0.63,
-    text: "3 of 5 planned sessions this week, including yesterday's guided mobility flow.",
-  },
-  {
-    label: "Nutrition",
-    reach: 0.81,
-    text: "Fiber target met 5 of 7 days. Protein at dinner is the one gap left.",
-  },
-  {
-    label: "Mind",
-    reach: 0.92,
-    text: "A daily purpose check-in, six days running — your longest streak yet.",
-  },
-  {
-    label: "Recovery",
-    reach: 0.47,
-    text: "Sleep averaged 6.1h against a 7.5h target. This is where next week's plan will focus.",
-  },
-] as const;
-
-const OVERALL = Math.round(
-  (DOMAINS.reduce((sum, d) => sum + d.reach, 0) / DOMAINS.length) * 100
-);
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function DashboardPage() {
+  const [sleepEntry] = useLocalStorageState<{ bedtime: string; wakeTime: string } | null>(
+    "lc_sleep_entry_v1",
+    null
+  );
+  const [meals] = useLocalStorageState<{ date: string }[]>("lc_meals_v1", []);
+  const [fitnessDays] = useLocalStorageState<boolean[]>(
+    `lc_fitness_${weekKey()}`,
+    [false, false, false, false, false, false, false]
+  );
+  const [mindEntries] = useLocalStorageState<{ date: string }[]>("lc_mind_entries_v1", []);
+
+  const sleepReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0.04;
+  const nutritionReach = nutritionReachFromMealsToday(meals.filter((m) => m.date === todayKey()).length);
+  const fitnessReach = fitnessReachFromDays(fitnessDays);
+  const mindReach = mindReachFromStreak(computeStreak(mindEntries));
+
+  const overall = Math.round(((sleepReach + nutritionReach + fitnessReach + mindReach) / 4) * 100);
+
   return (
     <div className={styles.page}>
       <SiteNav active="/dashboard" />
 
       <div className={styles.header}>
-        <span className="eyebrow">This week</span>
+        <span className="eyebrow">Today</span>
         <h1>Where the curve is bending</h1>
         <p className={styles.headerSub}>
-          Each domain draws its own trajectory from real tracked adherence — the brighter
-          segment is what you&apos;ve actually earned so far this week, not a projection.
+          Four domains, each measured its own way — the trajectory below is drawn from
+          what you&apos;ve actually logged, not a projection.
         </p>
       </div>
 
       <div className={styles.overview}>
         <div className={styles.overviewStat}>
-          <div className={styles.overviewNum}>{OVERALL}%</div>
-          <div className={styles.overviewLabel}>Overall trajectory, this week</div>
+          <div className={styles.overviewNum}>{overall}%</div>
+          <div className={styles.overviewLabel}>Overall trajectory, today</div>
         </div>
         <div className={styles.overviewScene}>
           <TrajectoryScene
-            reach={OVERALL / 100}
+            reach={overall / 100}
             interactive={false}
             radius={0.045}
             colorStart="#8b8d7e"
@@ -63,24 +71,10 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.grid}>
-        {DOMAINS.map((d) => (
-          <div className={styles.card} key={d.label}>
-            <div className={styles.cardTop}>
-              <span className={styles.cardLabel}>{d.label}</span>
-              <span className={`${styles.cardPct} tabular`}>{Math.round(d.reach * 100)}%</span>
-            </div>
-            <div className={styles.cardScene}>
-              <TrajectoryScene
-                reach={d.reach}
-                interactive={false}
-                radius={0.032}
-                colorStart="#8b8d7e"
-                colorEnd="#3e6b4f"
-              />
-            </div>
-            <p className={styles.cardText}>{d.text}</p>
-          </div>
-        ))}
+        <SleepPanel />
+        <NutritionPanel />
+        <FitnessPanel />
+        <MindPanel />
       </div>
     </div>
   );

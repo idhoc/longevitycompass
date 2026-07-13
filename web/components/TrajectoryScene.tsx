@@ -4,6 +4,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { buildTrajectoryPoints } from "@/lib/trajectoryCurve";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 
 const VERTEX_SHADER = `
   uniform float uTime;
@@ -52,11 +53,13 @@ function TrajectoryTube({
   colorStart,
   colorEnd,
   radius,
+  reducedMotion,
 }: {
   reach: number;
   colorStart: string;
   colorEnd: string;
   radius: number;
+  reducedMotion: boolean;
 }) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const points = useMemo(() => buildTrajectoryPoints(1), []);
@@ -85,7 +88,10 @@ function TrajectoryTube({
 
   useFrame((_, delta) => {
     if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value += delta;
+      // The traveling-band/pulse effects in the fragment shader read uTime;
+      // freezing its advance under prefers-reduced-motion stops that looping
+      // motion while still letting the reach value ease in below.
+      if (!reducedMotion) materialRef.current.uniforms.uTime.value += delta;
       materialRef.current.uniforms.uReach.value +=
         (reach - materialRef.current.uniforms.uReach.value) * Math.min(1, delta * 1.5);
     }
@@ -126,17 +132,20 @@ function Baseline({ width }: { width: number }) {
 
 function InteractiveGroup({
   interactive,
+  reducedMotion,
   children,
 }: {
   interactive: boolean;
+  reducedMotion: boolean;
   children: React.ReactNode;
 }) {
   const { pointer } = useThree();
   const group = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!group.current) return;
-    const targetY = interactive ? pointer.x * 0.18 : 0;
-    const targetX = (interactive ? -pointer.y * 0.06 : 0) + 0.08;
+    const followPointer = interactive && !reducedMotion;
+    const targetY = followPointer ? pointer.x * 0.18 : 0;
+    const targetX = (followPointer ? -pointer.y * 0.06 : 0) + 0.08;
     group.current.rotation.y += (targetY - group.current.rotation.y) * Math.min(1, delta * 1.4);
     group.current.rotation.x += (targetX - group.current.rotation.x) * Math.min(1, delta * 1.4);
   });
@@ -158,6 +167,7 @@ export function TrajectoryScene({
   colorEnd?: string;
   className?: string;
 }) {
+  const reducedMotion = usePrefersReducedMotion();
   return (
     <div className={className} aria-hidden="true">
       <Canvas
@@ -167,8 +177,8 @@ export function TrajectoryScene({
       >
         <ambientLight intensity={0.8} />
         <directionalLight position={[3, 4, 5]} intensity={0.6} />
-        <InteractiveGroup interactive={interactive}>
-          <TrajectoryTube reach={reach} colorStart={colorStart} colorEnd={colorEnd} radius={radius} />
+        <InteractiveGroup interactive={interactive} reducedMotion={reducedMotion}>
+          <TrajectoryTube reach={reach} colorStart={colorStart} colorEnd={colorEnd} radius={radius} reducedMotion={reducedMotion} />
           <Baseline width={8} />
         </InteractiveGroup>
       </Canvas>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -19,6 +20,7 @@ const STATE_PARAMS: Record<VoiceState, { amp: number; speed: number; bars: numbe
 export function Waveform({ state, className }: { state: VoiceState; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
+  const reducedMotion = usePrefersReducedMotion();
 
   // Keep the ref in sync in an effect, not during render — mutating a ref's
   // .current while rendering is invalid under React's concurrent renderer
@@ -72,15 +74,19 @@ export function Waveform({ state, className }: { state: VoiceState; className?: 
         ctx.fillRect(x, midY - h / 2, barWidth, h);
       }
       ctx.globalAlpha = 1;
-      raf = requestAnimationFrame(draw);
+      if (!reducedMotion) raf = requestAnimationFrame(draw);
     }
-    raf = requestAnimationFrame(draw);
+
+    // draw() re-schedules itself via rAF only when motion isn't reduced, so
+    // this single call renders one still frame under reduced motion and
+    // starts the normal loop otherwise.
+    draw();
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [reducedMotion]);
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
 }
