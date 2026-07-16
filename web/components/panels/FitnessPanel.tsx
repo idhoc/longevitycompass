@@ -42,7 +42,7 @@ export function FitnessPanel() {
 
       <div className={styles.panelBody}>
         <div className={styles.miniScene}>
-          <TrajectoryScene reach={reach} interactive={false} radius={0.03} colorStart="#8b8d7e" colorEnd="#3e6b4f" />
+          <TrajectoryScene reach={reach} interactive={false} radius={0.03} colorStart="#3a3f47" colorEnd="#c9a66b" />
         </div>
         <div role="group" aria-label="Mark days you moved this week" style={{ display: "flex", gap: "0.5em" }}>
           {DAY_LABELS.map((label, i) => (

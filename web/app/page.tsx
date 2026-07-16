@@ -50,7 +50,7 @@ export default function Home() {
           </div>
         </div>
         <div className={styles.heroScene}>
-          <TrajectoryScene reach={1} interactive colorStart="#8b8d7e" colorEnd="#3e6b4f" />
+          <TrajectoryScene reach={1} interactive colorStart="#3a3f47" colorEnd="#c9a66b" />
         </div>
       </section>
 

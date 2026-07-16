@@ -69,7 +69,7 @@ export function Waveform({ state, className }: { state: VoiceState; className?: 
         const h = Math.max(2, (wave * 0.7 + noise) * amp * rect.height * centerFalloff);
 
         const x = i * gap + (gap - barWidth) / 2;
-        ctx.fillStyle = i % 5 === 0 ? "#3e6b4f" : "#8b8d7e";
+        ctx.fillStyle = i % 5 === 0 ? "#5eead4" : "#c9a66b";
         ctx.globalAlpha = 0.55 + centerFalloff * 0.35;
         ctx.fillRect(x, midY - h / 2, barWidth, h);
       }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getWorkout } from "@/lib/workouts";
+import { getWorkout, getExercise, loadCustomWorkouts, type WorkoutRoutine } from "@/lib/workouts";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { weekKey, todayIndex } from "@/lib/domainReach";
 import styles from "./page.module.css";
@@ -56,7 +56,22 @@ function CountdownTimer({ seconds, onComplete }: { seconds: number; onComplete: 
 
 export default function WorkoutSessionPage() {
   const params = useParams<{ id: string }>();
-  const routine = getWorkout(params.id);
+  const presetRoutine = getWorkout(params.id);
+  const [customRoutine, setCustomRoutine] = useState<WorkoutRoutine | undefined>(undefined);
+  const [customChecked, setCustomChecked] = useState(false);
+
+  useEffect(() => {
+    if (!presetRoutine) {
+      // Custom routines only exist in localStorage, which isn't available
+      // during the server render — this has to be read post-mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCustomRoutine(loadCustomWorkouts().find((w) => w.id === params.id));
+    }
+    setCustomChecked(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
+
+  const routine = presetRoutine ?? customRoutine;
 
   const [index, setIndex] = useState(0);
   const finishedRef = useRef(false);
@@ -69,7 +84,10 @@ export default function WorkoutSessionPage() {
 
   const steps = routine?.steps ?? [];
   const done = index >= steps.length;
-  const step = !done ? steps[index] : null;
+  const rawStep = !done ? steps[index] : null;
+  const exercise = rawStep ? getExercise(rawStep.exerciseId) : null;
+  const seconds = exercise?.type === "timed" ? rawStep?.seconds ?? exercise.defaultSeconds ?? 30 : null;
+  const reps = exercise?.type === "reps" ? rawStep?.reps ?? exercise.defaultReps ?? 10 : null;
 
   function advance() {
     setIndex((i) => i + 1);
@@ -84,6 +102,7 @@ export default function WorkoutSessionPage() {
   }, [done]);
 
   if (!routine) {
+    if (!customChecked) return null;
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -133,17 +152,17 @@ export default function WorkoutSessionPage() {
         </div>
       ) : (
         <div className={styles.card}>
-          <h1 className={styles.stepName}>{step!.name}</h1>
-          <p className={styles.stepCue}>{step!.cue}</p>
+          <h1 className={styles.stepName}>{exercise!.name}</h1>
+          <p className={styles.stepCue}>{exercise!.cue}</p>
 
-          {step!.durationSeconds != null ? (
-            <CountdownTimer key={index} seconds={step!.durationSeconds} onComplete={advance} />
+          {seconds != null ? (
+            <CountdownTimer key={index} seconds={seconds} onComplete={advance} />
           ) : (
             <>
               <div className={styles.repsDisplay}>
                 <div className={styles.pulse} aria-hidden="true" />
-                <span className={styles.repsNum}>{step!.reps} reps</span>
-                {step!.tempo && <span className={styles.repsTempo}>{step!.tempo}</span>}
+                <span className={styles.repsNum}>{reps} reps</span>
+                {exercise!.tempo && <span className={styles.repsTempo}>{exercise!.tempo}</span>}
               </div>
               <div className={styles.actions}>
                 <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance}>
@@ -152,6 +171,8 @@ export default function WorkoutSessionPage() {
               </div>
             </>
           )}
+
+          <p className={styles.whyText}>{exercise!.why}</p>
 
           <div className={styles.actions}>
             <button type="button" className={styles.btn} onClick={advance}>

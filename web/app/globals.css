@@ -1,23 +1,28 @@
 /* ============================================================
-   Design tokens — grounded in the vocabulary of longevity science
-   itself: survival curves, lab instrumentation, field notation.
-   Deliberately not the AI-default cream+serif+terracotta, not
-   near-black+neon, not a broadsheet grid. See app/page.tsx for the
-   design rationale.
+   Design tokens — a precision-instrument register: an observatory
+   or chronometer reading your own rate of change, not a wellness
+   blog. Deliberately moved off the previous bone-paper/cream base,
+   which — however deliberate the original intent — sits close to
+   one of the most common AI-generated defaults (warm cream + serif
+   + single accent). This palette pairs a deep charcoal-navy housing
+   with a brass instrument accent and a cyan "vital signs" accent for
+   live data, keeping the same STIX/Plex type system. See
+   app/page.tsx for the design rationale.
    ============================================================ */
 :root {
   /* -- palette -- */
-  --paper: #f1eee6;         /* base ground: warm bone paper, cooler/greyer than cliche cream */
-  --paper-raised: #e9e4d7;  /* a half-step down, for recessed/inset surfaces */
-  --ink: #191a16;           /* near-black warm charcoal-olive */
-  --ink-soft: #55584c;      /* secondary text, same warm-olive family as ink */
-  --ink-faint: #8b8d7e;     /* tertiary / placeholder */
-  --signal: #3e6b4f;        /* the one accent: muted monitor/phosphor green */
-  --signal-bright: #6fcb8f; /* brighter variant, reserved for the WebGL scene + glow only */
-  --caution: #a6631f;       /* muted clay amber, used sparingly like a hazard label */
-  --caution-wash: #f0e2cf;
-  --line: #d9d2c2;          /* hairline rule colour */
-  --line-strong: #c3baa4;
+  --paper: #12151a;         /* instrument housing: deep charcoal-navy, not flat black */
+  --paper-raised: #1b2027;  /* a half-step up, for cards and raised surfaces */
+  --ink: #ede6d8;           /* primary text: warm bone, not stark white */
+  --ink-soft: #a6a296;      /* secondary text, same warm family, dimmer */
+  --ink-faint: #6e6b62;     /* tertiary / placeholder */
+  --signal: #c9a66b;        /* the primary accent: brass, like an instrument fitting */
+  --signal-bright: #e4c48c; /* brighter brass, for the WebGL scene + glow only */
+  --vital: #5eead4;         /* secondary accent: cyan, for live/vital data readouts */
+  --caution: #e0a458;       /* amber, used sparingly like a hazard label */
+  --caution-wash: rgba(224, 164, 88, 0.12);
+  --line: #262c34;          /* hairline rule colour */
+  --line-strong: #3a4149;
 
   /* -- type families (wired to next/font variables in layout.tsx) -- */
   --font-display: var(--font-stix), Georgia, serif;
@@ -51,13 +56,13 @@
   --radius-md: 7px;
   --max-measure: 62ch;
 
-  /* -- shadows: a single soft, warm-toned drop rather than default
-     grey box-shadow — keeps the flat-paper feel while giving cards
-     enough lift to read as distinct surfaces -- */
-  --shadow-sm: 0 1px 2px rgba(25, 26, 22, 0.05), 0 1px 1px rgba(25, 26, 22, 0.04);
-  --shadow-md: 0 4px 14px rgba(25, 26, 22, 0.07), 0 1px 3px rgba(25, 26, 22, 0.05);
+  /* -- shadows: real black recess plus a faint inner highlight along
+     the top edge — the "sculpted panel" look of a physical
+     instrument housing, not a flat card with a grey drop-shadow -- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * {

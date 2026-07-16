@@ -4,6 +4,7 @@ const TTS_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 interface SpeechRequestBody {
   text: string;
   voice?: string;
+  speed?: number;
 }
 
 /**
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     return new Response("Missing text", { status: 400 });
   }
   const voice = TTS_VOICES.includes(body.voice || "") ? (body.voice as string) : "nova";
+  const speed = typeof body.speed === "number" && body.speed >= 0.7 && body.speed <= 1.2 ? body.speed : 1.0;
   const clipped = text.length > 3000 ? text.slice(0, 3000) : text;
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
     const res = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: OPENAI_TTS_MODEL, voice, input: clipped, response_format: "mp3" }),
+      body: JSON.stringify({ model: OPENAI_TTS_MODEL, voice, input: clipped, response_format: "mp3", speed }),
     });
     if (!res.ok) {
       throw new Error(`OpenAI TTS ${res.status}`);

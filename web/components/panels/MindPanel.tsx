@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
-import { MEDITATIONS, getMeditation } from "@/lib/meditations";
+import {
+  MEDITATION_CATEGORIES,
+  getCategory,
+  getVariant,
+  type MeditationFocus,
+  type MeditationLength,
+} from "@/lib/meditations";
 import styles from "./panels.module.css";
 
 interface MindEntry {
@@ -16,8 +22,49 @@ interface MindEntry {
 interface MeditationSession {
   id: string;
   date: string;
-  meditationId: string;
+  focus: MeditationFocus;
+  length: MeditationLength;
   title: string;
+}
+
+interface AmbientHandle {
+  stop: () => void;
+}
+
+function startAmbientTone(): AmbientHandle | null {
+  try {
+    const Ctx =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc1.frequency.value = 110;
+    osc2.frequency.value = 165;
+    gain.gain.value = 0.0001;
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    osc1.start();
+    osc2.start();
+    gain.gain.linearRampToValueAtTime(0.02, ctx.currentTime + 1.5);
+    return {
+      stop: () => {
+        try {
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+          setTimeout(() => {
+            osc1.stop();
+            osc2.stop();
+            ctx.close();
+          }, 500);
+        } catch {
+          // already stopped
+        }
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface FocusSession {
@@ -114,11 +161,28 @@ export function MindPanel() {
     "lc_meditation_sessions_v1",
     []
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedFocus, setSelectedFocus] = useState<MeditationFocus | null>(null);
+  const [length, setLength] = useState<MeditationLength>("short");
+  const [pace, setPace] = useState<"normal" | "slow">("normal");
+  const [ambientOn, setAmbientOn] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [usingBrowserVoice, setUsingBrowserVoice] = useState(false);
+  const [breathLabel, setBreathLabel] = useState<"in" | "out">("in");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ambientRef = useRef<AmbientHandle | null>(null);
+
+  useEffect(() => {
+    if (!playing) return;
+    const t = setInterval(() => setBreathLabel((l) => (l === "in" ? "out" : "in")), 4000);
+    return () => clearInterval(t);
+  }, [playing]);
+
+  useEffect(() => {
+    return () => {
+      ambientRef.current?.stop();
+    };
+  }, []);
 
   const [, setFocusSessions] = useLocalStorageState<FocusSession[]>("lc_focus_sessions_v1", []);
   const [breakMinutes, setBreakMinutes] = useState<number | null>(null);
@@ -150,24 +214,33 @@ export function MindPanel() {
     setEditing(true);
   }
 
-  async function playMeditation(id: string) {
-    const med = getMeditation(id);
-    if (!med) return;
-    setSelectedId(id);
+  async function playMeditation(focus: MeditationFocus) {
+    const variant = getVariant(focus, length);
+    const category = getCategory(focus);
+    if (!variant || !category) return;
+    setSelectedFocus(focus);
     setLoadingAudio(true);
     setUsingBrowserVoice(false);
+    setBreathLabel("in");
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    if (ambientOn) ambientRef.current = startAmbientTone();
 
     function recordSession() {
-      setMeditationSessions((prev) => [...prev, { id: `${Date.now()}`, date: todayKey(), meditationId: med!.id, title: med!.title }]);
+      setMeditationSessions((prev) => [
+        ...prev,
+        { id: `${Date.now()}`, date: todayKey(), focus, length, title: category!.title },
+      ]);
     }
 
     function speakInBrowser() {
       setUsingBrowserVoice(true);
       setPlaying(true);
-      const utter = new SpeechSynthesisUtterance(med!.script);
+      const utter = new SpeechSynthesisUtterance(variant!.script);
+      utter.rate = pace === "slow" ? 0.85 : 1.0;
       utter.onend = () => {
         setPlaying(false);
+        ambientRef.current?.stop();
+        ambientRef.current = null;
         recordSession();
       };
       window.speechSynthesis.speak(utter);
@@ -177,7 +250,7 @@ export function MindPanel() {
       const res = await fetch("/api/meditation-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: med.script }),
+        body: JSON.stringify({ text: variant.script, speed: pace === "slow" ? 0.85 : 1.0 }),
       });
       if (res.status === 200 && audioRef.current) {
         const blob = await res.blob();
@@ -197,8 +270,10 @@ export function MindPanel() {
   function stopMeditation() {
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     audioRef.current?.pause();
+    ambientRef.current?.stop();
+    ambientRef.current = null;
     setPlaying(false);
-    setSelectedId(null);
+    setSelectedFocus(null);
   }
 
   function startBreak(minutes: number) {
@@ -319,7 +394,7 @@ export function MindPanel() {
                       height: e ? `${(e.purposeRating / 5) * 100}%` : "6%",
                       minHeight: 4,
                       borderRadius: 3,
-                      background: e ? (e.connected ? "#6fcb8f" : "#3e6b4f") : "var(--line)",
+                      background: e ? (e.connected ? "#5eead4" : "#c9a66b") : "var(--line)",
                     }}
                   />
                 ))}
@@ -341,39 +416,100 @@ export function MindPanel() {
               ref={audioRef}
               onEnded={() => {
                 setPlaying(false);
-                const med = selectedId ? getMeditation(selectedId) : undefined;
-                if (med) setMeditationSessions((prev) => [...prev, { id: `${Date.now()}`, date: todayKey(), meditationId: med.id, title: med.title }]);
+                ambientRef.current?.stop();
+                ambientRef.current = null;
+                const category = selectedFocus ? getCategory(selectedFocus) : undefined;
+                if (category && selectedFocus) {
+                  setMeditationSessions((prev) => [
+                    ...prev,
+                    { id: `${Date.now()}`, date: todayKey(), focus: selectedFocus, length, title: category.title },
+                  ]);
+                }
               }}
               style={{ display: "none" }}
             />
             {playing ? (
               <div style={{ textAlign: "center" }}>
-                <p className={styles.insightHeadline}>{getMeditation(selectedId!)?.title}</p>
+                <div
+                  className={styles.breathingCircle}
+                  aria-hidden="true"
+                  style={{ margin: "0 auto" }}
+                />
+                <p className={styles.insightHeadline} style={{ marginTop: "0.8em" }}>
+                  Breathe {breathLabel}
+                </p>
                 <p className={styles.emptyText} style={{ margin: "0.4em auto 0" }}>
                   {usingBrowserVoice ? "Playing via your browser's built-in voice." : "Playing…"}
+                  {ambientOn && " · Ambient tone on."}
                 </p>
                 <button type="button" className={styles.btn} style={{ marginTop: "0.8em" }} onClick={stopMeditation}>
                   Stop
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5em" }}>
-                {MEDITATIONS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={styles.meditationOption}
-                    onClick={() => playMeditation(m.id)}
-                    disabled={loadingAudio}
-                  >
-                    <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}>{m.title}</span>
-                    <span className={`${styles.panelMeta} tabular`} style={{ marginLeft: "0.6em" }}>{m.minutes} min</span>
-                    <div className={styles.emptyText} style={{ margin: "0.2em 0 0", maxWidth: "none" }}>{m.focus}</div>
-                  </button>
-                ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.7em" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5em" }}>
+                  {MEDITATION_CATEGORIES.map((c) => (
+                    <button
+                      key={c.focus}
+                      type="button"
+                      className={styles.meditationOption}
+                      onClick={() => playMeditation(c.focus)}
+                      disabled={loadingAudio}
+                    >
+                      <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}>{c.title}</span>
+                      <span className={`${styles.panelMeta} tabular`} style={{ marginLeft: "0.6em" }}>
+                        {getVariant(c.focus, length)?.minutes} min
+                      </span>
+                      <div className={styles.emptyText} style={{ margin: "0.2em 0 0", maxWidth: "none" }}>
+                        {c.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Length</span>
+                  <div className={styles.tagRow}>
+                    {(["short", "long"] as const).map((l) => (
+                      <button
+                        key={l}
+                        type="button"
+                        className={length === l ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                        onClick={() => setLength(l)}
+                        aria-pressed={length === l}
+                      >
+                        {l === "short" ? "Short" : "Long"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Pace</span>
+                  <div className={styles.tagRow}>
+                    {(["normal", "slow"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        className={pace === p ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                        onClick={() => setPace(p)}
+                        aria-pressed={pace === p}
+                      >
+                        {p === "normal" ? "Normal" : "Slower"}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={ambientOn ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                      onClick={() => setAmbientOn((a) => !a)}
+                      aria-pressed={ambientOn}
+                    >
+                      Ambient tone
+                    </button>
+                  </div>
+                </div>
                 {lastMeditation && (
                   <p className={styles.emptyText} style={{ margin: 0 }}>
-                    Last session: {lastMeditation.title}
+                    Last session: {lastMeditation.title} ({lastMeditation.length})
                   </p>
                 )}
               </div>

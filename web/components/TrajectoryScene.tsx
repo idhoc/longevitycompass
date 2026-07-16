@@ -40,7 +40,7 @@ const FRAGMENT_SHADER = `
     float fresnel = pow(1.0 - clamp(abs(vNormalView.z), 0.0, 1.0), 2.2);
 
     vec3 activeColor = gradColor + fresnel * 0.5 + travel * 0.35 + pulse;
-    vec3 fadedColor = mix(uColorStart, vec3(0.72, 0.70, 0.63), 0.72);
+    vec3 fadedColor = mix(uColorStart, vec3(0.11, 0.13, 0.16), 0.72);
 
     vec3 col = reached ? activeColor : fadedColor;
     float alpha = reached ? 0.94 : 0.2;
@@ -123,7 +123,7 @@ function Baseline({ width }: { width: number }) {
   const lineObject = useMemo(() => {
     const points = [new THREE.Vector3(-width / 2, -0.62, 0), new THREE.Vector3(width / 2, -0.62, 0)];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: "#c3baa4", transparent: true, opacity: 0.5 });
+    const material = new THREE.LineBasicMaterial({ color: "#4a5058", transparent: true, opacity: 0.5 });
     return new THREE.Line(geometry, material);
   }, [width]);
 
@@ -156,8 +156,8 @@ export function TrajectoryScene({
   reach = 1,
   interactive = true,
   radius = 0.05,
-  colorStart = "#8b8d7e",
-  colorEnd = "#3e6b4f",
+  colorStart = "#3a3f47",
+  colorEnd = "#c9a66b",
   className,
 }: {
   reach?: number;

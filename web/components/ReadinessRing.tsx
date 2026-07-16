@@ -6,9 +6,9 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const BAND_COLOR: Record<ReadinessBand, string> = {
-  low: "#a6631f",
-  moderate: "#b9932a",
-  high: "#3e6b4f",
+  low: "#d97757",
+  moderate: "#e0a458",
+  high: "#5eead4",
 };
 
 const BAND_LABEL: Record<ReadinessBand, string> = {
