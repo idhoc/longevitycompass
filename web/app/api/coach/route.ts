@@ -1,6 +1,7 @@
 import { callOpenAIText } from "@/lib/ai/openai";
 import { checkLocalRedFlags, containsEscalationLanguage, MI_STYLE_TEXT, SCOPE_TEXT } from "@/lib/ai/safety";
 import type { SafetyProfile } from "@/lib/ai/safety";
+import { TONE_SYSTEM_PROMPT, INTENSITY_SYSTEM_PROMPT, type CoachTone, type ContentIntensity } from "@/lib/profile";
 
 interface ChatTurn {
   role: "user" | "coach";
@@ -12,6 +13,12 @@ interface CoachRequestBody {
   history?: ChatTurn[];
   profile?: SafetyProfile;
   allowWebSearch?: boolean;
+  /** A plain-text summary of the person's actually-logged data (sleep,
+   * meals, workouts, mind check-ins) — grounds the reply in real numbers
+   * instead of a generic opener. */
+  context?: string;
+  tone?: CoachTone;
+  intensity?: ContentIntensity;
 }
 
 export async function POST(request: Request) {
@@ -37,7 +44,11 @@ export async function POST(request: Request) {
     "",
     MI_STYLE_TEXT,
     "",
+    TONE_SYSTEM_PROMPT[body.tone || "warm"],
+    INTENSITY_SYSTEM_PROMPT[body.intensity || "standard"],
+    "",
     "This app tracks four domains: Sleep & Recovery, Nutrition, Fitness & Movement, and Mind & Purpose. Answer inside that scope.",
+    body.context ? `\nWhat this person has actually logged recently:\n${body.context}` : "",
   ].join("\n");
 
   const transcript = (body.history || [])

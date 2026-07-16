@@ -1,102 +1,200 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SiteNav } from "@/components/SiteNav";
 import { Waveform, type VoiceState } from "@/components/Waveform";
+import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { minutesBetween } from "@/lib/sleepEstimate";
+import { weekKey, computeStreak } from "@/lib/domainReach";
+import { EMPTY_PROFILE, type UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 
-type Entry = { who: "you" | "coach"; text: string; time: string };
+type Entry = { who: "you" | "coach"; text: string; time: string; escalation?: boolean; error?: boolean };
 
-const OPENING: Entry[] = [
-  {
-    who: "coach",
-    text: "Morning. Sleep logged at 6.1 hours last night, a bit under your 7.5h target. What's actually keeping you up?",
-    time: "07:12",
-  },
-  {
-    who: "you",
-    text: "Work stress mostly, and I've been having coffee kind of late.",
-    time: "07:13",
-  },
-  {
-    who: "coach",
-    text: "Caffeine has roughly a 5-6 hour half-life for most people, so a 3pm coffee is still about a quarter-dose in your system at 9pm. Try moving your last cup to before noon this week and see if the 6.1h moves. If sleep stays broken after two weeks of that, it's worth a word with your doctor, not another week of guessing.",
-    time: "07:13",
-  },
-];
+interface SleepEntry {
+  date: string;
+  bedtime: string;
+  wakeTime: string;
+  quality: number;
+  restingHeartRate?: string;
+}
+interface LoggedMeal {
+  date: string;
+  totalCalories: number | null;
+}
+interface WorkoutSession {
+  id: string;
+  date: string;
+  title: string;
+}
+interface MindEntry {
+  date: string;
+  purposeRating: number;
+  note: string;
+}
 
-// A handful of topical, scope-respecting sample replies so the composer
-// feels alive without wiring a real model in this concept build.
-function sampleReply(input: string): string {
-  const q = input.toLowerCase();
-  if (q.includes("creatine")) {
-    return "Creatine monohydrate has the deepest evidence base of any supplement for strength and lean mass, roughly 3-5g daily, no loading phase required. It's not something I'd frame as longevity-critical on its own, more a reasonable add if you're already training. If you're on any kidney medication, check with your doctor first, that's outside what I can weigh in on.";
-  }
-  if (q.includes("protein")) {
-    return "Most research on healthy adults over 40 points to 1.2-1.6g of protein per kg of bodyweight for preserving muscle, higher than the general 0.8g RDA. Spread across meals matters about as much as the daily total, since muscle protein synthesis responds to each dose.";
-  }
-  if (q.includes("sleep")) {
-    return "Your logged average this week is 6.4h. The single highest-leverage change in the research isn't a supplement, it's consistent wake time, even on weekends. Circadian regulation responds more to when you wake than when you fall asleep.";
-  }
-  return "That's a fair question and I don't have a source-backed answer for it in front of me right now, so I'd rather say that plainly than guess. Ask me about sleep, protein, or creatine and I can point to something specific.";
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function timeNow() {
   return new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
+function sessionGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Morning check-in";
+  if (h < 18) return "Midday check-in";
+  return "Evening check-in";
+}
+
 export default function CoachPage() {
-  const [entries, setEntries] = useState<Entry[]>(OPENING);
+  const [profile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
+  const [sleepEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
+  const [meals] = useLocalStorageState<LoggedMeal[]>("lc_meals_v1", []);
+  const [fitnessDays] = useLocalStorageState<boolean[]>(
+    `lc_fitness_${weekKey()}`,
+    [false, false, false, false, false, false, false]
+  );
+  const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
+  const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
+
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
-  const [manualState, setManualState] = useState<VoiceState | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const timers = useRef<number[]>([]);
+  const [voiceOn, setVoiceOn] = useState(false);
+  const startedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
-  function clearTimers() {
-    timers.current.forEach((id) => window.clearTimeout(id));
-    timers.current = [];
+  const p = profile ?? EMPTY_PROFILE;
+
+  function buildContext(): string {
+    const lines: string[] = [];
+    const sleepEntry = sleepEntries.find((e) => e.date === todayKey());
+    if (sleepEntry) {
+      const hours = (minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime) / 60).toFixed(1);
+      lines.push(`Sleep: ${hours}h logged last night, quality ${sleepEntry.quality}/5.`);
+    } else {
+      lines.push("Sleep: nothing logged for last night yet.");
+    }
+
+    const todaysMeals = meals.filter((m) => m.date === todayKey());
+    if (todaysMeals.length) {
+      const kcal = Math.round(todaysMeals.reduce((sum, m) => sum + (m.totalCalories || 0), 0));
+      lines.push(`Nutrition: ${todaysMeals.length} meal${todaysMeals.length === 1 ? "" : "s"} logged today, about ${kcal} kcal so far.`);
+    } else {
+      lines.push("Nutrition: nothing logged today yet.");
+    }
+
+    const completedDays = fitnessDays.filter(Boolean).length;
+    const lastSession = sessions[sessions.length - 1];
+    lines.push(
+      `Fitness: ${completedDays} of 7 days moved this week.${lastSession ? ` Last session: ${lastSession.title}.` : ""}`
+    );
+
+    const streak = computeStreak(mindEntries);
+    const lastMind = mindEntries[mindEntries.length - 1];
+    lines.push(
+      streak > 0
+        ? `Mind: ${streak}-day reflection streak.${lastMind?.note ? ` Last note: "${lastMind.note}".` : ""}`
+        : "Mind: no reflection logged recently."
+    );
+
+    return lines.join("\n");
   }
 
-  function send(text: string) {
-    const trimmed = text.trim();
-    if (!trimmed || busy) return;
-    setManualState(null);
-    setEntries((e) => [...e, { who: "you", text: trimmed, time: timeNow() }]);
-    setDraft("");
+  async function speak(text: string) {
+    if (!voiceOn) return;
+    try {
+      const res = await fetch("/api/meditation-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, speed: 1.0 }),
+      });
+      if (res.status === 200 && audioRef.current) {
+        const blob = await res.blob();
+        audioRef.current.src = URL.createObjectURL(blob);
+        setVoiceState("speaking");
+        await audioRef.current.play();
+      }
+    } catch {
+      // silent fallback — the written reply already stands on its own
+    }
+  }
+
+  async function sendToCoach(userText: string | null) {
+    const isKickoff = userText === null;
+    if (!isKickoff) {
+      const trimmed = (userText || "").trim();
+      if (!trimmed || busy) return;
+      setEntries((e) => [...e, { who: "you", text: trimmed, time: timeNow() }]);
+      setDraft("");
+    }
     setBusy(true);
     setVoiceState("thinking");
 
-    timers.current.push(
-      window.setTimeout(() => {
-        setVoiceState("speaking");
-        const reply = sampleReply(trimmed);
-        setEntries((e) => [...e, { who: "coach", text: reply, time: timeNow() }]);
-        timers.current.push(
-          window.setTimeout(() => {
-            setVoiceState("idle");
-            setBusy(false);
-          }, 1600)
-        );
-      }, 900)
-    );
+    const history = entries.map((e) => ({ role: e.who === "you" ? ("user" as const) : ("coach" as const), content: e.text }));
+
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: isKickoff
+            ? "Open today's check-in. Reference at least one specific thing I've actually logged, in one or two short sentences, then ask one open question."
+            : userText,
+          history,
+          context: buildContext(),
+          tone: p.tone,
+          intensity: p.intensity,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      const reply: string = data.reply || "";
+      setEntries((e) => [...e, { who: "coach", text: reply, time: timeNow(), escalation: !!data.escalation }]);
+      if (reply) void speak(reply);
+    } catch {
+      setEntries((e) => [
+        ...e,
+        {
+          who: "coach",
+          text: "That request didn't go through — try again in a moment.",
+          time: timeNow(),
+          error: true,
+        },
+      ]);
+    } finally {
+      setBusy(false);
+      setVoiceState((s) => (s === "speaking" ? s : "idle"));
+    }
   }
 
-  function previewState(s: VoiceState) {
-    clearTimers();
-    setBusy(false);
-    setManualState(s);
-    setVoiceState(s);
-  }
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void sendToCoach(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const displayState = manualState ?? voiceState;
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [entries]);
 
   return (
     <div className={styles.page}>
       <SiteNav active="/coach" />
       <div className={styles.body}>
         <div className={styles.transcript}>
-          <div className={styles.log}>
+          <div className={styles.sessionHead}>
+            <span className="eyebrow">{sessionGreeting()}</span>
+            <span className={`${styles.sessionDate} tabular`}>
+              {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+            </span>
+          </div>
+          <div className={styles.log} ref={logRef}>
             {entries.map((entry, i) => (
               <div className={styles.entry} key={i}>
                 <div className={styles.entryMeta}>
@@ -109,22 +207,36 @@ export default function CoachPage() {
                   </span>
                   <span className={`${styles.entryTime} tabular`}>{entry.time}</span>
                 </div>
-                <p className={styles.entryText}>{entry.text}</p>
+                <p className={entry.escalation ? `${styles.entryText} ${styles.entryEscalation}` : styles.entryText}>
+                  {entry.text}
+                </p>
               </div>
             ))}
+            {busy && (
+              <div className={styles.entry}>
+                <div className={styles.entryMeta}>
+                  <span className={`${styles.entryWho} ${styles.entryWhoCoach}`}>COACH</span>
+                </div>
+                <div className={styles.typing} aria-label="Coach is thinking">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            )}
           </div>
           <form
             className={styles.composer}
             onSubmit={(e) => {
               e.preventDefault();
-              send(draft);
+              void sendToCoach(draft);
             }}
           >
             <input
               className={styles.input}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Ask about sleep, protein, creatine…"
+              placeholder="Say what's actually going on…"
               disabled={busy}
             />
             <button type="submit" className={styles.sendButton} disabled={busy || !draft.trim()}>
@@ -134,31 +246,29 @@ export default function CoachPage() {
         </div>
 
         <aside className={styles.instrument}>
+          <audio ref={audioRef} onEnded={() => setVoiceState("idle")} style={{ display: "none" }} />
           <div className={styles.instrumentTop}>
             <span className="eyebrow">Signal</span>
-            <span className={styles.stateLabel}>{displayState}</span>
+            <span className={styles.stateLabel}>{voiceState}</span>
           </div>
-          <Waveform state={displayState} className={styles.waveform} />
-          <div className={styles.stateButtons}>
-            {(["idle", "listening", "thinking", "speaking"] as VoiceState[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={
-                  displayState === s
-                    ? `${styles.stateButton} ${styles.stateButtonActive}`
-                    : styles.stateButton
-                }
-                onClick={() => previewState(s)}
-              >
-                {s}
-              </button>
-            ))}
+          <Waveform state={voiceState} className={styles.waveform} />
+          <button
+            type="button"
+            className={voiceOn ? `${styles.voiceToggle} ${styles.voiceToggleActive}` : styles.voiceToggle}
+            onClick={() => setVoiceOn((v) => !v)}
+            aria-pressed={voiceOn}
+          >
+            {voiceOn ? "Voice replies: on" : "Voice replies: off"}
+          </button>
+
+          <div className={styles.groundedIn}>
+            <span className={styles.groundedLabel}>This session is reading</span>
+            <p className={styles.groundedText}>{buildContext()}</p>
           </div>
+
           <p className={styles.instrumentNote}>
-            A waveform reads as an honest instrument for voice — an amplitude signal, not a
-            decorative sphere. These four buttons preview each state for this sample; in the
-            shipped app they reflect real mic input and TTS playback.
+            A wellness coach, not a clinician — anything that needs a real diagnosis gets a
+            direct, plain referral instead of a guess.
           </p>
         </aside>
       </div>

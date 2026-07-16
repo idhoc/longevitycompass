@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 export default function NutritionPage() {
   return (
     <div className={styles.page}>
-      <SiteNav active="/dashboard" />
+      <SiteNav active="/nutrition" />
       <div className={styles.header}>
         <span className="eyebrow">Nutrition</span>
         <h1>What you actually ate</h1>

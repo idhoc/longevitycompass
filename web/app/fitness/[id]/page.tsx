@@ -145,8 +145,8 @@ export default function WorkoutSessionPage() {
             <Link href="/fitness" className={styles.btn}>
               Do another
             </Link>
-            <Link href="/dashboard" className={`${styles.btn} ${styles.btnPrimary}`}>
-              Back to dashboard
+            <Link href="/today" className={`${styles.btn} ${styles.btnPrimary}`}>
+              Back to Today
             </Link>
           </div>
         </div>

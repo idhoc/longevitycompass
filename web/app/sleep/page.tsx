@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 export default function SleepPage() {
   return (
     <div className={styles.page}>
-      <SiteNav active="/dashboard" />
+      <SiteNav active="/sleep" />
       <div className={styles.header}>
         <span className="eyebrow">Sleep &amp; Recovery</span>
         <h1>Last night, in detail</h1>

@@ -37,8 +37,13 @@ const DEFAULT_ENTRY: SleepEntry = {
   restingHeartRate: "",
 };
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function SleepPanel() {
-  const [entry, setEntry] = useLocalStorageState<SleepEntry | null>("lc_sleep_entry_v1", null);
+  const [entries, setEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
+  const entry = entries.find((e) => e.date === todayKey()) ?? null;
   const [draft, setDraft] = useState<SleepEntry>(DEFAULT_ENTRY);
   const [editing, setEditing] = useState(false);
   const [insight, setInsight] = useState<SleepInsight | null>(null);
@@ -58,7 +63,8 @@ export function SleepPanel() {
   }
 
   function save() {
-    setEntry({ ...draft, date: new Date().toISOString().slice(0, 10) });
+    const date = todayKey();
+    setEntries((prev) => [...prev.filter((e) => e.date !== date), { ...draft, date }]);
     setEditing(false);
     setInsight(null);
     setInsightError(null);
@@ -240,7 +246,14 @@ export function SleepPanel() {
             </div>
           ) : (
             <div className={styles.panelFooter}>
-              <button type="button" className={styles.btn} onClick={() => setEditing(true)}>
+              <button
+                type="button"
+                className={styles.btn}
+                onClick={() => {
+                  if (entry) setDraft(entry);
+                  setEditing(true);
+                }}
+              >
                 Update
               </button>
               <button

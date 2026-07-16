@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { TrajectoryScene } from "@/components/TrajectoryScene";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
-import { weekKey, todayIndex, fitnessReachFromDays } from "@/lib/domainReach";
+import { weekKey, todayIndex } from "@/lib/domainReach";
 import styles from "./panels.module.css";
 
 interface WorkoutSession {
@@ -21,7 +20,6 @@ export function FitnessPanel() {
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
 
   const completed = days.filter(Boolean).length;
-  const reach = fitnessReachFromDays(days);
   const idx = todayIndex();
   const lastSession = sessions[sessions.length - 1];
 
@@ -41,9 +39,6 @@ export function FitnessPanel() {
       </div>
 
       <div className={styles.panelBody}>
-        <div className={styles.miniScene}>
-          <TrajectoryScene reach={reach} interactive={false} radius={0.03} colorStart="#3a3f47" colorEnd="#c9a66b" />
-        </div>
         <div role="group" aria-label="Mark days you moved this week" style={{ display: "flex", gap: "0.5em" }}>
           {DAY_LABELS.map((label, i) => (
             <button

@@ -11,7 +11,7 @@ export default function FitnessLibraryPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/dashboard" />
+      <SiteNav active="/fitness" />
 
       <div className={styles.header}>
         <span className="eyebrow">Guided sessions</span>

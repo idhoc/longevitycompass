@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 export default function MindPage() {
   return (
     <div className={styles.page}>
-      <SiteNav active="/dashboard" />
+      <SiteNav active="/mind" />
       <div className={styles.header}>
         <span className="eyebrow">Mind &amp; Purpose</span>
         <h1>Reflect, breathe, or step away</h1>

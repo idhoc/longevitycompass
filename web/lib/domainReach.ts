@@ -1,6 +1,6 @@
 /**
  * Shared reach (0-1 adherence) calculations, used both inside each domain
- * panel and by the dashboard overview so the headline number is always
+ * panel and by the Today overview so the headline number is always
  * derived from the same real, stored data — never a separate mock figure.
  */
 
@@ -20,6 +20,17 @@ export function dateKeyOffset(daysAgo: number): string {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   return d.toISOString().slice(0, 10);
+}
+
+/** Aligns arbitrary date-keyed entries to the last 7 calendar days (oldest
+ * first), filling gaps with null — the shape every trend chart on the
+ * Today page needs, so this lives in one place instead of being
+ * reimplemented per domain. */
+export function last7Days<T extends { date: string }>(entries: T[]): (T | null)[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = dateKeyOffset(6 - i);
+    return entries.find((e) => e.date === date) ?? null;
+  });
 }
 
 export function computeStreak(entries: { date: string }[]): number {

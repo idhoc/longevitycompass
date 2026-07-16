@@ -75,6 +75,53 @@
   align-items: stretch;
 }
 
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--signal);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.cardStat {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-md);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.cardSub {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  margin-top: -0.4em;
+}
+
 @media (max-width: 900px) {
   .overview {
     flex-direction: column;

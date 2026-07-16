@@ -28,9 +28,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Longevity Compass — a coaching trajectory, not a wellness app",
+  title: "Longevity Compass — a coach that reads what you log",
   description:
-    "A longevity coach built from published research on nutrition, movement, sleep, and mind — reshaped weekly by what you actually do.",
+    "A longevity coach built from published research on nutrition, movement, sleep, and mind — reshaped daily by what you actually do.",
 };
 
 export default function RootLayout({
@@ -43,6 +43,18 @@ export default function RootLayout({
       lang="en"
       className={`${stixTwo.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
+      <head>
+        {/* Sets the color scheme before first paint so switching themes in
+            Settings never produces a flash of the wrong theme on reload. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try {
+              var t = localStorage.getItem('lc_theme_v1');
+              if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

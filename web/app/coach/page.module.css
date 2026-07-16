@@ -42,36 +42,53 @@
   display: block;
 }
 
-.stateButtons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.voiceToggle {
   margin-top: var(--space-3);
-}
-
-.stateButton {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.5em 0.85em;
+  padding: 0.6em 0.9em;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   color: var(--ink-soft);
   background: transparent;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  width: 100%;
 }
 
-.stateButton:hover {
+.voiceToggle:hover {
   border-color: var(--signal);
   color: var(--ink);
 }
 
-.stateButtonActive {
-  border-color: var(--signal);
-  color: var(--ink);
-  background: var(--paper-raised);
+.voiceToggleActive {
+  border-color: var(--vital);
+  color: var(--vital);
+  background: color-mix(in srgb, var(--vital) 10%, transparent);
+}
+
+.groundedIn {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.groundedLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.groundedText {
+  margin-top: 0.6em;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.7;
+  white-space: pre-line;
 }
 
 .instrumentNote {
@@ -87,6 +104,19 @@
   display: flex;
   flex-direction: column;
   min-height: 60vh;
+}
+
+.sessionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.sessionDate {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
 }
 
 .log {
@@ -132,6 +162,46 @@
 .entryText {
   font-size: var(--text-base);
   line-height: 1.6;
+}
+
+.entryEscalation {
+  padding: var(--space-3);
+  border-left: 2px solid var(--caution);
+  background: var(--caution-wash);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.typing {
+  display: flex;
+  gap: 0.3em;
+  padding: 0.3em 0;
+}
+
+.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  animation: typingBounce 1.1s ease-in-out infinite;
+}
+
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 .composer {
