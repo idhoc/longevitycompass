@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
-import { TrajectoryScene } from "@/components/TrajectoryScene";
+import { ReadinessRing } from "@/components/ReadinessRing";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import {
@@ -11,7 +13,9 @@ import {
   nutritionReachFromMealsToday,
   sleepReachFromMinutes,
   mindReachFromStreak,
+  computeReadiness,
 } from "@/lib/domainReach";
+import { domainOrderFromProfile, type DomainKey, type UserProfile } from "@/lib/profile";
 import { SleepPanel } from "@/components/panels/SleepPanel";
 import { NutritionPanel } from "@/components/panels/NutritionPanel";
 import { FitnessPanel } from "@/components/panels/FitnessPanel";
@@ -22,8 +26,19 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const PANEL_BY_KEY: Record<DomainKey, React.ComponentType> = {
+  sleep: SleepPanel,
+  nutrition: NutritionPanel,
+  fitness: FitnessPanel,
+  mind: MindPanel,
+};
+
 export default function DashboardPage() {
-  const [sleepEntry] = useLocalStorageState<{ bedtime: string; wakeTime: string } | null>(
+  const router = useRouter();
+  const [profile, , profileHydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
+  const [skipped, , skippedHydrated] = useLocalStorageState<boolean>("lc_onboarding_skipped_v1", false);
+
+  const [sleepEntry] = useLocalStorageState<{ bedtime: string; wakeTime: string; quality?: number } | null>(
     "lc_sleep_entry_v1",
     null
   );
@@ -33,13 +48,23 @@ export default function DashboardPage() {
     [false, false, false, false, false, false, false]
   );
   const [mindEntries] = useLocalStorageState<{ date: string }[]>("lc_mind_entries_v1", []);
+  const [meditationSessions] = useLocalStorageState<{ date: string }[]>("lc_meditation_sessions_v1", []);
 
-  const sleepReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0.04;
+  useEffect(() => {
+    if (profileHydrated && skippedHydrated && !profile?.completedAt && !skipped) {
+      router.replace("/onboarding");
+    }
+  }, [profileHydrated, skippedHydrated, profile, skipped, router]);
+
+  const durationReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0.04;
+  const sleepReach = sleepEntry?.quality ? (durationReach + sleepEntry.quality / 5) / 2 : durationReach;
   const nutritionReach = nutritionReachFromMealsToday(meals.filter((m) => m.date === todayKey()).length);
   const fitnessReach = fitnessReachFromDays(fitnessDays);
-  const mindReach = mindReachFromStreak(computeStreak(mindEntries));
+  const mindDates = [...mindEntries, ...meditationSessions].map((e) => ({ date: e.date }));
+  const mindReach = mindReachFromStreak(computeStreak(mindDates));
 
-  const overall = Math.round(((sleepReach + nutritionReach + fitnessReach + mindReach) / 4) * 100);
+  const readiness = computeReadiness({ sleep: sleepReach, nutrition: nutritionReach, fitness: fitnessReach, mind: mindReach });
+  const domainOrder = domainOrderFromProfile(profile);
 
   return (
     <div className={styles.page}>
@@ -47,34 +72,27 @@ export default function DashboardPage() {
 
       <div className={styles.header}>
         <span className="eyebrow">Today</span>
-        <h1>Where the curve is bending</h1>
+        <h1>{profile?.name ? `Where you're at, ${profile.name}` : "Where you're at today"}</h1>
         <p className={styles.headerSub}>
-          Four domains, each measured its own way — the trajectory below is drawn from
-          what you&apos;ve actually logged, not a projection.
+          One readiness score, synthesized from what you&apos;ve actually logged across sleep,
+          nutrition, movement, and mind — not a wearable measurement yet, an honest self-reported
+          estimate.
         </p>
       </div>
 
       <div className={styles.overview}>
-        <div className={styles.overviewStat}>
-          <div className={styles.overviewNum}>{overall}%</div>
-          <div className={styles.overviewLabel}>Overall trajectory, today</div>
-        </div>
-        <div className={styles.overviewScene}>
-          <TrajectoryScene
-            reach={overall / 100}
-            interactive={false}
-            radius={0.045}
-            colorStart="#8b8d7e"
-            colorEnd="#3e6b4f"
-          />
+        <ReadinessRing score={readiness.score} band={readiness.band} />
+        <div className={styles.overviewCopy}>
+          <div className={styles.overviewLabel}>Readiness, today</div>
+          <p className={styles.overviewFocus}>{readiness.focus} is the biggest lever right now.</p>
         </div>
       </div>
 
       <div className={styles.grid}>
-        <SleepPanel />
-        <NutritionPanel />
-        <FitnessPanel />
-        <MindPanel />
+        {domainOrder.map((key) => {
+          const Panel = PANEL_BY_KEY[key];
+          return <Panel key={key} />;
+        })}
       </div>
     </div>
   );

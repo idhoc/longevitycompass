@@ -7,6 +7,12 @@
   gap: var(--space-3);
   background: var(--paper-raised);
   min-height: 260px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease;
+}
+
+.panel:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .panelHead {
@@ -169,6 +175,27 @@ textarea.input {
   border-color: var(--signal);
   color: var(--ink);
   background: color-mix(in srgb, var(--signal) 12%, transparent);
+}
+
+.meditationOption {
+  text-align: left;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.6em 0.8em;
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.meditationOption:hover {
+  border-color: var(--signal);
+  box-shadow: var(--shadow-md);
+}
+
+.meditationOption:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .miniScene {

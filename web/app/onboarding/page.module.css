@@ -1,0 +1,252 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.topRow {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.mark {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+}
+
+.markDot {
+  color: var(--signal);
+}
+
+.skip {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0.4em 0;
+}
+
+.skip:hover {
+  color: var(--ink);
+}
+
+.progress {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  gap: 0.4em;
+  margin-bottom: var(--space-6);
+}
+
+.progressDot {
+  height: 3px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.progressDotActive {
+  background: var(--signal);
+}
+
+.card {
+  width: 100%;
+  max-width: 640px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.title {
+  font-size: var(--text-xl);
+  margin-top: var(--space-2);
+}
+
+.subtitle {
+  margin-top: var(--space-3);
+  color: var(--ink-soft);
+  line-height: 1.6;
+  max-width: 52ch;
+}
+
+.fields {
+  margin-top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.input {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.65em 0.8em;
+  background: var(--paper-raised);
+  color: var(--ink);
+  width: 100%;
+}
+
+.input:focus {
+  border-color: var(--signal);
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6em;
+}
+
+.option {
+  text-align: left;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--paper-raised);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.option:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.option:hover {
+  border-color: var(--signal);
+}
+
+.optionActive {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 10%, var(--paper-raised));
+}
+
+.optionLabel {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-base);
+}
+
+.optionHint {
+  margin-top: 0.3em;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0.5em 0.9em;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: var(--paper-raised);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.tagActive {
+  border-color: var(--signal);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--signal);
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.footer {
+  margin-top: var(--space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.7em 1.2em;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--signal);
+  color: var(--ink);
+}
+
+.btnPrimary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.btnPrimary:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--paper);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.doneIcon {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-3xl);
+  color: var(--signal);
+  line-height: 1;
+}

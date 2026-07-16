@@ -4,6 +4,7 @@ import styles from "./SiteNav.module.css";
 const LINKS = [
   { href: "/", label: "Trajectory" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/fitness", label: "Workouts" },
   { href: "/coach", label: "Coach" },
 ];
 

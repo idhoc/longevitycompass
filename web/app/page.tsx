@@ -5,20 +5,20 @@ import styles from "./page.module.css";
 
 const FIELD_NOTES = [
   {
-    label: "Movement",
-    text: "Resistance and daily movement, dosed to what your week actually allows — not a workout you'll skip.",
+    label: "Sleep",
+    text: "A real check-in on bedtime, quality, and disruptors — plus a causal diagnostic that answers 'why am I tired' instead of just logging hours.",
   },
   {
     label: "Nutrition",
-    text: "The pattern you eat most days shapes cellular aging more than any single meal does.",
+    text: "Photograph what you ate, or what's in your fridge — vision AI reacts to the actual food, not a description you typed from memory.",
+  },
+  {
+    label: "Fitness",
+    text: "Guided sessions paced by a timer or a tempo cue, tracked against a real weekly pattern — not just a static plan.",
   },
   {
     label: "Mind",
-    text: "Purpose and connection remain the most consistently replicated predictor of a longer life across population studies.",
-  },
-  {
-    label: "Recovery",
-    text: "Sleep, circadian timing, and mobility — the part of the curve that repairs, rather than just moves it forward.",
+    text: "Daily reflection, guided meditation with a real spoken voice, and a timed nudge to step away from the screen.",
   },
 ];
 
@@ -36,12 +36,13 @@ export default function Home() {
             <em>This is where it bends.</em>
           </h1>
           <p className={styles.subhead}>
-            A coaching plan drawn from published research on nutrition, movement, sleep, and
-            mind — reshaped every week by what you actually did, not what you meant to do.
+            One readiness score, four domains that each work a different way — a sleep
+            diagnostic, photo-first nutrition, guided workouts, and real guided meditation —
+            reshaped every day by what you actually did, not what you meant to do.
           </p>
           <div className={styles.actions}>
             <Link href="/dashboard" className={styles.ctaPrimary}>
-              See your curve
+              See your readiness
             </Link>
             <Link href="/coach" className={styles.ctaSecondary}>
               How the coaching works →
@@ -56,7 +57,7 @@ export default function Home() {
       <section className={styles.section}>
         <div className={styles.sectionHeading}>
           <span className="eyebrow">Domains</span>
-          <h2>four areas, one curve</h2>
+          <h2>four domains, each built differently</h2>
         </div>
         <div className={styles.fieldNotes}>
           {FIELD_NOTES.map((note) => (
@@ -84,7 +85,7 @@ export default function Home() {
 
       <footer className={styles.footer}>
         <span>Longevity Compass</span>
-        <span className="tabular">Concept build — 3 screens</span>
+        <span className="tabular">Field build 01</span>
       </footer>
     </div>
   );

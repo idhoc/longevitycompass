@@ -48,3 +48,35 @@ export function sleepReachFromMinutes(minutes: number): number {
 export function mindReachFromStreak(streak: number): number {
   return Math.max(0.04, Math.min(1, streak / 7));
 }
+
+export type ReadinessBand = "low" | "moderate" | "high";
+
+export interface ReadinessComponents {
+  sleep: number;
+  nutrition: number;
+  fitness: number;
+  mind: number;
+}
+
+const DOMAIN_FOCUS_LABEL: Record<keyof ReadinessComponents, string> = {
+  sleep: "Last night's sleep",
+  nutrition: "Today's nutrition",
+  fitness: "This week's movement",
+  mind: "Your mind check-in",
+};
+
+/**
+ * A same-day wellness readiness score, not a physiological recovery
+ * metric — there is no HRV or resting-HR input yet (that needs a real
+ * wearable-data integration, not something to fake). It synthesizes what
+ * you've actually logged across all four domains into one honest number.
+ */
+export function computeReadiness(components: ReadinessComponents) {
+  const score = Math.round(
+    ((components.sleep + components.nutrition + components.fitness + components.mind) / 4) * 100
+  );
+  const band: ReadinessBand = score < 40 ? "low" : score < 70 ? "moderate" : "high";
+  const entries = Object.entries(components) as [keyof ReadinessComponents, number][];
+  const [weakestKey] = entries.reduce((min, cur) => (cur[1] < min[1] ? cur : min));
+  return { score, band, focus: DOMAIN_FOCUS_LABEL[weakestKey] };
+}

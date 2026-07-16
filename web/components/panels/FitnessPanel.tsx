@@ -1,19 +1,29 @@
 "use client";
 
+import Link from "next/link";
 import { TrajectoryScene } from "@/components/TrajectoryScene";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { weekKey, todayIndex, fitnessReachFromDays } from "@/lib/domainReach";
 import styles from "./panels.module.css";
+
+interface WorkoutSession {
+  id: string;
+  date: string;
+  routineId: string;
+  title: string;
+}
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function FitnessPanel() {
   const key = `lc_fitness_${weekKey()}`;
   const [days, setDays] = useLocalStorageState<boolean[]>(key, [false, false, false, false, false, false, false]);
+  const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
 
   const completed = days.filter(Boolean).length;
   const reach = fitnessReachFromDays(days);
   const idx = todayIndex();
+  const lastSession = sessions[sessions.length - 1];
 
   function toggle(i: number) {
     setDays((d) => d.map((v, j) => (j === i ? !v : v)));
@@ -59,8 +69,15 @@ export function FitnessPanel() {
           ))}
         </div>
         <p className={styles.emptyText} style={{ margin: 0 }}>
-          Tap a day you moved — walking, lifting, a guided session, anything that counted.
+          {lastSession
+            ? `Last guided session: ${lastSession.title}.`
+            : "Tap a day you moved — walking, lifting, a guided session, anything that counted."}
         </p>
+        <div className={styles.panelFooter}>
+          <Link href="/fitness" className={`${styles.btn} ${styles.btnPrimary}`}>
+            Guided workout
+          </Link>
+        </div>
       </div>
     </section>
   );
