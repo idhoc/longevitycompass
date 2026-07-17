@@ -15,7 +15,7 @@ export default function FitnessLibraryPage() {
 
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow">Guided sessions</span>
+        <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness</span>
         <h1>Pick a session</h1>
         <p className={styles.headerSub}>
           Step-by-step, paced by a timer or a tempo cue — no equipment, no video needed. Every

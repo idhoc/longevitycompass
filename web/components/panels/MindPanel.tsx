@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Orb } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
 import {
@@ -394,7 +395,7 @@ export function MindPanel() {
                       height: e ? `${(e.purposeRating / 5) * 100}%` : "6%",
                       minHeight: 4,
                       borderRadius: 3,
-                      background: e ? (e.connected ? "#00f19f" : "#0093e7") : "var(--line)",
+                      background: e ? (e.connected ? "var(--mind)" : "var(--line-strong)") : "var(--line)",
                     }}
                   />
                 ))}
@@ -431,10 +432,15 @@ export function MindPanel() {
             {playing ? (
               <div style={{ textAlign: "center" }}>
                 <div
-                  className={styles.breathingCircle}
-                  aria-hidden="true"
-                  style={{ margin: "0 auto" }}
-                />
+                  style={{
+                    margin: "0 auto",
+                    width: "fit-content",
+                    transform: breathLabel === "in" ? "scale(1.12)" : "scale(0.9)",
+                    transition: "transform 4s ease-in-out",
+                  }}
+                >
+                  <Orb state="idle" size={160} color="var(--mind)" />
+                </div>
                 <p className={styles.insightHeadline} style={{ marginTop: "0.8em" }}>
                   Breathe {breathLabel}
                 </p>

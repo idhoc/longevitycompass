@@ -198,25 +198,6 @@ textarea.input {
   cursor: not-allowed;
 }
 
-.breathingCircle {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--vital) 30%, transparent), transparent 70%);
-  border: 2px solid var(--vital);
-  animation: breathe 8s ease-in-out infinite;
-}
-
-@keyframes breathe {
-  0%, 100% { transform: scale(0.75); opacity: 0.6; }
-  50% { transform: scale(1.15); opacity: 1; }
-}
-
-.miniScene {
-  position: relative;
-  height: 90px;
-  overflow: hidden;
-}
 
 .miniScene :global(canvas) {
   width: 100% !important;

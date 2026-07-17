@@ -2,18 +2,21 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
   width: 100%;
 }
 
-.header {
+.hero {
   padding: var(--space-6) var(--space-5) var(--space-4);
+  background: radial-gradient(ellipse 600px 260px at 30% 0%, color-mix(in srgb, var(--signal) 6%, transparent), transparent 70%);
 }
 
-.header h1 {
-  font-size: var(--text-xl);
-  margin-top: var(--space-2);
+.heroTitle {
+  margin-top: 0.25em;
+  font-size: var(--text-2xl);
+  font-style: italic;
+  font-weight: 500;
 }
 
 .headerSub {
@@ -27,7 +30,7 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-4) var(--space-5);
+  padding: var(--space-2) var(--space-4) var(--space-6);
 }
 
 .dialLink {
@@ -40,127 +43,60 @@
   transform: translateY(-2px);
 }
 
-.journalCard {
-  margin: 0 var(--space-5) var(--space-6);
-  border: 1px solid var(--signal);
-  background: color-mix(in srgb, var(--signal) 8%, var(--paper-raised));
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.journalLabel {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
-.journalText {
-  margin-top: 0.3em;
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
-  max-width: 40ch;
-}
-
-.journalCta {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.6em 1.1em;
-  border-radius: var(--radius-sm);
-  background: var(--signal);
-  color: var(--paper-sunken);
-}
-
-.section {
-  margin: 0 var(--space-5) var(--space-6);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  background: var(--paper-raised);
-}
-
-.sectionHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.sectionTitle {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-base);
-}
-
-.sectionLink {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
-.activityList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6em;
-}
-
-.activityRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6em 0.8em;
-  border-radius: var(--radius-sm);
-  background: var(--paper-sunken);
-}
-
-.activityTitle {
-  font-size: var(--text-sm);
-}
-
-.activityMeta {
-  font-size: var(--text-xs);
-  color: var(--strain);
-}
-
-.emptyText {
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
-  line-height: 1.6;
-}
-
-.grid {
-  margin: 0 var(--space-5) var(--space-6);
+.bento {
+  margin: 0 var(--space-5) var(--space-8);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
-.smallCard {
+.tile {
   display: flex;
   flex-direction: column;
-  gap: 0.4em;
-  border: 1px solid var(--line);
+  gap: 0.3em;
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   background: var(--paper-raised);
-  transition: border-color 0.15s ease;
+  border: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  min-height: 108px;
 }
 
-.smallCard:hover {
-  border-color: var(--signal);
+a.tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
-.smallLabel {
+.tileWide {
+  grid-column: span 2;
+}
+
+.tileNutrition {
+  border-left-color: var(--nutrition);
+  background: linear-gradient(150deg, var(--nutrition-wash), var(--paper-raised) 60%);
+}
+
+.tileFitness {
+  border-left-color: var(--fitness);
+  background: linear-gradient(150deg, var(--fitness-wash), var(--paper-raised) 60%);
+}
+
+.tileMind {
+  border-left-color: var(--mind);
+  background: linear-gradient(150deg, var(--mind-wash), var(--paper-raised) 60%);
+}
+
+.tileJournal {
+  border-left-color: var(--signal);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 10%, transparent), var(--paper-raised) 60%);
+}
+
+.tileHealthspan {
+  grid-column: span 2;
+}
+
+.tileLabel {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
@@ -168,16 +104,34 @@
   color: var(--ink-soft);
 }
 
-.smallStat {
+.tileStat {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-md);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.tileSub {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 
 .healthspanRow {
   display: flex;
   align-items: center;
   gap: var(--space-5);
+  margin-top: 0.3em;
+}
+
+@media (max-width: 640px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tileWide,
+  .tileHealthspan {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 560px) {
@@ -185,9 +139,16 @@
     padding-left: var(--space-3);
     padding-right: var(--space-3);
   }
-  .header, .journalCard, .section, .grid {
+  .hero, .bento {
     margin-left: var(--space-3);
     margin-right: var(--space-3);
+  }
+  .bento {
+    grid-template-columns: 1fr;
+  }
+  .tileWide,
+  .tileHealthspan {
+    grid-column: span 1;
   }
   .healthspanRow {
     flex-direction: column;

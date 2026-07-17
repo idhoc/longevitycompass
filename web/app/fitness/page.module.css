@@ -77,7 +77,7 @@
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--signal);
+  color: var(--fitness);
 }
 
 .cardMinutes {
@@ -136,5 +136,5 @@
 }
 
 .backLink:hover {
-  color: var(--signal);
+  color: var(--fitness);
 }

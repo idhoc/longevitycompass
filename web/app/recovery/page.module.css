@@ -7,7 +7,7 @@
 
 .header {
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
   padding: var(--space-7) var(--space-4) var(--space-5);
 }
 
@@ -23,16 +23,107 @@
   line-height: 1.6;
 }
 
+.backLink {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.backLink:hover {
+  color: var(--signal);
+}
+
 .content {
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
   padding: 0 var(--space-4) var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-7);
 }
 
-.categoryBlock {
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-2);
+}
+
+/* -- vitals -- */
+.vitalCard {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--paper-raised);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.vitalRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.vitalHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.vitalLabel {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+
+.vitalValue {
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusText {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.vitalNote {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+.unavailableBlock {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: 0.6em;
@@ -43,7 +134,28 @@
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--signal);
+  color: var(--ink-soft);
+}
+
+.unavailableList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.unavailableList li::before {
+  content: "— ";
+}
+
+/* -- journal -- */
+.categoryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  margin-top: var(--space-3);
 }
 
 .behaviorList {
@@ -96,7 +208,8 @@
 
 .insightsSection {
   border-top: 1px solid var(--line);
-  padding-top: var(--space-5);
+  padding-top: var(--space-4);
+  margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: 0.8em;
@@ -130,4 +243,10 @@
   font-size: var(--text-sm);
   color: var(--ink-soft);
   line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .vitalRow {
+    grid-template-columns: 1fr;
+  }
 }

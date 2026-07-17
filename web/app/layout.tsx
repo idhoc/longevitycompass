@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Body + display: IBM's own engineering-heritage sans, at heavier weights
-// for headlines — a deliberate alternative to the Inter/system-ui default,
-// and matched to WHOOP's plain, bold, all-business type register (no
-// decorative serif).
+// Display: a high-contrast, characterful serif for hero moments — names,
+// greetings, headlines — the register that carries actual warmth,
+// deliberately different from the flat bold-sans-everywhere pass this
+// app had before.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+});
+
+// Body: IBM's own engineering-heritage sans — the UI-chrome and data
+// register, a deliberate alternative to the Inter/system-ui default.
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
@@ -34,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${plexSans.variable} ${plexMono.variable}`}
+      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
       <head>
         {/* Sets the color scheme before first paint so switching themes in

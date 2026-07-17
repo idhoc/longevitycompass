@@ -27,6 +27,18 @@
   color: var(--ink);
 }
 
+.topRowRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.liveStrain {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--strain);
+}
+
 .stepCount {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -45,7 +57,7 @@
 
 .progressFill {
   height: 100%;
-  background: var(--signal);
+  background: var(--fitness);
   border-radius: 999px;
   transition: width 0.3s ease;
 }
@@ -74,12 +86,21 @@
   margin-right: auto;
 }
 
+.ringWrap {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  margin: var(--space-5) auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .timerDisplay {
-  margin: var(--space-5) 0;
   font-family: var(--font-mono);
-  font-size: var(--text-3xl);
+  font-size: var(--text-xl);
   font-variant-numeric: tabular-nums;
-  color: var(--signal);
+  color: var(--fitness);
 }
 
 .repsDisplay {
@@ -94,7 +115,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-3xl);
-  color: var(--signal);
+  color: var(--fitness);
   line-height: 1;
 }
 
@@ -110,7 +131,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 3px solid var(--signal);
+  border: 3px solid var(--fitness);
   animation: pulse 3s ease-in-out infinite;
 }
 
@@ -150,7 +171,7 @@
 }
 
 .btn:hover {
-  border-color: var(--signal);
+  border-color: var(--fitness);
   color: var(--ink);
 }
 
@@ -161,8 +182,8 @@
 }
 
 .btnPrimary:hover {
-  background: var(--signal);
-  border-color: var(--signal);
+  background: var(--fitness);
+  border-color: var(--fitness);
   color: var(--paper);
 }
 
@@ -170,7 +191,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-3xl);
-  color: var(--signal);
+  color: var(--fitness);
   line-height: 1;
 }
 

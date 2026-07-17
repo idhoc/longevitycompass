@@ -4,158 +4,72 @@
   flex-direction: column;
 }
 
-.recoveryBanner {
-  margin: var(--space-6) var(--space-6) 0;
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--signal) 7%, transparent), transparent 70%);
+}
+
+.heroTitle {
+  margin-top: 0.3em;
+  font-size: var(--text-xl);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.recoveryPill {
+  margin-top: var(--space-4);
   display: flex;
   align-items: center;
-  gap: 0.7em;
+  gap: 0.6em;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  border-radius: 999px;
+  padding: 0.55em 1.1em;
   background: var(--paper-raised);
+  max-width: 90vw;
 }
 
 .recoveryDot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .recoveryValue {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 
 .recoveryText {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--ink-soft);
-}
-
-.body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: var(--space-5);
-  padding: var(--space-6);
-}
-
-.instrument {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  height: fit-content;
-  position: sticky;
-  top: var(--space-4);
-}
-
-.instrumentTop {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.stateLabel {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
-.waveform {
-  width: 100%;
-  height: 96px;
-  margin: var(--space-3) 0;
-  display: block;
-}
-
-.voiceToggle {
-  margin-top: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.6em 0.9em;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  color: var(--ink-soft);
-  background: transparent;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-  width: 100%;
-}
-
-.voiceToggle:hover {
-  border-color: var(--signal);
-  color: var(--ink);
-}
-
-.voiceToggleActive {
-  border-color: var(--vital);
-  color: var(--vital);
-  background: color-mix(in srgb, var(--vital) 10%, transparent);
-}
-
-.groundedIn {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
-}
-
-.groundedLabel {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.groundedText {
-  margin-top: 0.6em;
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-  line-height: 1.7;
-  white-space: pre-line;
-}
-
-.instrumentNote {
-  margin-top: var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-  line-height: 1.6;
+  text-align: left;
 }
 
 .transcript {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  flex: 1;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 60vh;
-}
-
-.sessionHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  border-bottom: 1px solid var(--line);
-}
-
-.sessionDate {
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
+  border-top: 1px solid var(--line);
 }
 
 .log {
   flex: 1;
-  padding: var(--space-4);
+  padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   overflow-y: auto;
+  min-height: 40vh;
 }
 
 .entry {
@@ -236,9 +150,43 @@
 
 .composer {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
   border-top: 1px solid var(--line);
   padding: var(--space-4);
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.micButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.micButton:hover {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.micButtonActive {
+  border-color: var(--fitness);
+  color: var(--fitness);
+  background: var(--fitness-wash);
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--fitness-wash); }
+  50% { box-shadow: 0 0 0 6px transparent; }
 }
 
 .input {
@@ -278,15 +226,51 @@
   cursor: not-allowed;
 }
 
-@media (max-width: 860px) {
-  .recoveryBanner {
-    margin: var(--space-4) var(--space-4) 0;
-  }
-  .body {
-    grid-template-columns: 1fr;
-    padding: var(--space-4);
-  }
-  .instrument {
-    position: static;
+.footerRow {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.voiceToggle {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5em 0.9em;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.voiceToggle:hover {
+  border-color: var(--signal);
+  color: var(--ink);
+}
+
+.voiceToggleActive {
+  border-color: var(--vital);
+  color: var(--vital);
+  background: color-mix(in srgb, var(--vital) 10%, transparent);
+}
+
+.instrumentNote {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .recoveryText {
+    display: none;
   }
 }

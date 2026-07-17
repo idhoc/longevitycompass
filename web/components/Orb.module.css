@@ -1,0 +1,12 @@
+.wrap {
+  position: relative;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: blur(0.5px);
+}
+
+.wrap canvas {
+  filter: blur(6px);
+}

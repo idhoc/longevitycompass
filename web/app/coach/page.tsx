@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SiteNav } from "@/components/SiteNav";
-import { Waveform, type VoiceState } from "@/components/Waveform";
+import { Orb, type OrbState } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { weekKey, computeStreak } from "@/lib/domainReach";
@@ -40,6 +40,20 @@ interface MindEntry {
   note: string;
 }
 
+interface SpeechRecognitionLike extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+interface SpeechRecognitionResultEventLike {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -67,13 +81,16 @@ export default function CoachPage() {
   const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
 
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [orbState, setOrbState] = useState<OrbState>("idle");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [micSupported, setMicSupported] = useState(false);
+  const [listening, setListening] = useState(false);
   const startedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const p = profile ?? EMPTY_PROFILE;
 
@@ -140,7 +157,7 @@ export default function CoachPage() {
       if (res.status === 200 && audioRef.current) {
         const blob = await res.blob();
         audioRef.current.src = URL.createObjectURL(blob);
-        setVoiceState("speaking");
+        setOrbState("speaking");
         await audioRef.current.play();
       }
     } catch {
@@ -157,7 +174,7 @@ export default function CoachPage() {
       setDraft("");
     }
     setBusy(true);
-    setVoiceState("thinking");
+    setOrbState("thinking");
 
     const history = entries.map((e) => ({ role: e.who === "you" ? ("user" as const) : ("coach" as const), content: e.text }));
 
@@ -192,7 +209,50 @@ export default function CoachPage() {
       ]);
     } finally {
       setBusy(false);
-      setVoiceState((s) => (s === "speaking" ? s : "idle"));
+      setOrbState((s) => (s === "speaking" ? s : "idle"));
+    }
+  }
+
+  // Feature-detect the Web Speech API once, client-side only — Safari
+  // desktop and Firefox don't support it, so the mic button simply
+  // doesn't render there rather than pretending to work.
+  useEffect(() => {
+    const Ctor =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    if (!Ctor) return;
+    const recognition = new Ctor();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) void sendToCoach(transcript);
+    };
+    recognition.onerror = () => {
+      setListening(false);
+      setOrbState("idle");
+    };
+    recognition.onend = () => {
+      setListening(false);
+    };
+    recognitionRef.current = recognition;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMicSupported(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleMic() {
+    const recognition = recognitionRef.current;
+    if (!recognition || busy) return;
+    if (listening) {
+      recognition.stop();
+      setListening(false);
+      setOrbState("idle");
+    } else {
+      setListening(true);
+      setOrbState("listening");
+      recognition.start();
     }
   }
 
@@ -210,98 +270,103 @@ export default function CoachPage() {
   return (
     <div className={styles.page}>
       <SiteNav active="/coach" />
-      {band && recovery != null && (
-        <div className={styles.recoveryBanner}>
-          <span className={styles.recoveryDot} style={{ background: RECOVERY_COLOR[band] }} aria-hidden="true" />
-          <span className={`${styles.recoveryValue} tabular`}>{recovery}%</span>
-          <p className={styles.recoveryText}>{RECOVERY_ADVICE[band]}</p>
-        </div>
-      )}
-      <div className={styles.body}>
-        <div className={styles.transcript}>
-          <div className={styles.sessionHead}>
-            <span className="eyebrow">{sessionGreeting()}</span>
-            <span className={`${styles.sessionDate} tabular`}>
-              {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-            </span>
+
+      <div className={styles.hero}>
+        <audio ref={audioRef} onEnded={() => setOrbState("idle")} style={{ display: "none" }} />
+        <Orb state={orbState} size={200} />
+        <span className="eyebrow" style={{ marginTop: "1.2em" }}>
+          {sessionGreeting()}
+        </span>
+        <h1 className={styles.heroTitle}>
+          {p.name ? `Hey ${p.name}, I'm here.` : "I'm here."}
+        </h1>
+        {band && recovery != null && (
+          <div className={styles.recoveryPill}>
+            <span className={styles.recoveryDot} style={{ background: RECOVERY_COLOR[band] }} aria-hidden="true" />
+            <span className={`${styles.recoveryValue} tabular`}>{recovery}% recovery</span>
+            <span className={styles.recoveryText}>{RECOVERY_ADVICE[band]}</span>
           </div>
-          <div className={styles.log} ref={logRef}>
-            {entries.map((entry, i) => (
-              <div className={styles.entry} key={i}>
-                <div className={styles.entryMeta}>
-                  <span
-                    className={`${styles.entryWho} ${
-                      entry.who === "coach" ? styles.entryWhoCoach : styles.entryWhoUser
-                    }`}
-                  >
-                    {entry.who === "coach" ? "COACH" : "YOU"}
-                  </span>
-                  <span className={`${styles.entryTime} tabular`}>{entry.time}</span>
-                </div>
-                <p className={entry.escalation ? `${styles.entryText} ${styles.entryEscalation}` : styles.entryText}>
-                  {entry.text}
-                </p>
+        )}
+      </div>
+
+      <div className={styles.transcript}>
+        <div className={styles.log} ref={logRef}>
+          {entries.map((entry, i) => (
+            <div className={styles.entry} key={i}>
+              <div className={styles.entryMeta}>
+                <span
+                  className={`${styles.entryWho} ${
+                    entry.who === "coach" ? styles.entryWhoCoach : styles.entryWhoUser
+                  }`}
+                >
+                  {entry.who === "coach" ? "COACH" : "YOU"}
+                </span>
+                <span className={`${styles.entryTime} tabular`}>{entry.time}</span>
               </div>
-            ))}
-            {busy && (
-              <div className={styles.entry}>
-                <div className={styles.entryMeta}>
-                  <span className={`${styles.entryWho} ${styles.entryWhoCoach}`}>COACH</span>
-                </div>
-                <div className={styles.typing} aria-label="Coach is thinking">
-                  <span />
-                  <span />
-                  <span />
-                </div>
+              <p className={entry.escalation ? `${styles.entryText} ${styles.entryEscalation}` : styles.entryText}>
+                {entry.text}
+              </p>
+            </div>
+          ))}
+          {busy && (
+            <div className={styles.entry}>
+              <div className={styles.entryMeta}>
+                <span className={`${styles.entryWho} ${styles.entryWhoCoach}`}>COACH</span>
               </div>
-            )}
-          </div>
-          <form
-            className={styles.composer}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void sendToCoach(draft);
-            }}
-          >
-            <input
-              className={styles.input}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Say what's actually going on…"
-              disabled={busy}
-            />
-            <button type="submit" className={styles.sendButton} disabled={busy || !draft.trim()}>
-              Send
-            </button>
-          </form>
+              <div className={styles.typing} aria-label="Coach is thinking">
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+          )}
         </div>
 
-        <aside className={styles.instrument}>
-          <audio ref={audioRef} onEnded={() => setVoiceState("idle")} style={{ display: "none" }} />
-          <div className={styles.instrumentTop}>
-            <span className="eyebrow">Signal</span>
-            <span className={styles.stateLabel}>{voiceState}</span>
-          </div>
-          <Waveform state={voiceState} className={styles.waveform} />
+        <form
+          className={styles.composer}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendToCoach(draft);
+          }}
+        >
+          {micSupported && (
+            <button
+              type="button"
+              className={listening ? `${styles.micButton} ${styles.micButtonActive}` : styles.micButton}
+              onClick={toggleMic}
+              disabled={busy}
+              aria-pressed={listening}
+              aria-label={listening ? "Stop listening" : "Talk to your coach"}
+            >
+              ●
+            </button>
+          )}
+          <input
+            className={styles.input}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={listening ? "Listening…" : "Say what's actually going on…"}
+            disabled={busy || listening}
+          />
+          <button type="submit" className={styles.sendButton} disabled={busy || !draft.trim()}>
+            Send
+          </button>
+        </form>
+
+        <div className={styles.footerRow}>
           <button
             type="button"
             className={voiceOn ? `${styles.voiceToggle} ${styles.voiceToggleActive}` : styles.voiceToggle}
             onClick={() => setVoiceOn((v) => !v)}
             aria-pressed={voiceOn}
           >
-            {voiceOn ? "Voice replies: on" : "Voice replies: off"}
+            {voiceOn ? "Spoken replies: on" : "Spoken replies: off"}
           </button>
-
-          <div className={styles.groundedIn}>
-            <span className={styles.groundedLabel}>This session is reading</span>
-            <p className={styles.groundedText}>{buildContext()}</p>
-          </div>
-
           <p className={styles.instrumentNote}>
-            A wellness coach, not a clinician — anything that needs a real diagnosis gets a
-            direct, plain referral instead of a guess.
+            A wellness coach, not a clinician — anything needing a real diagnosis gets a direct
+            referral instead of a guess.
           </p>
-        </aside>
+        </div>
       </div>
     </div>
   );

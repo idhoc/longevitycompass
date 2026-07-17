@@ -40,6 +40,7 @@ interface SleepEntry {
 interface LoggedMeal {
   date: string;
   totalCalories: number | null;
+  proteinG: number | null;
 }
 interface WorkoutSession {
   id: string;
@@ -53,6 +54,14 @@ interface MindEntry {
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function greetingWord(): string {
+  const h = new Date().getHours();
+  if (h < 5) return "Still up";
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function HomePage() {
@@ -101,10 +110,12 @@ export default function HomePage() {
     return sum + (routine ? estimateMinutes(routine.steps) : 15);
   }, 0);
   const strain = computeStrain(workoutMinutesToday);
+  const completedDays = fitnessDays.filter(Boolean).length;
 
-  // -- Pace of Aging: kept from the prior build, reusing the four-domain
-  // reach inputs since it's a longer-run habit trend, not a same-day score --
   const todaysMeals = meals.filter((m) => m.date === todayKey());
+  const totalCalories = todaysMeals.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
+  const totalProtein = todaysMeals.reduce((sum, m) => sum + (m.proteinG || 0), 0);
+
   const durationReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0.04;
   const sleepReach = sleepEntry?.quality ? (durationReach + sleepEntry.quality / 5) / 2 : durationReach;
   const nutritionReach = nutritionReachFromMealsToday(todaysMeals.length);
@@ -130,17 +141,16 @@ export default function HomePage() {
     <div className={styles.page}>
       <SiteNav active="/home" />
 
-      <div className={styles.header}>
-        <span className="eyebrow">Home</span>
-        <h1>{profile?.name ? `Hey, ${profile.name}` : "Home"}</h1>
-        <p className={styles.headerSub}>
-          Recovery, Sleep, and Strain — read from what you actually logged, not a wearable&apos;s
-          heart-rate sensor. {readiness.focus} is the biggest lever right now.
-        </p>
+      <div className={styles.hero}>
+        <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
+        <h1 className={styles.heroTitle}>
+          {greetingWord()}{profile?.name ? `, ${profile.name}` : ""}.
+        </h1>
+        <p className={styles.headerSub}>{readiness.focus} is the biggest lever right now.</p>
       </div>
 
       <div className={styles.dials}>
-        <Link href="/sleep" className={styles.dialLink}>
+        <Link href="/recovery" className={styles.dialLink}>
           <Dial
             value={sleepPerformance}
             max={100}
@@ -149,7 +159,7 @@ export default function HomePage() {
             label="Sleep"
           />
         </Link>
-        <Link href="/body" className={styles.dialLink}>
+        <Link href="/recovery" className={styles.dialLink}>
           <Dial
             value={recovery}
             max={100}
@@ -163,77 +173,53 @@ export default function HomePage() {
         </Link>
       </div>
 
-      <div className={styles.journalCard}>
-        <div>
-          <div className={styles.journalLabel}>Journal</div>
-          <p className={styles.journalText}>
-            {journalToday
-              ? "Logged for today — check tomorrow's Recovery to see what moved."
-              : "Log tonight's behaviors before bed."}
+      <div className={styles.bento}>
+        <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition} ${styles.tileWide}`}>
+          <span className={styles.tileLabel}>Nutrition</span>
+          <span className={styles.tileStat}>{todaysMeals.length ? `${Math.round(totalCalories)} kcal` : "Nothing logged"}</span>
+          <p className={styles.tileSub}>
+            {todaysMeals.length ? `${todaysMeals.length} meal${todaysMeals.length === 1 ? "" : "s"} · ${Math.round(totalProtein)}g protein` : "Photograph a meal to start"}
           </p>
-        </div>
-        <Link href="/journal" className={styles.journalCta}>
-          {journalToday ? "Edit" : "Log tonight"}
         </Link>
-      </div>
 
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Activities</span>
-          <Link href="/fitness" className={styles.sectionLink}>
-            Start one →
-          </Link>
-        </div>
-        {todaysSessions.length ? (
-          <div className={styles.activityList}>
-            {todaysSessions.map((s) => {
-              const routine = getAnyWorkout(s.routineId);
-              return (
-                <div className={styles.activityRow} key={s.id}>
-                  <span className={styles.activityTitle}>{s.title}</span>
-                  <span className={`${styles.activityMeta} tabular`}>{routine ? estimateMinutes(routine.steps) : 15} min</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className={styles.emptyText}>No activity logged today.</p>
-        )}
-      </div>
-
-      <div className={styles.grid}>
-        <Link href="/nutrition" className={styles.smallCard}>
-          <span className={styles.smallLabel}>Nutrition</span>
-          <span className={styles.smallStat}>
-            {todaysMeals.length ? `${todaysMeals.length} meal${todaysMeals.length === 1 ? "" : "s"}` : "—"}
-          </span>
+        <Link href="/fitness" className={`${styles.tile} ${styles.tileFitness} ${styles.tileWide}`}>
+          <span className={styles.tileLabel}>Fitness</span>
+          <span className={styles.tileStat}>{completedDays}/7 days</span>
+          <p className={styles.tileSub}>
+            {todaysSessions.length
+              ? todaysSessions.map((s) => s.title).join(", ")
+              : "No session logged today — start one"}
+          </p>
         </Link>
-        <Link href="/mind" className={styles.smallCard}>
-          <span className={styles.smallLabel}>Mind</span>
-          <span className={styles.smallStat}>{mindStreak > 0 ? `${mindStreak}-day streak` : "—"}</span>
-        </Link>
-      </div>
 
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>Healthspan</span>
-        </div>
-        {healthspanUnlocked ? (
-          <div className={styles.healthspanRow}>
-            <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
-            <p className={styles.emptyText}>
-              Pace of Aging — a self-reported habit estimate, not WHOOP&apos;s real nine-metric
-              model (sleep, heart-rate zones, strength time, steps, VO2 max, and more). 1.0x is
-              average.
+        <Link href="/mind" className={`${styles.tile} ${styles.tileMind}`}>
+          <span className={styles.tileLabel}>Mind</span>
+          <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "—"}</span>
+        </Link>
+
+        <Link href="/recovery" className={`${styles.tile} ${styles.tileJournal}`}>
+          <span className={styles.tileLabel}>Journal</span>
+          <span className={styles.tileStat}>{journalToday ? "Logged" : "Not yet"}</span>
+          <p className={styles.tileSub}>{journalToday ? "Edit tonight's log" : "Log before bed"}</p>
+        </Link>
+
+        <div className={`${styles.tile} ${styles.tileHealthspan}`}>
+          <span className={styles.tileLabel}>Healthspan</span>
+          {healthspanUnlocked ? (
+            <div className={styles.healthspanRow}>
+              <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
+              <p className={styles.tileSub}>
+                Pace of Aging — a self-reported habit estimate, not WHOOP&apos;s real nine-metric
+                model. 1.0x is average.
+              </p>
+            </div>
+          ) : (
+            <p className={styles.tileSub}>
+              Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"} to unlock your Pace of
+              Aging — a lighter version of WHOOP&apos;s real 21-in-31-days requirement.
             </p>
-          </div>
-        ) : (
-          <p className={styles.emptyText}>
-            Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"} of any activity to unlock your
-            Pace of Aging — a lighter version of WHOOP&apos;s real 21-recoveries-in-31-days
-            requirement.
-          </p>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
