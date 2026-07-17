@@ -8,6 +8,7 @@ import { GeneticsImport } from "@/components/GeneticsImport";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { clearLoggedData, clearEverything, exportAllData } from "@/lib/resetData";
+import { t } from "@/lib/i18n";
 import {
   EMPTY_PROFILE,
   GOAL_OPTIONS,
@@ -85,7 +86,7 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/settings" />
+      <SiteNav />
 
       <div className={styles.header}>
         <span className="eyebrow">Settings</span>
@@ -98,7 +99,7 @@ export default function SettingsPage() {
 
       <div className={styles.sections}>
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Profile</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Profile")}</h2>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="set-name">Name</label>
@@ -196,7 +197,7 @@ export default function SettingsPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>How it talks to you</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "How it talks to you")}</h2>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>Tone</span>
             <div className={styles.optionGrid}>
@@ -249,7 +250,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="set-language">Coach&apos;s reply language</label>
+              <label className={styles.fieldLabel} htmlFor="set-language">App language</label>
               <select
                 id="set-language"
                 className={styles.input}
@@ -263,15 +264,16 @@ export default function SettingsPage() {
                 ))}
               </select>
               <p className={styles.optionHint} style={{ margin: 0 }}>
-                Changes what language the Coach writes back in. The rest of the app&apos;s
-                interface stays in English.
+                Translates navigation, Home, and these Settings headings, and changes what
+                language the Coach writes back in. Domain pages (Nutrition, Fitness, Mind,
+                Recovery) aren&apos;t translated yet.
               </p>
             </div>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Appearance</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Appearance")}</h2>
           <div className={styles.themeRow}>
             {(["light", "dark"] as Theme[]).map((t) => (
               <button
@@ -289,7 +291,7 @@ export default function SettingsPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Connected data</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Connected data")}</h2>
           <p className={styles.sectionSub}>
             Optional. Nothing here is required, and nothing here is uploaded — every import runs
             entirely in this browser tab.
@@ -301,7 +303,7 @@ export default function SettingsPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Your data</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Your data")}</h2>
           <p className={styles.sectionSub}>
             Everything you&apos;ve logged lives only in this browser — there is no account and
             nothing is uploaded anywhere except the single photo or message needed to answer a
@@ -358,7 +360,7 @@ export default function SettingsPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>About</h2>
+          <h2 className={styles.sectionTitle}>{t(p.language, "About")}</h2>
           <p className={styles.sectionSub}>
             Longevity Compass is a coaching tool, not a medical device — every insight is grounded
             in cited research or plainly labeled as an estimate, and anything outside wellness

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { SiteNav } from "@/components/SiteNav";
 import { AgingPaceGauge } from "@/components/AgingPaceGauge";
 import { RoutineCompass } from "@/components/RoutineCompass";
@@ -29,8 +30,9 @@ import {
   recoveryBand,
   RECOVERY_COLOR,
 } from "@/lib/whoopScores";
-import { JOURNAL_KEY, type JournalEntry } from "@/lib/journal";
-import type { UserProfile } from "@/lib/profile";
+import { domainOrderFromProfile, type UserProfile } from "@/lib/profile";
+import { featuredTopics, domainColor } from "@/lib/topics";
+import { t } from "@/lib/i18n";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -60,6 +62,11 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+};
+
 function greetingWord(): string {
   const h = new Date().getHours();
   if (h < 5) return "Still up";
@@ -82,7 +89,6 @@ export default function HomePage() {
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
   const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
   const [meditationSessions] = useLocalStorageState<{ date: string }[]>("lc_meditation_sessions_v1", []);
-  const [journalEntries] = useLocalStorageState<JournalEntry[]>(JOURNAL_KEY, []);
 
   useEffect(() => {
     if (profileHydrated && skippedHydrated && !profile?.completedAt && !skipped) {
@@ -100,6 +106,7 @@ export default function HomePage() {
     .filter((n) => Number.isFinite(n) && n > 0);
   const restingHRBaseline = priorHRs.length ? priorHRs.reduce((s, v) => s + v, 0) / priorHRs.length : null;
   const restingHR = sleepEntry ? Number(sleepEntry.restingHeartRate) : NaN;
+  const hasRestingHR = Number.isFinite(restingHR) && restingHR > 0;
 
   const recovery = computeRecovery({
     sleepPerformance,
@@ -139,53 +146,97 @@ export default function HomePage() {
   const healthspanUnlocked = loggedDayCount >= 5;
   const daysToUnlock = Math.max(0, 5 - loggedDayCount);
 
-  const journalToday = journalEntries.find((e) => e.date === todayKey());
-
   const compassDays: DomainDayReach[] = Array.from({ length: 7 }, (_, i) => {
     const date = dateKeyOffset(6 - i);
     return dailyDomainReach(date, { sleepEntries, meals, sessions, mindEntries, meditationSessions });
   });
 
+  const topics = featuredTopics(domainOrderFromProfile(profile));
+  const sleepLogStreak = computeStreak(sleepEntries);
+
   return (
     <div className={styles.page}>
-      <SiteNav active="/home" />
+      <SiteNav />
 
-      <div className={styles.hero}>
+      <motion.div className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
         <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
         <h1 className={styles.heroTitle}>
-          {greetingWord()}{profile?.name ? `, ${profile.name}` : ""}.
+          {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
         </h1>
         <p className={styles.headerSub}>{readiness.focus} is the biggest lever right now.</p>
-        <Link href="/topics" className={styles.topicsLink}>
-          See all topics →
-        </Link>
-      </div>
+      </motion.div>
 
-      <div className={styles.compassSection}>
-        <RoutineCompass days={compassDays} centerLabel="Readiness" centerValue={`${readiness.score}%`} />
-        <div className={styles.statStrip}>
-          <Link href="/recovery" className={styles.statPill}>
-            <span className={styles.statValue}>{sleepEntry ? `${sleepPerformance}%` : "—"}</span>
-            <span className={styles.statLabel}>Sleep</span>
-          </Link>
-          <Link href="/recovery" className={styles.statPill}>
-            <span className={styles.statValue} style={{ color: RECOVERY_COLOR[band] }}>
-              {sleepEntry ? `${recovery}%` : "—"}
-            </span>
-            <span className={styles.statLabel}>Recovery</span>
-          </Link>
-          <Link href="/fitness" className={styles.statPill}>
-            <span className={styles.statValue}>{strain.toFixed(1)}</span>
-            <span className={styles.statLabel}>Strain</span>
+      <motion.div
+        className={styles.topicsSection}
+        initial="hidden"
+        animate="show"
+        variants={fadeUp}
+        transition={{ duration: 0.4, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className={styles.topicsHead}>
+          <h2 className={styles.topicsTitle}>{t(profile?.language, "Topics")}</h2>
+          <Link href="/topics" className={styles.topicsLink}>
+            {t(profile?.language, "See all")} →
           </Link>
         </div>
-      </div>
+        <div className={styles.topicsStrip}>
+          {topics.map((topic) => (
+            <Link key={topic.id} href={topic.href} className={styles.topicCard} style={{ borderTopColor: domainColor(topic.domain) }}>
+              <span className={styles.topicIcon} aria-hidden="true">{topic.icon}</span>
+              <span className={styles.topicTitle}>{topic.title}</span>
+              <p className={styles.topicDesc}>{topic.description}</p>
+            </Link>
+          ))}
+        </div>
+      </motion.div>
 
-      <div className={styles.grid}>
+      <motion.div
+        className={styles.vitalsCard}
+        initial="hidden"
+        animate="show"
+        variants={fadeUp}
+        transition={{ duration: 0.4, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <RoutineCompass days={compassDays} centerLabel="Readiness" centerValue={`${readiness.score}%`} />
+        <div className={styles.vitalsGrid}>
+          <Link href="/recovery" className={styles.vitalCell}>
+            <span className={styles.vitalValue}>
+              {sleepEntry ? (minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime) / 60).toFixed(1) : "—"}
+              {sleepEntry && <span className={styles.vitalUnit}>h</span>}
+            </span>
+            <span className={styles.vitalLabel}>Sleep</span>
+          </Link>
+          <Link href="/recovery" className={styles.vitalCell}>
+            <span className={styles.vitalValue}>
+              {hasRestingHR ? restingHR : "—"}
+              {hasRestingHR && <span className={styles.vitalUnit}>bpm</span>}
+            </span>
+            <span className={styles.vitalLabel}>Resting HR</span>
+          </Link>
+          <Link href="/recovery" className={styles.vitalCell}>
+            <span className={styles.vitalValue} style={{ color: RECOVERY_COLOR[band] }}>
+              {sleepEntry ? `${recovery}%` : "—"}
+            </span>
+            <span className={styles.vitalLabel}>Recovery</span>
+          </Link>
+          <Link href="/fitness" className={styles.vitalCell}>
+            <span className={styles.vitalValue}>{strain.toFixed(1)}</span>
+            <span className={styles.vitalLabel}>Strain</span>
+          </Link>
+        </div>
+      </motion.div>
+
+      <motion.div
+        className={styles.grid}
+        initial="hidden"
+        animate="show"
+        variants={fadeUp}
+        transition={{ duration: 0.4, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+      >
         <Link href="/recovery" className={`${styles.tile} ${styles.tileRecovery}`}>
           <span className={styles.tileLabel}>Recovery</span>
-          <span className={styles.tileStat}>{journalToday ? "Logged tonight" : "Not logged yet"}</span>
-          <p className={styles.tileSub}>{journalToday ? "Edit tonight's journal" : "Log before bed"}</p>
+          <span className={styles.tileStat}>{sleepLogStreak > 0 ? `${sleepLogStreak}d streak` : "Not logged yet"}</span>
+          <p className={styles.tileSub}>{sleepEntry ? "Last night logged" : "Log last night"}</p>
         </Link>
 
         <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition}`}>
@@ -211,10 +262,16 @@ export default function HomePage() {
           <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "Not logged yet"}</span>
           <p className={styles.tileSub}>Reflect, meditate, or take a break</p>
         </Link>
-      </div>
+      </motion.div>
 
-      <div className={styles.healthspan}>
-        <span className={styles.tileLabel}>Healthspan</span>
+      <motion.div
+        className={styles.healthspan}
+        initial="hidden"
+        animate="show"
+        variants={fadeUp}
+        transition={{ duration: 0.4, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <span className={styles.tileLabel}>{t(profile?.language, "Healthspan")}</span>
         {healthspanUnlocked ? (
           <div className={styles.healthspanRow}>
             <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
@@ -225,11 +282,12 @@ export default function HomePage() {
           </div>
         ) : (
           <p className={styles.tileSub}>
-            Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"} to unlock your Pace of
-            Aging — a lighter version of WHOOP&apos;s real 21-in-31-days requirement.
+            Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"}{" "}
+            to unlock your Pace of Aging — a lighter version of WHOOP&apos;s real 21-in-31-days
+            requirement.
           </p>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

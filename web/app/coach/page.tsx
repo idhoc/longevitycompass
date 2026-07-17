@@ -270,7 +270,7 @@ export default function CoachPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/coach" />
+      <SiteNav />
 
       <div className={styles.hero}>
         <audio ref={audioRef} onEnded={() => setOrbState("idle")} style={{ display: "none" }} />

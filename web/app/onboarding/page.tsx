@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { Orb } from "@/components/Orb";
 import { RoutineCompass } from "@/components/RoutineCompass";
@@ -11,14 +11,38 @@ import {
   EMPTY_PROFILE,
   GOAL_OPTIONS,
   SLEEP_HOURS_OPTIONS,
+  SLEEP_COMPLAINT_OPTIONS,
+  CAFFEINE_OPTIONS,
+  ACTIVITY_LEVEL_OPTIONS,
   WORKOUT_STYLE_OPTIONS,
+  NUTRITION_PATTERN_OPTIONS,
+  DIETARY_OPTIONS,
   domainPlanFromProfile,
   type UserProfile,
   type DomainKey,
 } from "@/lib/profile";
 import styles from "./page.module.css";
 
-const TOTAL_STEPS = 5; // Welcome, Goal, Setup, Tour, Action
+const STEP_ORDER = [
+  "welcome",
+  "goal",
+  "age",
+  "sleepHours",
+  "sleepComplaints",
+  "caffeine",
+  "activity",
+  "workoutStyle",
+  "injuries",
+  "nutritionPattern",
+  "dietary",
+  "stress",
+  "tour",
+  "action",
+] as const;
+type StepId = (typeof STEP_ORDER)[number];
+const STEP_COUNT = STEP_ORDER.length;
+
+const AGE_RANGES = ["18-29", "30-44", "45-59", "60+"] as const;
 
 const ACTION_COPY: Record<
   DomainKey | "none",
@@ -56,11 +80,76 @@ const ACTION_COPY: Record<
   },
 };
 
-const slideVariants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -40 : 40, opacity: 0 }),
-};
+function questionForStep(id: StepId, draft: UserProfile): string {
+  switch (id) {
+    case "welcome":
+      return `Hi${draft.name ? ` ${draft.name}` : ""} — I'm your coach here at Longevity Compass. I'll ask a few quick things about your goals, sleep, food, movement, and stress, and shape everything after this around your actual life instead of a generic plan. Takes a couple minutes, and you can skip to the app any time.`;
+    case "goal":
+      return "First — what matters most to you right now?";
+    case "age":
+      return "How old are you, roughly? It changes what I'll actually recommend, especially for movement.";
+    case "sleepHours":
+      return "How much sleep do you usually get a night?";
+    case "sleepComplaints":
+      return "What tends to get in the way of good sleep, if anything?";
+    case "caffeine":
+      return "How much caffeine do you usually have in a day?";
+    case "activity":
+      return "How would you describe your current activity level?";
+    case "workoutStyle":
+      return "And what kind of movement do you actually enjoy?";
+    case "injuries":
+      return "Anything I should work around — an old injury, a joint issue, anything like that? Fine to skip.";
+    case "nutritionPattern":
+      return "How would you describe how you eat day to day?";
+    case "dietary":
+      return "Any dietary restrictions I should keep in mind?";
+    case "stress":
+      return "Last one before I show you around — how's your stress level lately, 1 to 5?";
+    case "tour":
+      return "Here's the actual dashboard you'll land on — tap around, then let's get you started.";
+    case "action": {
+      const chosenGoal = draft.primaryGoals[0] ?? "none";
+      const action = ACTION_COPY[chosenGoal];
+      return draft.name ? `${action.title}, ${draft.name}.` : `${action.title}.`;
+    }
+    default:
+      return "";
+  }
+}
+
+function summaryForStep(id: StepId, draft: UserProfile): string | null {
+  switch (id) {
+    case "welcome":
+      return draft.name ? `I'm ${draft.name}.` : null;
+    case "goal": {
+      const g = GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0]);
+      return g ? g.label : "Not sure yet.";
+    }
+    case "age":
+      return draft.ageRange || "Prefer not to say.";
+    case "sleepHours":
+      return draft.sleepHours || SLEEP_HOURS_OPTIONS[2];
+    case "sleepComplaints":
+      return draft.sleepComplaints.length ? draft.sleepComplaints.join(", ") : "No real complaint.";
+    case "caffeine":
+      return draft.caffeineHabit || "None";
+    case "activity":
+      return ACTIVITY_LEVEL_OPTIONS.find((a) => a.key === draft.activityLevel)?.label ?? "Not sure yet.";
+    case "workoutStyle":
+      return draft.workoutStyle || "Not sure yet";
+    case "injuries":
+      return draft.injuries.trim() ? draft.injuries.trim() : "Nothing to work around.";
+    case "nutritionPattern":
+      return draft.nutritionPattern || "No real pattern";
+    case "dietary":
+      return draft.dietaryRestrictions.length ? draft.dietaryRestrictions.join(", ") : "No restrictions";
+    case "stress":
+      return `${draft.stressLevel} out of 5`;
+    default:
+      return null;
+  }
+}
 
 function BloomMark() {
   const dots = Array.from({ length: 8 }, (_, i) => (i / 8) * 360);
@@ -187,23 +276,55 @@ function GoalCompass({ value, onChange }: { value: DomainKey | null; onChange: (
   );
 }
 
+interface Bubble {
+  who: "coach" | "you";
+  text: string;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [, setProfile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [, setSkipped] = useLocalStorageState<boolean>("lc_onboarding_skipped_v1", false);
-  const [step, setStep] = useState(0);
-  const [direction, setDirection] = useState(1);
+  const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<UserProfile>(EMPTY_PROFILE);
   const [openHotspot, setOpenHotspot] = useState<"compass" | "tiles" | null>(null);
+  const [transcript, setTranscript] = useState<Bubble[]>([{ who: "coach", text: questionForStep("welcome", EMPTY_PROFILE) }]);
+  const [reflecting, setReflecting] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
 
-  function next() {
-    setDirection(1);
-    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  }
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [transcript, reflecting]);
 
-  function back() {
-    setDirection(-1);
-    setStep((s) => Math.max(s - 1, 0));
+  const stepId = STEP_ORDER[stepIndex];
+
+  async function advance() {
+    const summary = summaryForStep(stepId, draft);
+    if (summary) setTranscript((t) => [...t, { who: "you", text: summary }]);
+
+    const nextIndex = stepIndex + 1;
+
+    if (summary) {
+      setReflecting(true);
+      try {
+        const res = await fetch("/api/onboarding-reflect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: questionForStep(stepId, draft), answer: summary, name: draft.name }),
+        });
+        const data = await res.json();
+        if (data?.message) setTranscript((t) => [...t, { who: "coach", text: data.message }]);
+      } catch {
+        // the reflection is a nice-to-have, not required for the flow to continue
+      } finally {
+        setReflecting(false);
+      }
+    }
+
+    if (nextIndex < STEP_COUNT) {
+      setTranscript((t) => [...t, { who: "coach", text: questionForStep(STEP_ORDER[nextIndex], draft) }]);
+    }
+    setStepIndex(nextIndex);
   }
 
   function skip() {
@@ -213,6 +334,13 @@ export default function OnboardingPage() {
 
   function chooseGoal(key: DomainKey) {
     setDraft((d) => ({ ...d, primaryGoals: [key] }));
+  }
+
+  function toggleMulti(field: "sleepComplaints" | "dietaryRestrictions", value: string) {
+    setDraft((d) => {
+      const list = d[field];
+      return { ...d, [field]: list.includes(value) ? list.filter((v) => v !== value) : [...list, value] };
+    });
   }
 
   function finishAndGo(href: string) {
@@ -237,216 +365,396 @@ export default function OnboardingPage() {
     <div className={styles.page}>
       <div className={styles.topRow}>
         <span className={styles.mark}>Longevity Compass</span>
-        {step > 0 && (
-          <button type="button" className={styles.skip} onClick={skip}>
-            Skip for now
-          </button>
-        )}
+        <button type="button" className={styles.skip} onClick={skip}>
+          Skip for now
+        </button>
       </div>
 
       <span className={styles.srOnly} role="status">
-        Step {step + 1} of {TOTAL_STEPS}
+        Step {stepIndex + 1} of {STEP_COUNT}
       </span>
 
-      <div className={styles.card}>
-        <AnimatePresence mode="wait" custom={direction}>
+      <div className={styles.transcript} ref={logRef} aria-live="polite">
+        {stepIndex === 0 && <BloomMark />}
+        {transcript.map((b, i) => (
           <motion.div
-            key={step}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
+            key={i}
+            className={b.who === "coach" ? styles.bubbleCoach : styles.bubbleYou}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
           >
-            {step === 0 && (
-              <div className={styles.welcome}>
-                <BloomMark />
-                <h1 className={styles.title}>Welcome to Longevity Compass</h1>
-                <p className={styles.subtitle}>
-                  We&apos;re here to help you live a longer, healthier life — one small, doable
-                  step at a time. No overwhelm, no jargon, just what actually helps.
-                </p>
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="ob-name">
-                    What should we call you? (optional)
-                  </label>
-                  <input
-                    id="ob-name"
-                    className={styles.input}
-                    value={draft.name}
-                    onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                    placeholder="First name"
-                    autoComplete="given-name"
-                  />
-                </div>
-                <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={next}>
-                  Let&apos;s begin
-                </button>
-                <p className={styles.fineprint}>
-                  This app offers friendly coaching, not medical advice — it&apos;ll always say so
-                  plainly if something needs a real doctor.
-                </p>
-              </div>
-            )}
-
-            {step === 1 && (
-              <>
-                <span className={styles.eyebrow}>Where to point first</span>
-                <h1 className={styles.title}>What matters most to you right now?</h1>
-                <p className={styles.subtitle}>
-                  Drag the needle, or tap a point on the dial — you can explore everything else
-                  whenever you&apos;re ready.
-                </p>
-                <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={chooseGoal} />
-                {draft.primaryGoals[0] && (
-                  <p className={styles.compassHint}>
-                    {GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0])?.hint}
-                  </p>
-                )}
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <span className={styles.eyebrow}>A couple quick things</span>
-                <h1 className={styles.title}>Let&apos;s fit this to your life</h1>
-                <p className={styles.subtitle}>
-                  This shapes a real plan for you, instead of a one-size-fits-all one.
-                </p>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>How much sleep do you usually get?</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={SLEEP_HOURS_OPTIONS.length - 1}
-                    step={1}
-                    value={sleepIndex === -1 ? 2 : sleepIndex}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, sleepHours: SLEEP_HOURS_OPTIONS[Number(e.target.value)] }))
-                    }
-                    className={styles.slider}
-                    aria-label="How much sleep do you usually get"
-                  />
-                  <div className={styles.sliderLabels} aria-hidden="true">
-                    {SLEEP_HOURS_OPTIONS.map((h) => (
-                      <span key={h}>{h}</span>
-                    ))}
-                  </div>
-                  <p className={styles.sliderValue}>{draft.sleepHours || SLEEP_HOURS_OPTIONS[2]}</p>
-                </div>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>What kind of movement do you enjoy?</span>
-                  <div className={styles.swipeStrip}>
-                    {WORKOUT_STYLE_OPTIONS.map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        className={draft.workoutStyle === w ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
-                        onClick={() => setDraft((d) => ({ ...d, workoutStyle: w }))}
-                        aria-pressed={draft.workoutStyle === w}
-                      >
-                        {w}
-                      </button>
-                    ))}
-                  </div>
-                  <p className={styles.swipeHint}>Swipe to see all options →</p>
-                </div>
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <span className={styles.eyebrow}>Your actual dashboard</span>
-                <h1 className={styles.title}>Here&apos;s where it all lives</h1>
-                <p className={styles.subtitle}>
-                  This is the real compass from Home, blank because nothing&apos;s logged yet — tap
-                  it, or the domains below, to see what they do.
-                </p>
-                <div className={styles.tourPreview}>
-                  <button
-                    type="button"
-                    className={styles.tourHotspot}
-                    onClick={() => setOpenHotspot((h) => (h === "compass" ? null : "compass"))}
-                    aria-expanded={openHotspot === "compass"}
-                  >
-                    <RoutineCompass days={previewDays} centerLabel="This week" centerValue="—" />
-                  </button>
-                  {openHotspot === "compass" && (
-                    <p className={styles.tourCallout}>
-                      Every ring is a domain — sleep, nutrition, fitness, mind. Every wedge is a
-                      day. Log something and it fills in for real; today always sits on top.
-                    </p>
-                  )}
-
-                  <div className={styles.tourTileRow} role="group" aria-label="Domains">
-                    {(["nutrition", "fitness", "mind"] as const).map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        className={styles.tourHotspotTile}
-                        style={{ borderColor: `var(--${d})` }}
-                        onClick={() => setOpenHotspot((h) => (h === "tiles" ? null : "tiles"))}
-                        aria-expanded={openHotspot === "tiles"}
-                      >
-                        {d === "nutrition" ? "Nutrition" : d === "fitness" ? "Fitness" : "Mind"}
-                      </button>
-                    ))}
-                  </div>
-                  {openHotspot === "tiles" && (
-                    <p className={styles.tourCallout}>
-                      Tap any domain on Home to log something or dig in — guided workouts, meal
-                      photos, guided meditation, sleep tracking, all one tap deep.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {step === 4 && (
-              <div className={styles.actionStep}>
-                {chosenGoal === "mind" ? (
-                  <div className={styles.orbMoment}>
-                    <Orb state="idle" size={140} color="var(--mind)" />
-                  </div>
-                ) : (
-                  <div className={styles.doneIcon}>✓</div>
-                )}
-                <h1 className={styles.title}>
-                  {draft.name ? `${action.title}, ${draft.name}.` : `${action.title}.`}
-                </h1>
-                {goalLabel && chosenGoal !== "none" && (
-                  <p className={styles.planLine}>{plan[chosenGoal as DomainKey]}</p>
-                )}
-                <p className={styles.subtitle}>{action.body}</p>
-              </div>
-            )}
+            {b.text}
           </motion.div>
-        </AnimatePresence>
+        ))}
+        {reflecting && (
+          <div className={styles.typing}>
+            <span />
+            <span />
+            <span />
+          </div>
+        )}
+      </div>
 
-        {step > 0 && (
-          <div className={styles.footer}>
-            <button type="button" className={styles.btn} onClick={back}>
-              Back
+      <div className={styles.composer}>
+        {stepId === "welcome" && (
+          <div className={styles.welcomeComposer}>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="ob-name">
+                What should we call you? (optional)
+              </label>
+              <input
+                id="ob-name"
+                className={styles.input}
+                value={draft.name}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                placeholder="First name"
+                autoComplete="given-name"
+              />
+            </div>
+            <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={advance}>
+              Let&apos;s begin
             </button>
-            {step < TOTAL_STEPS - 1 ? (
+            <p className={styles.fineprint}>
+              This app offers friendly coaching, not medical advice — it&apos;ll always say so
+              plainly if something needs a real doctor.
+            </p>
+          </div>
+        )}
+
+        {stepId === "goal" && (
+          <>
+            <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={chooseGoal} />
+            {draft.primaryGoals[0] && (
+              <p className={styles.compassHint}>{GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0])?.hint}</p>
+            )}
+            <div className={styles.footer}>
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={next}
-                disabled={step === 1 && draft.primaryGoals.length === 0}
+                onClick={advance}
+                disabled={draft.primaryGoals.length === 0 || reflecting}
               >
                 Continue
               </button>
-            ) : (
+            </div>
+          </>
+        )}
+
+        {stepId === "age" && (
+          <>
+            <div className={styles.chipRow}>
+              {AGE_RANGES.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  className={draft.ageRange === a ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => setDraft((d) => ({ ...d, ageRange: a }))}
+                  aria-pressed={draft.ageRange === a}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
               <button
                 type="button"
-                className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`}
-                onClick={() => finishAndGo(action.href)}
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={advance}
+                disabled={!draft.ageRange || reflecting}
               >
-                {action.cta}
+                Continue
               </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "sleepHours" && (
+          <>
+            <input
+              type="range"
+              min={0}
+              max={SLEEP_HOURS_OPTIONS.length - 1}
+              step={1}
+              value={sleepIndex === -1 ? 2 : sleepIndex}
+              onChange={(e) => setDraft((d) => ({ ...d, sleepHours: SLEEP_HOURS_OPTIONS[Number(e.target.value)] }))}
+              className={styles.slider}
+              aria-label="How much sleep do you usually get"
+            />
+            <div className={styles.sliderLabels} aria-hidden="true">
+              {SLEEP_HOURS_OPTIONS.map((h) => (
+                <span key={h}>{h}</span>
+              ))}
+            </div>
+            <p className={styles.sliderValue}>{draft.sleepHours || SLEEP_HOURS_OPTIONS[2]}</p>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "sleepComplaints" && (
+          <>
+            <div className={styles.chipRow}>
+              {SLEEP_COMPLAINT_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={draft.sleepComplaints.includes(c) ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => toggleMulti("sleepComplaints", c)}
+                  aria-pressed={draft.sleepComplaints.includes(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "caffeine" && (
+          <>
+            <div className={styles.chipRow}>
+              {CAFFEINE_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={draft.caffeineHabit === c ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => setDraft((d) => ({ ...d, caffeineHabit: c }))}
+                  aria-pressed={draft.caffeineHabit === c}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={advance}
+                disabled={!draft.caffeineHabit || reflecting}
+              >
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "activity" && (
+          <>
+            <div className={styles.chipRow}>
+              {ACTIVITY_LEVEL_OPTIONS.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  className={draft.activityLevel === a.key ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => setDraft((d) => ({ ...d, activityLevel: a.key }))}
+                  aria-pressed={draft.activityLevel === a.key}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={advance}
+                disabled={!draft.activityLevel || reflecting}
+              >
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "workoutStyle" && (
+          <>
+            <div className={styles.swipeStrip}>
+              {WORKOUT_STYLE_OPTIONS.map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  className={draft.workoutStyle === w ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => setDraft((d) => ({ ...d, workoutStyle: w }))}
+                  aria-pressed={draft.workoutStyle === w}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+            <p className={styles.swipeHint}>Swipe to see all options →</p>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "injuries" && (
+          <>
+            <input
+              className={styles.input}
+              value={draft.injuries}
+              onChange={(e) => setDraft((d) => ({ ...d, injuries: e.target.value }))}
+              placeholder="e.g. bad left knee — or leave this blank"
+            />
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "nutritionPattern" && (
+          <>
+            <div className={styles.chipRow}>
+              {NUTRITION_PATTERN_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={draft.nutritionPattern === n ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => setDraft((d) => ({ ...d, nutritionPattern: n }))}
+                  aria-pressed={draft.nutritionPattern === n}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={advance}
+                disabled={!draft.nutritionPattern || reflecting}
+              >
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "dietary" && (
+          <>
+            <div className={styles.chipRow}>
+              {DIETARY_OPTIONS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={draft.dietaryRestrictions.includes(d) ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  onClick={() => toggleMulti("dietaryRestrictions", d)}
+                  aria-pressed={draft.dietaryRestrictions.includes(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "stress" && (
+          <>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              step={1}
+              value={draft.stressLevel}
+              onChange={(e) => setDraft((d) => ({ ...d, stressLevel: Number(e.target.value) }))}
+              className={styles.slider}
+              aria-label="Stress level, 1 to 5"
+            />
+            <div className={styles.sliderLabels} aria-hidden="true">
+              <span>Calm</span>
+              <span>High</span>
+            </div>
+            <p className={styles.sliderValue}>{draft.stressLevel} / 5</p>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "tour" && (
+          <>
+            <div className={styles.tourPreview}>
+              <button
+                type="button"
+                className={styles.tourHotspot}
+                onClick={() => setOpenHotspot((h) => (h === "compass" ? null : "compass"))}
+                aria-expanded={openHotspot === "compass"}
+              >
+                <RoutineCompass days={previewDays} centerLabel="This week" centerValue="—" />
+              </button>
+              {openHotspot === "compass" && (
+                <p className={styles.tourCallout}>
+                  Every ring is a domain — sleep, nutrition, fitness, mind. Every wedge is a day.
+                  Log something and it fills in for real; today always sits on top.
+                </p>
+              )}
+
+              <div className={styles.tourTileRow} role="group" aria-label="Domains">
+                {(["nutrition", "fitness", "mind"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={styles.tourHotspotTile}
+                    style={{ borderColor: `var(--${d})` }}
+                    onClick={() => setOpenHotspot((h) => (h === "tiles" ? null : "tiles"))}
+                    aria-expanded={openHotspot === "tiles"}
+                  >
+                    {d === "nutrition" ? "Nutrition" : d === "fitness" ? "Fitness" : "Mind"}
+                  </button>
+                ))}
+              </div>
+              {openHotspot === "tiles" && (
+                <p className={styles.tourCallout}>
+                  Tap any domain on Home to log something or dig in — guided workouts, meal
+                  photos, guided meditation, sleep tracking, all one tap deep.
+                </p>
+              )}
+            </div>
+            <div className={styles.footer}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {stepId === "action" && (
+          <div className={styles.actionStep}>
+            {chosenGoal === "mind" ? (
+              <div className={styles.orbMoment}>
+                <Orb state="idle" size={140} color="var(--mind)" />
+              </div>
+            ) : (
+              <div className={styles.doneIcon}>✓</div>
             )}
+            {goalLabel && chosenGoal !== "none" && <p className={styles.planLine}>{plan[chosenGoal as DomainKey]}</p>}
+            <p className={styles.subtitle}>{action.body}</p>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`}
+              onClick={() => finishAndGo(action.href)}
+            >
+              {action.cta}
+            </button>
           </div>
         )}
       </div>

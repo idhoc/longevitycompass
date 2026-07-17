@@ -19,7 +19,7 @@ export default function TopicsPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/topics" />
+      <SiteNav />
 
       <div className={styles.header}>
         <span className="eyebrow" style={{ color: "var(--signal)" }}>Topics</span>

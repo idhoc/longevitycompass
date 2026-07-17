@@ -32,7 +32,7 @@ export default function NutritionPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/home" />
+      <SiteNav />
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
         <span className="eyebrow" style={{ color: "var(--nutrition)" }}>Nutrition</span>

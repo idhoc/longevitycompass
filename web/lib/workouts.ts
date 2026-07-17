@@ -278,6 +278,63 @@ export function getWorkout(id: string): WorkoutRoutine | undefined {
   return WORKOUTS.find((w) => w.id === id);
 }
 
+type ActivityTier = "gentle" | "moderate" | "active";
+
+/** Which style leads for each tier — not a fitness prescription, just a
+ * sensible default starting point: lower-impact first for anyone 60+ or
+ * currently sedentary, higher-intensity first for anyone already active. */
+const TIER_STYLE_ORDER: Record<ActivityTier, WorkoutRoutine["style"][]> = {
+  gentle: ["Mobility", "Mixed", "Strength", "Cardio"],
+  moderate: ["Mixed", "Strength", "Cardio", "Mobility"],
+  active: ["Strength", "Cardio", "Mixed", "Mobility"],
+};
+
+function activityTier(profile: { ageRange: string; activityLevel: string } | null): ActivityTier {
+  if (!profile) return "moderate";
+  if (profile.ageRange === "60+" || profile.activityLevel === "sedentary") return "gentle";
+  if (profile.activityLevel === "active" && profile.ageRange !== "60+") return "active";
+  return "moderate";
+}
+
+/** Reorders the built-in library around the profile: an explicitly
+ * stated workout-style preference wins first, then age/activity level
+ * decide the rest — a 60-year-old and a 20-year-old genuinely see a
+ * different lead recommendation, not just a relabeled default list. */
+export function orderWorkoutsForProfile(
+  workouts: WorkoutRoutine[],
+  profile: { ageRange: string; activityLevel: string; workoutStyle: string } | null
+): WorkoutRoutine[] {
+  const styleOrder = TIER_STYLE_ORDER[activityTier(profile)];
+  const preferred = profile?.workoutStyle && profile.workoutStyle !== "Not sure yet" ? profile.workoutStyle : null;
+  const rank = (style: WorkoutRoutine["style"]) => {
+    const i = styleOrder.indexOf(style);
+    return i === -1 ? styleOrder.length : i;
+  };
+
+  return [...workouts].sort((a, b) => {
+    if (preferred) {
+      if (a.style === preferred && b.style !== preferred) return -1;
+      if (b.style === preferred && a.style !== preferred) return 1;
+    }
+    return rank(a.style) - rank(b.style);
+  });
+}
+
+/** A one-line, honest reason for whichever workout ends up first —
+ * shown so the reordering reads as intentional, not random. */
+export function recommendationReason(
+  profile: { ageRange: string; activityLevel: string; workoutStyle: string } | null
+): string | null {
+  if (!profile) return null;
+  if (profile.workoutStyle && profile.workoutStyle !== "Not sure yet") {
+    return `Leading with ${profile.workoutStyle.toLowerCase()} — what you told us you enjoy.`;
+  }
+  if (profile.ageRange === "60+") return "Lower-impact sessions first, based on your profile.";
+  if (profile.activityLevel === "sedentary") return "Starting gentle, based on your current activity level.";
+  if (profile.activityLevel === "active") return "Strength and cardio first, based on your current activity level.";
+  return null;
+}
+
 const CUSTOM_KEY = "lc_custom_workouts_v1";
 
 export function loadCustomWorkouts(): WorkoutRoutine[] {

@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Bitter, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
-// Display: Bricolage Grotesque — an unusual, high-personality variable
-// grotesque (irregular terminals, a real point of view) for headlines,
-// the compass mark, and hero numbers. Chosen specifically to not read as
-// a safe default — most AI-generated products reach for Inter or a
-// generic serif; this doesn't.
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+// Display: Bitter — a bold slab serif for headlines, the compass mark,
+// and hero numbers. Slab serifs read as sturdy and grounded ("outward")
+// without the aggression of a grotesque or the fragility of a delicate
+// old-style serif — the calm half of "bolder yet calm." Distinct from
+// every display face this project has tried before (Fraunces, Bricolage
+// Grotesque, system-default Inter).
+const bitter = Bitter({
+  variable: "--font-bitter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["500", "600", "700", "800", "900"],
 });
 
 // Body: IBM's own engineering-heritage sans — the UI-chrome and data
@@ -43,7 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${bitter.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.
@@ -61,7 +63,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <PageTransition>{children}</PageTransition>
+      </body>
     </html>
   );
 }

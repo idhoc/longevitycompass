@@ -94,7 +94,7 @@ export default function BuildWorkoutPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/home" />
+      <SiteNav />
 
       <div className={styles.header}>
         <span className="eyebrow">Fitness &amp; Movement</span>

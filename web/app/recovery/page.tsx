@@ -8,7 +8,6 @@ import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
 import { dateKeyOffset, last7Days } from "@/lib/domainReach";
 import { computeRecoveryHistory, computeStrain } from "@/lib/whoopScores";
-import { JOURNAL_BEHAVIORS, JOURNAL_KEY, computeBehaviorCorrelation, type JournalEntry, type JournalCategory } from "@/lib/journal";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -46,12 +45,9 @@ const STATUS_COLOR: Record<VitalStatus, string> = {
   "no-data": "var(--ink-faint)",
 };
 
-const CATEGORY_ORDER: JournalCategory[] = ["sleep hygiene", "lifestyle", "nutrition", "mental health", "recovery"];
-
 export default function RecoveryPage() {
   const [sleepEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
-  const [journalEntries, setJournalEntries] = useLocalStorageState<JournalEntry[]>(JOURNAL_KEY, []);
 
   const todayEntry = sleepEntries.find((e) => e.date === todayKey());
   const todayRHR = todayEntry ? Number(todayEntry.restingHeartRate) : NaN;
@@ -94,34 +90,16 @@ export default function RecoveryPage() {
     return minutes ? computeStrain(minutes) / 21 : minutes === 0 ? 0 : null;
   });
 
-  const today = todayKey();
-  const todaysJournal = journalEntries.find((e) => e.date === today);
-  const checked = todaysJournal?.behaviors ?? {};
-
-  function toggle(behaviorId: string) {
-    const nextBehaviors = { ...checked, [behaviorId]: !checked[behaviorId] };
-    setJournalEntries((prev) => [...prev.filter((e) => e.date !== today), { date: today, behaviors: nextBehaviors }]);
-  }
-
-  const correlations = JOURNAL_BEHAVIORS.map((b) => computeBehaviorCorrelation(b.id, journalEntries, recoveryByDate)).filter(
-    (c): c is NonNullable<typeof c> => c != null
-  );
-  const byCategory = CATEGORY_ORDER.map((cat) => ({
-    category: cat,
-    behaviors: JOURNAL_BEHAVIORS.filter((b) => b.category === cat),
-  }));
-
   return (
     <div className={styles.page}>
-      <SiteNav active="/home" />
+      <SiteNav />
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
         <span className="eyebrow" style={{ color: "var(--signal)" }}>Recovery</span>
         <h1>Sleep, vitals, and what actually moves them</h1>
         <p className={styles.headerSub}>
-          A real check-in on last night, your resting-HR trend against your own baseline, and a
-          nightly behavior log with correlations against next-day Recovery — WHOOP&apos;s Sleep,
-          Body, and Journal, together in one place.
+          A real check-in on last night, and your resting heart rate trend against your own
+          baseline — WHOOP&apos;s Sleep and Body, together in one place.
         </p>
       </div>
 
@@ -170,72 +148,6 @@ export default function RecoveryPage() {
               Exactly what WHOOP&apos;s hardware measures continuously. Wiring up a real
               wearable-data API is the honest way to add these — not a simulated number.
             </p>
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <span className={styles.sectionLabel}>Journal</span>
-          <p className={styles.vitalNote} style={{ marginBottom: "0.4em" }}>
-            A slice of WHOOP&apos;s real 300+ behavior Journal — log what applied today.
-          </p>
-          {byCategory.map(({ category, behaviors }) => (
-            <div className={styles.categoryBlock} key={category}>
-              <span className={styles.categoryLabel}>{category}</span>
-              <div className={styles.behaviorList}>
-                {behaviors.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    className={checked[b.id] ? `${styles.behaviorRow} ${styles.behaviorRowActive}` : styles.behaviorRow}
-                    onClick={() => toggle(b.id)}
-                    aria-pressed={!!checked[b.id]}
-                  >
-                    <span className={styles.checkbox} aria-hidden="true">
-                      {checked[b.id] ? "✓" : ""}
-                    </span>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          <div className={styles.insightsSection}>
-            <span className={styles.categoryLabel}>What&apos;s correlated with your Recovery</span>
-            {correlations.length ? (
-              <div className={styles.insightList}>
-                {correlations.map((c) => {
-                  const behavior = JOURNAL_BEHAVIORS.find((b) => b.id === c.behaviorId)!;
-                  const diff = c.withAvg - c.withoutAvg;
-                  return (
-                    <div className={styles.insightCard} key={c.behaviorId}>
-                      <p className={styles.insightText}>
-                        On nights you logged <strong>{behavior.label.toLowerCase()}</strong>, next-day
-                        Recovery averaged <span className="tabular">{c.withAvg}%</span> vs{" "}
-                        <span className="tabular">{c.withoutAvg}%</span> otherwise
-                        {diff !== 0 && (
-                          <>
-                            {" "}
-                            ({diff > 0 ? "+" : ""}
-                            {diff} pts)
-                          </>
-                        )}
-                        .
-                      </p>
-                      <p className={styles.insightMeta}>
-                        {c.withCount} night{c.withCount === 1 ? "" : "s"} with · {c.withoutCount} without
-                        — a plain average, not a statistical test.
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className={styles.emptyText}>
-                Log at least 3 nights with a behavior on and 3 with it off (and keep logging sleep)
-                to see a correlation here — WHOOP itself requires 5 and 5 over 90 days.
-              </p>
-            )}
           </div>
         </section>
       </div>

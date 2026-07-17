@@ -87,7 +87,7 @@ interface SleepEntryRecord extends SleepInputs {
  * own resting HR against a trailing 7-entry baseline of prior nights —
  * the same "compare against your own recent norm" idea WHOOP uses,
  * just over self-reported nights instead of continuous sensor data.
- * Used to feed the Journal's behavior-correlation view. */
+ * Used to feed the Recovery trend chart. */
 export function computeRecoveryHistory(entries: SleepEntryRecord[]): Map<string, number> {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const result = new Map<string, number>();

@@ -31,12 +31,12 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       icon: "⌚",
     },
     {
-      id: "vitals-journal",
+      id: "vitals",
       domain: "sleep",
-      title: "Vitals & recovery journal",
-      description: "Resting heart rate against your own baseline, plus a nightly behavior log.",
+      title: "Vitals",
+      description: "Resting heart rate against your own baseline, tracked night over night.",
       href: "/recovery",
-      feature: "Unique feature: correlates logged behaviors against next-day Recovery",
+      feature: "Unique feature: compares tonight against your own last 7 nights, not a population norm",
       icon: "💓",
     },
   ],
@@ -139,4 +139,15 @@ export function topicGroupsFromOrder(domainOrder: DomainKey[]): TopicGroup[] {
 
 export function allTopics(): Topic[] {
   return Object.values(DOMAIN_TOPICS).flat();
+}
+
+export function domainColor(domain: DomainKey): string {
+  return DOMAIN_META[domain].color;
+}
+
+/** The lead topic from each domain, in priority order — what Home's
+ * preview strip shows, so "Topics" reads as the actual front door instead
+ * of a buried nav item. */
+export function featuredTopics(domainOrder: DomainKey[], count = 4): Topic[] {
+  return domainOrder.map((domain) => DOMAIN_TOPICS[domain][0]).slice(0, count);
 }

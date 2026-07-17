@@ -35,6 +35,16 @@ export const NUTRITION_PATTERN_OPTIONS = [
   "No real pattern",
 ] as const;
 
+export const DIETARY_OPTIONS = [
+  "No restrictions",
+  "Vegetarian",
+  "Vegan",
+  "Gluten-free",
+  "Dairy-free",
+] as const;
+
+export const CAFFEINE_OPTIONS = ["None", "1 cup a day", "2-3 cups a day", "4+ cups a day"] as const;
+
 export const TONE_OPTIONS = [
   {
     key: "warm",
@@ -99,6 +109,9 @@ export interface UserProfile {
   activityLevel: (typeof ACTIVITY_LEVEL_OPTIONS)[number]["key"] | "";
   workoutStyle: (typeof WORKOUT_STYLE_OPTIONS)[number] | "";
   nutritionPattern: (typeof NUTRITION_PATTERN_OPTIONS)[number] | "";
+  dietaryRestrictions: string[];
+  caffeineHabit: (typeof CAFFEINE_OPTIONS)[number] | "";
+  injuries: string;
   stressLevel: number;
   tone: CoachTone;
   intensity: ContentIntensity;
@@ -117,6 +130,9 @@ export const EMPTY_PROFILE: UserProfile = {
   activityLevel: "",
   workoutStyle: "",
   nutritionPattern: "",
+  dietaryRestrictions: [],
+  caffeineHabit: "",
+  injuries: "",
   stressLevel: 3,
   tone: "warm",
   intensity: "standard",
@@ -149,11 +165,17 @@ export function domainPlanFromProfile(profile: UserProfile | null): Record<Domai
         : "Establishing a baseline, then watching what moves the needle night to night.",
     nutrition:
       p?.nutritionPattern && p.nutritionPattern !== "No real pattern"
-        ? `Working with how you actually eat: ${p.nutritionPattern.toLowerCase()}.`
+        ? `Working with how you actually eat: ${p.nutritionPattern.toLowerCase()}${
+            p.dietaryRestrictions.length && !p.dietaryRestrictions.includes("No restrictions")
+              ? `, keeping it ${p.dietaryRestrictions.join(" and ").toLowerCase()}`
+              : ""
+          }.`
         : "Photographing meals first, to see the real pattern before changing anything.",
     fitness:
       p?.workoutStyle && p.workoutStyle !== "Not sure yet"
-        ? `Built around ${p.workoutStyle.toLowerCase()} training, matched to a ${p.activityLevel || "current"} baseline.`
+        ? `Built around ${p.workoutStyle.toLowerCase()} training, matched to a ${p.activityLevel || "current"} baseline${
+            p.injuries ? `, working around ${p.injuries.toLowerCase()}` : ""
+          }.`
         : "Starting light and consistent, then finding what you actually enjoy doing.",
     mind:
       p?.stressLevel != null

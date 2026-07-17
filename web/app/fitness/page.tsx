@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
-import { WORKOUTS, type WorkoutRoutine } from "@/lib/workouts";
+import { WORKOUTS, orderWorkoutsForProfile, recommendationReason, type WorkoutRoutine } from "@/lib/workouts";
 import { GeneticInsightCard } from "@/components/GeneticInsightCard";
+import type { UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 
 export default function FitnessLibraryPage() {
   const [customWorkouts] = useLocalStorageState<WorkoutRoutine[]>("lc_custom_workouts_v1", []);
+  const [profile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
+  const orderedWorkouts = orderWorkoutsForProfile(WORKOUTS, profile);
+  const reason = recommendationReason(profile);
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/home" />
+      <SiteNav />
 
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
@@ -55,13 +59,14 @@ export default function FitnessLibraryPage() {
 
       <div className={styles.sectionLabel}>Guided sessions</div>
       <div className={styles.grid}>
-        {WORKOUTS.map((w) => (
+        {orderedWorkouts.map((w, i) => (
           <div className={styles.card} key={w.id}>
             <div className={styles.cardTop}>
               <span className={styles.cardStyle}>{w.style}</span>
               <span className={`${styles.cardMinutes} tabular`}>{w.minutes} min</span>
             </div>
             <div className={styles.cardTitle}>{w.title}</div>
+            {i === 0 && reason && <p className={styles.cardRecommend}>{reason}</p>}
             <p className={styles.cardDesc}>{w.description}</p>
             <Link href={`/fitness/${w.id}`} className={styles.cardCta}>
               Start

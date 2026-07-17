@@ -98,6 +98,13 @@
   font-size: var(--text-sm);
 }
 
+.cardRecommend {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fitness);
+  letter-spacing: 0.01em;
+}
+
 .cardCta {
   margin-top: auto;
   align-self: flex-start;

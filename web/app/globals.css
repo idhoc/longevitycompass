@@ -74,7 +74,7 @@
 
 :root {
   /* -- type families (wired to next/font variables in layout.tsx) -- */
-  --font-display: var(--font-bricolage), system-ui, sans-serif;
+  --font-display: var(--font-bitter), Georgia, serif;
   --font-body: var(--font-plex-sans), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
@@ -141,8 +141,8 @@ a {
 h1, h2, h3 {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
 }
 
 .hero-italic {
