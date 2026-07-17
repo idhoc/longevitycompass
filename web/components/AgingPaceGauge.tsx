@@ -17,9 +17,9 @@ function arcPath(fromDeg: number, toDeg: number) {
 }
 
 const SEGMENTS = [
-  { from: 180, to: 120, color: "#16ec06" },
-  { from: 120, to: 60, color: "#ffde00" },
-  { from: 60, to: 0, color: "#ff0026" },
+  { from: 180, to: 120, color: "#5fae71" },
+  { from: 120, to: 60, color: "#e0a83e" },
+  { from: 60, to: 0, color: "#d0625a" },
 ];
 
 const BAND_LABEL: Record<AgingPaceBand, string> = {

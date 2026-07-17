@@ -29,8 +29,8 @@ export function MacroRings({
 }) {
   const rings: Ring[] = [
     { label: "Protein", value: proteinG, target: proteinTarget, color: "var(--nutrition)" },
-    { label: "Carbs", value: carbsG, target: carbsTarget, color: "#ffcf5c" },
-    { label: "Fat", value: fatG, target: fatTarget, color: "#ff6b5f" },
+    { label: "Carbs", value: carbsG, target: carbsTarget, color: "#e0b45c" },
+    { label: "Fat", value: fatG, target: fatTarget, color: "#c96a5c" },
   ];
 
   return (
@@ -42,7 +42,7 @@ export function MacroRings({
           const pct = Math.max(0, Math.min(1, ring.value / ring.target));
           return (
             <g key={ring.label}>
-              <circle cx={SIZE / 2} cy={SIZE / 2} r={r} fill="none" stroke="var(--paper-sunken)" strokeWidth={STROKE} />
+              <circle cx={SIZE / 2} cy={SIZE / 2} r={r} fill="none" stroke="var(--line-strong)" strokeWidth={STROKE} />
               <circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}

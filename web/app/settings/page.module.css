@@ -101,7 +101,8 @@
 .tag {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  padding: 0.5em 0.9em;
+  padding: 0.8em 1em;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   color: var(--ink-soft);
@@ -191,11 +192,11 @@
 }
 
 .themeSwatchDark {
-  background: linear-gradient(135deg, #0a0a0a 50%, #00f19f 50%);
+  background: linear-gradient(135deg, #1e1b17 50%, #6bbba8 50%);
 }
 
 .themeSwatchLight {
-  background: linear-gradient(135deg, #f7f7f6 50%, #00a876 50%);
+  background: linear-gradient(135deg, #fbf8f3 50%, #4f9a8c 50%);
 }
 
 .themeLabel {
@@ -244,7 +245,8 @@
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 0.6em 1em;
+  padding: 0.85em 1.2em;
+  min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: transparent;

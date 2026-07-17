@@ -26,7 +26,7 @@ export function Dial({ value, max, color, display, label, sublabel }: DialProps)
       style={{ position: "relative", width: SIZE, height: SIZE, flexShrink: 0 }}
     >
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
-        <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke="var(--paper-sunken)" strokeWidth={STROKE} />
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke="var(--line-strong)" strokeWidth={STROKE} />
         <circle
           cx={SIZE / 2}
           cy={SIZE / 2}

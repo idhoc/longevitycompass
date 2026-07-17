@@ -3,9 +3,9 @@ export type Theme = "dark" | "light";
 const KEY = "lc_theme_v1";
 
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const raw = window.localStorage.getItem(KEY);
-  return raw === "light" ? "light" : "dark";
+  return raw === "dark" ? "dark" : "light";
 }
 
 /** Applies a theme to the document and persists it — the single place both

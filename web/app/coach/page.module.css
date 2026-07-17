@@ -161,8 +161,8 @@
 
 .micButton {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--line-strong);
   background: transparent;
@@ -211,6 +211,7 @@
   background: var(--ink);
   color: var(--paper);
   padding: 0 1.4em;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;

@@ -44,6 +44,10 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
+      // The boot script below sets data-theme on this element before React
+      // hydrates, on purpose (that's what avoids the flash) — React would
+      // otherwise flag that as a hydration mismatch even though it's correct.
+      suppressHydrationWarning
     >
       <head>
         {/* Sets the color scheme before first paint so switching themes in

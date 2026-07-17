@@ -1,8 +1,8 @@
 const SEGMENTS = [
-  { key: "deep", color: "#0093e7", label: "Deep" },
-  { key: "rem", color: "#00f19f", label: "REM" },
-  { key: "light", color: "#5a6570", label: "Light" },
-  { key: "awake", color: "#ff9a3d", label: "Awake" },
+  { key: "deep", color: "#5b8fbf", label: "Deep" },
+  { key: "rem", color: "#4f9a8c", label: "REM" },
+  { key: "light", color: "#a39c8a", label: "Light" },
+  { key: "awake", color: "#c97a3d", label: "Awake" },
 ] as const;
 
 export function StageBar({

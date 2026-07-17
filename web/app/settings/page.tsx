@@ -25,7 +25,7 @@ type ConfirmState = "none" | "clear" | "reset";
 export default function SettingsPage() {
   const router = useRouter();
   const [profile, setProfile, hydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   const [confirming, setConfirming] = useState<ConfirmState>("none");
   const [exportedNote, setExportedNote] = useState<string | null>(null);
 
@@ -249,7 +249,7 @@ export default function SettingsPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Appearance</h2>
           <div className={styles.themeRow}>
-            {(["dark", "light"] as Theme[]).map((t) => (
+            {(["light", "dark"] as Theme[]).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -258,7 +258,7 @@ export default function SettingsPage() {
                 aria-pressed={theme === t}
               >
                 <span className={t === "dark" ? styles.themeSwatchDark : styles.themeSwatchLight} aria-hidden="true" />
-                <span className={styles.themeLabel}>{t === "dark" ? "Instrument (dark)" : "Bone paper (light)"}</span>
+                <span className={styles.themeLabel}>{t === "dark" ? "Cozy (dark)" : "Warm (light)"}</span>
               </button>
             ))}
           </div>

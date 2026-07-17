@@ -16,9 +16,9 @@ export function recoveryBand(score: number): RecoveryBand {
 }
 
 export const RECOVERY_COLOR: Record<RecoveryBand, string> = {
-  high: "#16ec06",
-  moderate: "#ffde00",
-  low: "#ff0026",
+  high: "var(--recovery-high)",
+  moderate: "var(--recovery-med)",
+  low: "var(--recovery-low)",
 };
 
 interface SleepInputs {

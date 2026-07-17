@@ -2,11 +2,11 @@ export type DomainKey = "sleep" | "nutrition" | "fitness" | "mind";
 
 export const DEFAULT_DOMAIN_ORDER: DomainKey[] = ["sleep", "nutrition", "fitness", "mind"];
 
-export const GOAL_OPTIONS: { key: DomainKey; label: string; hint: string }[] = [
-  { key: "sleep", label: "Sleep better", hint: "Fall asleep easier, wake up with more energy" },
-  { key: "nutrition", label: "Eat with more intention", hint: "Less guessing, more knowing what you actually ate" },
-  { key: "fitness", label: "Move consistently", hint: "Build a routine that survives a busy week" },
-  { key: "mind", label: "Feel more grounded", hint: "Purpose, connection, less reactive stress" },
+export const GOAL_OPTIONS: { key: DomainKey; label: string; hint: string; icon: string }[] = [
+  { key: "sleep", label: "Better sleep", hint: "Fall asleep easier, wake up with more energy", icon: "🌙" },
+  { key: "nutrition", label: "Eat well", hint: "Less guessing, more knowing what you actually ate", icon: "🍎" },
+  { key: "fitness", label: "Move more", hint: "Build a routine that survives a busy week", icon: "🏃" },
+  { key: "mind", label: "Feel grounded", hint: "Purpose, connection, less reactive stress", icon: "🧘" },
 ];
 
 export const SLEEP_HOURS_OPTIONS = ["Under 6", "6 to 7", "7 to 8", "8 or more"] as const;
