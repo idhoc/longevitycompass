@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { MEAL_IDEAS, type MealIdea } from "@/lib/mealIdeas";
 import styles from "./panels.module.css";
 
 interface MealFood {
@@ -51,6 +52,43 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function IdeaRecipeCard({ idea }: { idea: MealIdea }) {
+  return (
+    <div className={styles.recipeCard}>
+      <p className={styles.insightHeadline} style={{ margin: 0 }}>
+        {idea.title}
+      </p>
+      <div className={styles.recipeMetaRow}>
+        <span className={styles.recipePill}>{idea.tag}</span>
+        <span className={styles.recipePill}>{idea.kcal} kcal</span>
+        <span className={styles.recipePill}>{idea.proteinG}g protein</span>
+      </div>
+      <p className={styles.insightExplanation}>{idea.description}</p>
+      <div className={styles.ingredientCols}>
+        <div>
+          <span className={styles.fieldLabel}>Ingredients</span>
+          <ul className={styles.ingredientList} style={{ marginTop: "0.4em" }}>
+            {idea.ingredients.map((ing) => (
+              <li key={ing} className={styles.ingredientItem}>
+                <span className={styles.ingredientDot} style={{ background: "var(--nutrition)" }} />
+                {ing}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <ol className={styles.stepList}>
+        {idea.steps.map((step, i) => (
+          <li key={i} className={styles.stepItem}>
+            <span className={styles.stepNum}>{i + 1}</span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function NutritionPanel() {
   const [mode, setMode] = useState<Mode>("log");
 
@@ -69,11 +107,14 @@ export function NutritionPanel() {
   const [recipeError, setRecipeError] = useState<string | null>(null);
   const recipeInputRef = useRef<HTMLInputElement>(null);
 
+  const [openIdeaId, setOpenIdeaId] = useState<string | null>(null);
+  const [justLoggedId, setJustLoggedId] = useState<string | null>(null);
+
   const todaysMeals = meals.filter((m) => m.date === todayKey());
   const totalCalories = todaysMeals.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
   const totalProtein = todaysMeals.reduce((sum, m) => sum + (m.proteinG || 0), 0);
-  const latest = todaysMeals[todaysMeals.length - 1];
   const latestRecipe = recipes[recipes.length - 1];
+  const openIdea = MEAL_IDEAS.find((i) => i.id === openIdeaId) ?? null;
 
   async function handleFile(file: File) {
     setUploading(true);
@@ -141,6 +182,24 @@ export function NutritionPanel() {
     }
   }
 
+  function logIdea(idea: MealIdea) {
+    const entry: LoggedMeal = {
+      id: `${Date.now()}`,
+      date: todayKey(),
+      thumbnail: "",
+      foods: [{ name: idea.title, estimated_grams: null, estimated_calories: idea.kcal }],
+      totalCalories: idea.kcal,
+      proteinG: idea.proteinG,
+      carbsG: idea.carbsG,
+      fatG: idea.fatG,
+      suggestion: idea.description,
+      confidence: "moderate",
+    };
+    setMeals((prev) => [...prev, entry]);
+    setJustLoggedId(idea.id);
+    setTimeout(() => setJustLoggedId(null), 2000);
+  }
+
   return (
     <section className={styles.panel} aria-labelledby="nutrition-panel-title">
       <div className={styles.panelHead}>
@@ -178,35 +237,61 @@ export function NutritionPanel() {
         {mode === "log" ? (
           <>
             {todaysMeals.length > 0 && (
-              <div style={{ display: "flex", gap: "0.5em", flexWrap: "wrap" }}>
+              <div className={styles.mealGrid}>
                 {todaysMeals.map((m) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={m.id}
-                    src={m.thumbnail}
-                    alt={m.foods.map((f) => f.name).join(", ") || "Logged meal photo"}
-                    width={56}
-                    height={56}
-                    style={{ borderRadius: 8, objectFit: "cover", border: "1px solid var(--line-strong)" }}
-                  />
+                  <div key={m.id} className={styles.mealCard}>
+                    {m.thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={m.thumbnail}
+                        alt={m.foods.map((f) => f.name).join(", ") || "Logged meal photo"}
+                        className={styles.mealThumb}
+                      />
+                    ) : (
+                      <div className={styles.mealThumbIcon} aria-hidden="true">
+                        🍽️
+                      </div>
+                    )}
+                    <span className={styles.mealCardName}>{m.foods.map((f) => f.name).join(", ") || "Meal"}</span>
+                    {m.totalCalories != null && <span className={styles.mealCardKcal}>{Math.round(m.totalCalories)} kcal</span>}
+                  </div>
                 ))}
               </div>
             )}
 
-            {latest ? (
-              <div>
-                <p className={styles.emptyText} style={{ margin: 0 }}>
-                  Last photo: {latest.foods.map((f) => f.name).join(", ") || "—"}
-                </p>
-                <p className={styles.insightExplanation} style={{ marginTop: "0.4em" }}>
-                  {latest.suggestion}
-                </p>
+            <div>
+              <span className={styles.fieldLabel}>Meal ideas — tap for the recipe</span>
+              <div className={styles.ideaStrip} style={{ marginTop: "0.5em" }}>
+                {MEAL_IDEAS.map((idea) => (
+                  <button
+                    key={idea.id}
+                    type="button"
+                    className={openIdeaId === idea.id ? `${styles.ideaCard} ${styles.ideaCardActive}` : styles.ideaCard}
+                    onClick={() => setOpenIdeaId((cur) => (cur === idea.id ? null : idea.id))}
+                    aria-expanded={openIdeaId === idea.id}
+                  >
+                    <span className={styles.ideaTag}>{idea.tag}</span>
+                    <div className={styles.ideaTitle}>{idea.title}</div>
+                    <div className={styles.ideaMacros}>
+                      {idea.kcal} kcal · {idea.proteinG}g protein
+                    </div>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <p className={styles.emptyText}>
-                Photograph each meal instead of describing it — the plan reacts to what you
-                actually ate, not what you remember eating.
-              </p>
+            </div>
+
+            {openIdea && (
+              <div>
+                <IdeaRecipeCard idea={openIdea} />
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  style={{ marginTop: "0.6em" }}
+                  onClick={() => logIdea(openIdea)}
+                >
+                  {justLoggedId === openIdea.id ? "Logged ✓" : `Log this — ${openIdea.kcal} kcal`}
+                </button>
+              </div>
             )}
 
             {error && (
@@ -241,26 +326,46 @@ export function NutritionPanel() {
         ) : (
           <>
             {latestRecipe ? (
-              <div>
-                <p className={styles.insightHeadline} style={{ margin: 0 }}>{latestRecipe.title}</p>
-                <p className={styles.emptyText} style={{ marginTop: "0.4em" }}>
-                  Uses: {latestRecipe.usesIngredients.join(", ") || "—"}
-                  {latestRecipe.missingCommonItems.length > 0 && (
-                    <> · Also needs: {latestRecipe.missingCommonItems.join(", ")}</>
-                  )}
+              <div className={styles.recipeCard}>
+                <p className={styles.insightHeadline} style={{ margin: 0 }}>
+                  {latestRecipe.title}
                 </p>
-                {(latestRecipe.estimatedMinutes || latestRecipe.servings) && (
-                  <p className={`${styles.panelMeta} tabular`} style={{ marginTop: "0.4em" }}>
-                    {latestRecipe.estimatedMinutes ? `${latestRecipe.estimatedMinutes} min` : ""}
-                    {latestRecipe.estimatedMinutes && latestRecipe.servings ? " · " : ""}
-                    {latestRecipe.servings ? `${latestRecipe.servings} servings` : ""}
-                  </p>
-                )}
+                <div className={styles.recipeMetaRow}>
+                  {latestRecipe.estimatedMinutes && <span className={styles.recipePill}>{latestRecipe.estimatedMinutes} min</span>}
+                  {latestRecipe.servings && <span className={styles.recipePill}>{latestRecipe.servings} servings</span>}
+                </div>
+                <div className={styles.ingredientCols}>
+                  <div>
+                    <span className={styles.fieldLabel}>You have</span>
+                    <ul className={styles.ingredientList} style={{ marginTop: "0.4em" }}>
+                      {latestRecipe.usesIngredients.map((ing) => (
+                        <li key={ing} className={styles.ingredientItem}>
+                          <span className={styles.ingredientDot} style={{ background: "var(--nutrition)" }} />
+                          {ing}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {latestRecipe.missingCommonItems.length > 0 && (
+                    <div>
+                      <span className={styles.fieldLabel}>You&apos;ll need</span>
+                      <ul className={styles.ingredientList} style={{ marginTop: "0.4em" }}>
+                        {latestRecipe.missingCommonItems.map((ing) => (
+                          <li key={ing} className={styles.ingredientItem}>
+                            <span className={styles.ingredientDot} style={{ background: "var(--ink-faint)" }} />
+                            {ing}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
                 {latestRecipe.steps.length > 0 && (
-                  <ol style={{ marginTop: "0.6em", paddingLeft: "1.2em", display: "flex", flexDirection: "column", gap: "0.35em" }}>
+                  <ol className={styles.stepList}>
                     {latestRecipe.steps.map((step, i) => (
-                      <li key={i} className={styles.emptyText} style={{ maxWidth: "none" }}>
-                        {step}
+                      <li key={i} className={styles.stepItem}>
+                        <span className={styles.stepNum}>{i + 1}</span>
+                        <span>{step}</span>
                       </li>
                     ))}
                   </ol>
@@ -269,9 +374,30 @@ export function NutritionPanel() {
             ) : (
               <p className={styles.emptyText}>
                 Photograph what&apos;s in your fridge or pantry and get a real recipe built
-                around it — instead of a plan that assumes ingredients you don&apos;t have.
+                around it — or browse a recipe idea below.
               </p>
             )}
+
+            <div>
+              <span className={styles.fieldLabel}>Recipe ideas — tap for the full recipe</span>
+              <div className={styles.ideaStrip} style={{ marginTop: "0.5em" }}>
+                {MEAL_IDEAS.map((idea) => (
+                  <button
+                    key={idea.id}
+                    type="button"
+                    className={openIdeaId === idea.id ? `${styles.ideaCard} ${styles.ideaCardActive}` : styles.ideaCard}
+                    onClick={() => setOpenIdeaId((cur) => (cur === idea.id ? null : idea.id))}
+                    aria-expanded={openIdeaId === idea.id}
+                  >
+                    <span className={styles.ideaTag}>{idea.tag}</span>
+                    <div className={styles.ideaTitle}>{idea.title}</div>
+                    <div className={styles.ideaMacros}>{idea.ingredients.length} ingredients</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {openIdea && <IdeaRecipeCard idea={openIdea} />}
 
             {recipeError && (
               <p className={styles.emptyText} role="alert">
