@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { NutritionPanel } from "@/components/panels/NutritionPanel";
 import { MacroRings } from "@/components/MacroRings";
+import { GeneticInsightCard } from "@/components/GeneticInsightCard";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import styles from "./page.module.css";
 
@@ -59,6 +60,7 @@ export default function NutritionPage() {
           </div>
         )}
         <NutritionPanel />
+        <GeneticInsightCard rsids={["rs4988235", "rs762551", "rs1801133"]} color="var(--nutrition)" />
       </div>
     </div>
   );

@@ -4,19 +4,22 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
-import { Dial } from "@/components/Dial";
 import { AgingPaceGauge } from "@/components/AgingPaceGauge";
+import { RoutineCompass } from "@/components/RoutineCompass";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
 import {
   weekKey,
+  dateKeyOffset,
+  dailyDomainReach,
   computeStreak,
   fitnessReachFromDays,
   nutritionReachFromMealsToday,
   sleepReachFromMinutes,
   mindReachFromStreak,
   computeReadiness,
+  type DomainDayReach,
 } from "@/lib/domainReach";
 import { computeAgingPace } from "@/lib/agingPace";
 import {
@@ -47,6 +50,7 @@ interface WorkoutSession {
   date: string;
   routineId: string;
   title: string;
+  durationMinutes?: number;
 }
 interface MindEntry {
   date: string;
@@ -107,7 +111,7 @@ export default function HomePage() {
   const todaysSessions = sessions.filter((s) => s.date === todayKey());
   const workoutMinutesToday = todaysSessions.reduce((sum, s) => {
     const routine = getAnyWorkout(s.routineId);
-    return sum + (routine ? estimateMinutes(routine.steps) : 15);
+    return sum + (s.durationMinutes ?? (routine ? estimateMinutes(routine.steps) : 15));
   }, 0);
   const strain = computeStrain(workoutMinutesToday);
   const completedDays = fitnessDays.filter(Boolean).length;
@@ -137,6 +141,11 @@ export default function HomePage() {
 
   const journalToday = journalEntries.find((e) => e.date === todayKey());
 
+  const compassDays: DomainDayReach[] = Array.from({ length: 7 }, (_, i) => {
+    const date = dateKeyOffset(6 - i);
+    return dailyDomainReach(date, { sleepEntries, meals, sessions, mindEntries, meditationSessions });
+  });
+
   return (
     <div className={styles.page}>
       <SiteNav active="/home" />
@@ -147,34 +156,39 @@ export default function HomePage() {
           {greetingWord()}{profile?.name ? `, ${profile.name}` : ""}.
         </h1>
         <p className={styles.headerSub}>{readiness.focus} is the biggest lever right now.</p>
-      </div>
-
-      <div className={styles.dials}>
-        <Link href="/recovery" className={styles.dialLink}>
-          <Dial
-            value={sleepPerformance}
-            max={100}
-            color="var(--signal)"
-            display={sleepEntry ? `${sleepPerformance}%` : "—"}
-            label="Sleep"
-          />
-        </Link>
-        <Link href="/recovery" className={styles.dialLink}>
-          <Dial
-            value={recovery}
-            max={100}
-            color={RECOVERY_COLOR[band]}
-            display={sleepEntry ? `${recovery}%` : "—"}
-            label="Recovery"
-          />
-        </Link>
-        <Link href="/fitness" className={styles.dialLink}>
-          <Dial value={strain} max={21} color="var(--strain)" display={strain.toFixed(1)} label="Strain" />
+        <Link href="/topics" className={styles.topicsLink}>
+          See all topics →
         </Link>
       </div>
 
-      <div className={styles.bento}>
-        <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition} ${styles.tileWide}`}>
+      <div className={styles.compassSection}>
+        <RoutineCompass days={compassDays} centerLabel="Readiness" centerValue={`${readiness.score}%`} />
+        <div className={styles.statStrip}>
+          <Link href="/recovery" className={styles.statPill}>
+            <span className={styles.statValue}>{sleepEntry ? `${sleepPerformance}%` : "—"}</span>
+            <span className={styles.statLabel}>Sleep</span>
+          </Link>
+          <Link href="/recovery" className={styles.statPill}>
+            <span className={styles.statValue} style={{ color: RECOVERY_COLOR[band] }}>
+              {sleepEntry ? `${recovery}%` : "—"}
+            </span>
+            <span className={styles.statLabel}>Recovery</span>
+          </Link>
+          <Link href="/fitness" className={styles.statPill}>
+            <span className={styles.statValue}>{strain.toFixed(1)}</span>
+            <span className={styles.statLabel}>Strain</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className={styles.grid}>
+        <Link href="/recovery" className={`${styles.tile} ${styles.tileRecovery}`}>
+          <span className={styles.tileLabel}>Recovery</span>
+          <span className={styles.tileStat}>{journalToday ? "Logged tonight" : "Not logged yet"}</span>
+          <p className={styles.tileSub}>{journalToday ? "Edit tonight's journal" : "Log before bed"}</p>
+        </Link>
+
+        <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition}`}>
           <span className={styles.tileLabel}>Nutrition</span>
           <span className={styles.tileStat}>{todaysMeals.length ? `${Math.round(totalCalories)} kcal` : "Nothing logged"}</span>
           <p className={styles.tileSub}>
@@ -182,44 +196,39 @@ export default function HomePage() {
           </p>
         </Link>
 
-        <Link href="/fitness" className={`${styles.tile} ${styles.tileFitness} ${styles.tileWide}`}>
+        <Link href="/fitness" className={`${styles.tile} ${styles.tileFitness}`}>
           <span className={styles.tileLabel}>Fitness</span>
           <span className={styles.tileStat}>{completedDays}/7 days</span>
           <p className={styles.tileSub}>
             {todaysSessions.length
               ? todaysSessions.map((s) => s.title).join(", ")
-              : "No session logged today — start one"}
+              : "No session logged today"}
           </p>
         </Link>
 
         <Link href="/mind" className={`${styles.tile} ${styles.tileMind}`}>
           <span className={styles.tileLabel}>Mind</span>
-          <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "—"}</span>
+          <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "Not logged yet"}</span>
+          <p className={styles.tileSub}>Reflect, meditate, or take a break</p>
         </Link>
+      </div>
 
-        <Link href="/recovery" className={`${styles.tile} ${styles.tileJournal}`}>
-          <span className={styles.tileLabel}>Journal</span>
-          <span className={styles.tileStat}>{journalToday ? "Logged" : "Not yet"}</span>
-          <p className={styles.tileSub}>{journalToday ? "Edit tonight's log" : "Log before bed"}</p>
-        </Link>
-
-        <div className={`${styles.tile} ${styles.tileHealthspan}`}>
-          <span className={styles.tileLabel}>Healthspan</span>
-          {healthspanUnlocked ? (
-            <div className={styles.healthspanRow}>
-              <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
-              <p className={styles.tileSub}>
-                Pace of Aging — a self-reported habit estimate, not WHOOP&apos;s real nine-metric
-                model. 1.0x is average.
-              </p>
-            </div>
-          ) : (
+      <div className={styles.healthspan}>
+        <span className={styles.tileLabel}>Healthspan</span>
+        {healthspanUnlocked ? (
+          <div className={styles.healthspanRow}>
+            <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
             <p className={styles.tileSub}>
-              Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"} to unlock your Pace of
-              Aging — a lighter version of WHOOP&apos;s real 21-in-31-days requirement.
+              Pace of Aging — a self-reported habit estimate, not WHOOP&apos;s real nine-metric
+              model. 1.0x is average.
             </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className={styles.tileSub}>
+            Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"} to unlock your Pace of
+            Aging — a lighter version of WHOOP&apos;s real 21-in-31-days requirement.
+          </p>
+        )}
       </div>
     </div>
   );

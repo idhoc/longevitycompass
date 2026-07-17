@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { Orb } from "@/components/Orb";
+import { RoutineCompass } from "@/components/RoutineCompass";
+import { dateKeyOffset, type DomainDayReach } from "@/lib/domainReach";
 import {
   EMPTY_PROFILE,
   GOAL_OPTIONS,
@@ -90,6 +92,101 @@ function BloomMark() {
   );
 }
 
+const COMPASS_SIZE = 220;
+const COMPASS_CENTER = COMPASS_SIZE / 2;
+const COMPASS_RADIUS = 78;
+const COMPASS_RING = 24;
+
+function angleForGoalIndex(i: number) {
+  return -90 + i * 90; // N, E, S, W — matches GOAL_OPTIONS order
+}
+
+/** The goal picker, reimagined as an actual compass — tap or drag
+ * anywhere on the dial to point the needle at what matters most, instead
+ * of picking from a grid of buttons. The four real buttons underneath
+ * keep it fully reachable by keyboard and screen reader. */
+function GoalCompass({ value, onChange }: { value: DomainKey | null; onChange: (key: DomainKey) => void }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const activeIndex = GOAL_OPTIONS.findIndex((g) => g.key === value);
+  const needleAngle = activeIndex >= 0 ? angleForGoalIndex(activeIndex) : -90;
+
+  function selectFromPoint(clientX: number, clientY: number) {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = clientX - rect.left - rect.width / 2;
+    const y = clientY - rect.top - rect.height / 2;
+    let deg = (Math.atan2(y, x) * 180) / Math.PI + 90;
+    if (deg < 0) deg += 360;
+    const idx = Math.round(deg / 90) % 4;
+    onChange(GOAL_OPTIONS[idx].key);
+  }
+
+  return (
+    <div className={styles.compassWrap}>
+      <svg
+        ref={svgRef}
+        width={COMPASS_SIZE}
+        height={COMPASS_SIZE}
+        viewBox={`0 0 ${COMPASS_SIZE} ${COMPASS_SIZE}`}
+        className={styles.compassSvg}
+        aria-hidden="true"
+        onPointerDown={(e) => {
+          setDragging(true);
+          e.currentTarget.setPointerCapture(e.pointerId);
+          selectFromPoint(e.clientX, e.clientY);
+        }}
+        onPointerMove={(e) => {
+          if (dragging) selectFromPoint(e.clientX, e.clientY);
+        }}
+        onPointerUp={() => setDragging(false)}
+      >
+        <circle cx={COMPASS_CENTER} cy={COMPASS_CENTER} r={COMPASS_RADIUS + COMPASS_RING} fill="var(--paper-raised)" stroke="var(--line-strong)" strokeWidth={2} />
+        <circle cx={COMPASS_CENTER} cy={COMPASS_CENTER} r={COMPASS_RADIUS - 10} fill="none" stroke="var(--line)" strokeDasharray="2 6" />
+        <line
+          x1={COMPASS_CENTER}
+          y1={COMPASS_CENTER}
+          x2={COMPASS_CENTER + COMPASS_RADIUS * Math.cos((needleAngle * Math.PI) / 180)}
+          y2={COMPASS_CENTER + COMPASS_RADIUS * Math.sin((needleAngle * Math.PI) / 180)}
+          stroke="var(--signal)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          style={{ transition: dragging ? "none" : "all 0.4s cubic-bezier(0.16,1,0.3,1)" }}
+        />
+        <circle cx={COMPASS_CENTER} cy={COMPASS_CENTER} r={5} fill="var(--ink)" />
+        {GOAL_OPTIONS.map((g, i) => {
+          const a = angleForGoalIndex(i);
+          const x = COMPASS_CENTER + (COMPASS_RADIUS + COMPASS_RING) * Math.cos((a * Math.PI) / 180);
+          const y = COMPASS_CENTER + (COMPASS_RADIUS + COMPASS_RING) * Math.sin((a * Math.PI) / 180);
+          return (
+            <g key={g.key} transform={`translate(${x} ${y})`}>
+              <circle r={20} fill={value === g.key ? "var(--signal)" : "var(--paper)"} stroke="var(--line-strong)" strokeWidth={1.5} />
+              <text textAnchor="middle" dominantBaseline="central" fontSize="18">
+                {g.icon}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      <div className={styles.compassButtons} role="radiogroup" aria-label="Primary goal">
+        {GOAL_OPTIONS.map((g) => (
+          <button
+            key={g.key}
+            type="button"
+            role="radio"
+            aria-checked={value === g.key}
+            className={value === g.key ? `${styles.compassButton} ${styles.compassButtonActive}` : styles.compassButton}
+            onClick={() => onChange(g.key)}
+          >
+            <span aria-hidden="true">{g.icon}</span> {g.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [, setProfile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
@@ -97,6 +194,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [draft, setDraft] = useState<UserProfile>(EMPTY_PROFILE);
+  const [openHotspot, setOpenHotspot] = useState<"compass" | "tiles" | null>(null);
 
   function next() {
     setDirection(1);
@@ -126,6 +224,14 @@ export default function OnboardingPage() {
   const action = ACTION_COPY[chosenGoal];
   const goalLabel = GOAL_OPTIONS.find((g) => g.key === chosenGoal)?.label;
   const plan = domainPlanFromProfile(draft);
+  const sleepIndex = (SLEEP_HOURS_OPTIONS as readonly string[]).indexOf(draft.sleepHours);
+  const previewDays: DomainDayReach[] = Array.from({ length: 7 }, (_, i) => ({
+    date: dateKeyOffset(6 - i),
+    sleep: 0,
+    nutrition: 0,
+    fitness: 0,
+    mind: 0,
+  }));
 
   return (
     <div className={styles.page}>
@@ -138,20 +244,9 @@ export default function OnboardingPage() {
         )}
       </div>
 
-      {step > 0 && (
-        <div
-          className={styles.progress}
-          role="progressbar"
-          aria-valuenow={step + 1}
-          aria-valuemin={1}
-          aria-valuemax={TOTAL_STEPS}
-          aria-label={`Step ${step + 1} of ${TOTAL_STEPS}`}
-        >
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <div key={i} className={i <= step ? `${styles.progressDot} ${styles.progressDotActive}` : styles.progressDot} />
-          ))}
-        </div>
-      )}
+      <span className={styles.srOnly} role="status">
+        Step {step + 1} of {TOTAL_STEPS}
+      </span>
 
       <div className={styles.card}>
         <AnimatePresence mode="wait" custom={direction}>
@@ -197,64 +292,57 @@ export default function OnboardingPage() {
 
             {step === 1 && (
               <>
-                <span className={styles.eyebrow}>Step 1 of {TOTAL_STEPS}</span>
+                <span className={styles.eyebrow}>Where to point first</span>
                 <h1 className={styles.title}>What matters most to you right now?</h1>
                 <p className={styles.subtitle}>
-                  Pick one to start — you can explore everything else whenever you&apos;re ready.
+                  Drag the needle, or tap a point on the dial — you can explore everything else
+                  whenever you&apos;re ready.
                 </p>
-                <div className={styles.goalGrid} role="radiogroup" aria-label="Primary goal">
-                  {GOAL_OPTIONS.map((g) => (
-                    <label
-                      key={g.key}
-                      className={draft.primaryGoals[0] === g.key ? `${styles.goalCard} ${styles.goalCardActive}` : styles.goalCard}
-                    >
-                      <input
-                        type="radio"
-                        name="goal"
-                        className={styles.srOnly}
-                        checked={draft.primaryGoals[0] === g.key}
-                        onChange={() => chooseGoal(g.key)}
-                      />
-                      <span className={styles.goalIcon} aria-hidden="true">{g.icon}</span>
-                      <span className={styles.goalLabel}>{g.label}</span>
-                      <span className={styles.goalHint}>{g.hint}</span>
-                    </label>
-                  ))}
-                </div>
+                <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={chooseGoal} />
+                {draft.primaryGoals[0] && (
+                  <p className={styles.compassHint}>
+                    {GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0])?.hint}
+                  </p>
+                )}
               </>
             )}
 
             {step === 2 && (
               <>
-                <span className={styles.eyebrow}>Step 2 of {TOTAL_STEPS}</span>
-                <h1 className={styles.title}>A couple of quick questions</h1>
+                <span className={styles.eyebrow}>A couple quick things</span>
+                <h1 className={styles.title}>Let&apos;s fit this to your life</h1>
                 <p className={styles.subtitle}>
-                  This helps things fit your life, instead of giving you a one-size-fits-all plan.
+                  This shapes a real plan for you, instead of a one-size-fits-all one.
                 </p>
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>How much sleep do you usually get?</span>
-                  <div className={styles.chipRow}>
+                  <input
+                    type="range"
+                    min={0}
+                    max={SLEEP_HOURS_OPTIONS.length - 1}
+                    step={1}
+                    value={sleepIndex === -1 ? 2 : sleepIndex}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, sleepHours: SLEEP_HOURS_OPTIONS[Number(e.target.value)] }))
+                    }
+                    className={styles.slider}
+                    aria-label="How much sleep do you usually get"
+                  />
+                  <div className={styles.sliderLabels} aria-hidden="true">
                     {SLEEP_HOURS_OPTIONS.map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        className={draft.sleepHours === h ? `${styles.chip} ${styles.chipActive}` : styles.chip}
-                        onClick={() => setDraft((d) => ({ ...d, sleepHours: h }))}
-                        aria-pressed={draft.sleepHours === h}
-                      >
-                        {h}
-                      </button>
+                      <span key={h}>{h}</span>
                     ))}
                   </div>
+                  <p className={styles.sliderValue}>{draft.sleepHours || SLEEP_HOURS_OPTIONS[2]}</p>
                 </div>
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>What kind of movement do you enjoy?</span>
-                  <div className={styles.chipRow}>
+                  <div className={styles.swipeStrip}>
                     {WORKOUT_STYLE_OPTIONS.map((w) => (
                       <button
                         key={w}
                         type="button"
-                        className={draft.workoutStyle === w ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+                        className={draft.workoutStyle === w ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
                         onClick={() => setDraft((d) => ({ ...d, workoutStyle: w }))}
                         aria-pressed={draft.workoutStyle === w}
                       >
@@ -262,30 +350,55 @@ export default function OnboardingPage() {
                       </button>
                     ))}
                   </div>
+                  <p className={styles.swipeHint}>Swipe to see all options →</p>
                 </div>
               </>
             )}
 
             {step === 3 && (
               <>
-                <span className={styles.eyebrow}>Step 3 of {TOTAL_STEPS}</span>
-                <h1 className={styles.title}>Here&apos;s your Home screen</h1>
+                <span className={styles.eyebrow}>Your actual dashboard</span>
+                <h1 className={styles.title}>Here&apos;s where it all lives</h1>
                 <p className={styles.subtitle}>
-                  Check in here once a day — everything else branches out from this one screen.
+                  This is the real compass from Home, blank because nothing&apos;s logged yet — tap
+                  it, or the domains below, to see what they do.
                 </p>
-                <div className={styles.tourPreview} aria-hidden="true">
-                  <div className={styles.tourDials}>
-                    <span className={styles.tourDial} style={{ borderColor: "var(--signal)" }} />
-                    <span className={styles.tourDial} style={{ borderColor: "var(--recovery-high)" }} />
-                    <span className={styles.tourDial} style={{ borderColor: "var(--strain)" }} />
+                <div className={styles.tourPreview}>
+                  <button
+                    type="button"
+                    className={styles.tourHotspot}
+                    onClick={() => setOpenHotspot((h) => (h === "compass" ? null : "compass"))}
+                    aria-expanded={openHotspot === "compass"}
+                  >
+                    <RoutineCompass days={previewDays} centerLabel="This week" centerValue="—" />
+                  </button>
+                  {openHotspot === "compass" && (
+                    <p className={styles.tourCallout}>
+                      Every ring is a domain — sleep, nutrition, fitness, mind. Every wedge is a
+                      day. Log something and it fills in for real; today always sits on top.
+                    </p>
+                  )}
+
+                  <div className={styles.tourTileRow} role="group" aria-label="Domains">
+                    {(["nutrition", "fitness", "mind"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={styles.tourHotspotTile}
+                        style={{ borderColor: `var(--${d})` }}
+                        onClick={() => setOpenHotspot((h) => (h === "tiles" ? null : "tiles"))}
+                        aria-expanded={openHotspot === "tiles"}
+                      >
+                        {d === "nutrition" ? "Nutrition" : d === "fitness" ? "Fitness" : "Mind"}
+                      </button>
+                    ))}
                   </div>
-                  <div className={styles.tourCallout}>Your daily numbers, in one glance</div>
-                  <div className={styles.tourTiles}>
-                    <span className={styles.tourTile} style={{ background: "var(--nutrition-wash)", borderColor: "var(--nutrition)" }} />
-                    <span className={styles.tourTile} style={{ background: "var(--fitness-wash)", borderColor: "var(--fitness)" }} />
-                    <span className={styles.tourTile} style={{ background: "var(--mind-wash)", borderColor: "var(--mind)" }} />
-                  </div>
-                  <div className={styles.tourCallout}>Tap any card to log or learn more</div>
+                  {openHotspot === "tiles" && (
+                    <p className={styles.tourCallout}>
+                      Tap any domain on Home to log something or dig in — guided workouts, meal
+                      photos, guided meditation, sleep tracking, all one tap deep.
+                    </p>
+                  )}
                 </div>
               </>
             )}

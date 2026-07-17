@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import styles from "./panels.module.css";
 
@@ -53,6 +53,11 @@ function fileToDataUrl(file: File): Promise<string> {
 
 export function NutritionPanel() {
   const [mode, setMode] = useState<Mode>("log");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get("topic") === "recipe") setMode("recipe");
+  }, []);
 
   const [meals, setMeals] = useLocalStorageState<LoggedMeal[]>("lc_meals_v1", []);
   const [uploading, setUploading] = useState(false);

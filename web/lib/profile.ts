@@ -77,6 +77,19 @@ export const UNITS_OPTIONS = [
 
 export type UnitsPreference = (typeof UNITS_OPTIONS)[number]["key"];
 
+export const LANGUAGE_OPTIONS = [
+  { key: "English", label: "English" },
+  { key: "Spanish", label: "Español" },
+  { key: "Mandarin Chinese", label: "中文" },
+  { key: "Hindi", label: "हिन्दी" },
+  { key: "French", label: "Français" },
+  { key: "Portuguese", label: "Português" },
+  { key: "Arabic", label: "العربية" },
+  { key: "Japanese", label: "日本語" },
+] as const;
+
+export type CoachLanguage = (typeof LANGUAGE_OPTIONS)[number]["key"];
+
 export interface UserProfile {
   name: string;
   ageRange: "18-29" | "30-44" | "45-59" | "60+" | "";
@@ -90,6 +103,7 @@ export interface UserProfile {
   tone: CoachTone;
   intensity: ContentIntensity;
   units: UnitsPreference;
+  language: CoachLanguage;
   disclaimerAcknowledged: boolean;
   completedAt: string | null;
 }
@@ -107,6 +121,7 @@ export const EMPTY_PROFILE: UserProfile = {
   tone: "warm",
   intensity: "standard",
   units: "imperial",
+  language: "English",
   disclaimerAcknowledged: false,
   completedAt: null,
 };

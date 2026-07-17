@@ -190,6 +190,7 @@ export default function CoachPage() {
           context: buildContext(),
           tone: p.tone,
           intensity: p.intensity,
+          language: p.language || "English",
         }),
       });
       const data = await res.json();

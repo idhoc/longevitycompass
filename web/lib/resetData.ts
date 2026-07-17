@@ -14,6 +14,7 @@ const LOGGED_DATA_KEYS = [
   "lc_mind_entries_v1",
   "lc_meditation_sessions_v1",
   "lc_focus_sessions_v1",
+  "lc_genetics_v1",
   JOURNAL_KEY,
 ];
 

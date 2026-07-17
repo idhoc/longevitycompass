@@ -152,6 +152,12 @@ function BreakCountdown({ minutes, onComplete }: { minutes: number; onComplete: 
 export function MindPanel() {
   const [mode, setMode] = useState<Mode>("reflect");
 
+  useEffect(() => {
+    const topic = new URLSearchParams(window.location.search).get("topic");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (topic === "meditate" || topic === "break" || topic === "reflect") setMode(topic);
+  }, []);
+
   const [entries, setEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
   const [rating, setRating] = useState(3);
   const [connected, setConnected] = useState(false);
@@ -463,7 +469,7 @@ export function MindPanel() {
                       onClick={() => playMeditation(c.focus)}
                       disabled={loadingAudio}
                     >
-                      <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}>{c.title}</span>
+                      <span style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>{c.title}</span>
                       <span className={`${styles.panelMeta} tabular`} style={{ marginLeft: "0.6em" }}>
                         {getVariant(c.focus, length)?.minutes} min
                       </span>

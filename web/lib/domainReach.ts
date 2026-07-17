@@ -4,6 +4,8 @@
  * derived from the same real, stored data — never a separate mock figure.
  */
 
+import { minutesBetween } from "./sleepEstimate";
+
 export function weekKey(): string {
   const now = new Date();
   const firstDayOfWeek = new Date(now);
@@ -58,6 +60,49 @@ export function sleepReachFromMinutes(minutes: number): number {
 
 export function mindReachFromStreak(streak: number): number {
   return Math.max(0.04, Math.min(1, streak / 7));
+}
+
+export interface DomainDayReach {
+  date: string;
+  sleep: number;
+  nutrition: number;
+  fitness: number;
+  mind: number;
+}
+
+/**
+ * Per-day, per-domain reach for an arbitrary past date, built only from
+ * data that was actually logged that day — 0 means genuinely nothing
+ * logged, never a fabricated placeholder. This is what the RoutineCompass
+ * renders: a real record of the routine, not a simulated one.
+ */
+export function dailyDomainReach(
+  date: string,
+  data: {
+    sleepEntries: { date: string; bedtime: string; wakeTime: string; quality?: number }[];
+    meals: { date: string }[];
+    sessions: { date: string }[];
+    mindEntries: { date: string }[];
+    meditationSessions: { date: string }[];
+  }
+): DomainDayReach {
+  const sleepEntry = data.sleepEntries.find((e) => e.date === date);
+  const sleep = sleepEntry
+    ? (() => {
+        const duration = sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime));
+        return sleepEntry.quality ? (duration + sleepEntry.quality / 5) / 2 : duration;
+      })()
+    : 0;
+
+  const mealCount = data.meals.filter((m) => m.date === date).length;
+  const nutrition = mealCount > 0 ? nutritionReachFromMealsToday(mealCount) : 0;
+
+  const fitness = data.sessions.some((s) => s.date === date) ? 1 : 0;
+
+  const mind =
+    data.mindEntries.some((e) => e.date === date) || data.meditationSessions.some((e) => e.date === date) ? 1 : 0;
+
+  return { date, sleep, nutrition, fitness, mind };
 }
 
 export type ReadinessBand = "low" | "moderate" | "high";

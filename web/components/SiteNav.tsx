@@ -3,6 +3,7 @@ import styles from "./SiteNav.module.css";
 
 const LINKS = [
   { href: "/home", label: "Home" },
+  { href: "/topics", label: "Topics" },
   { href: "/recovery", label: "Recovery" },
   { href: "/nutrition", label: "Nutrition" },
   { href: "/fitness", label: "Fitness" },

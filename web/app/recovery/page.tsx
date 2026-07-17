@@ -23,6 +23,7 @@ interface WorkoutSession {
   date: string;
   routineId: string;
   title: string;
+  durationMinutes?: number;
 }
 
 function todayKey() {
@@ -84,7 +85,7 @@ export default function RecoveryPage() {
 
   const minutesByDate = sessions.reduce<Record<string, number>>((acc, s) => {
     const routine = getAnyWorkout(s.routineId);
-    acc[s.date] = (acc[s.date] ?? 0) + (routine ? estimateMinutes(routine.steps) : 15);
+    acc[s.date] = (acc[s.date] ?? 0) + (s.durationMinutes ?? (routine ? estimateMinutes(routine.steps) : 15));
     return acc;
   }, {});
   const strainTrend = Array.from({ length: 7 }, (_, i) => {

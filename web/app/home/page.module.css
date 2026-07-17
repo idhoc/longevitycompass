@@ -15,8 +15,8 @@
 .heroTitle {
   margin-top: 0.25em;
   font-size: var(--text-2xl);
-  font-style: italic;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .headerSub {
@@ -26,27 +26,70 @@
   line-height: 1.6;
 }
 
-.dials {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4) var(--space-6);
+.topicsLink {
+  display: inline-block;
+  margin-top: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--signal);
+  border-bottom: 1px solid var(--signal);
+  padding-bottom: 2px;
 }
 
-.dialLink {
+.compassSection {
   display: flex;
-  border-radius: 50%;
-  transition: transform 0.15s ease;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-6);
 }
 
-.dialLink:hover {
+.statStrip {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 420px;
+}
+
+.statPill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+  padding: 0.7em 0.5em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-raised);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.statPill:hover {
+  border-color: var(--signal);
   transform: translateY(-2px);
 }
 
-.bento {
-  margin: 0 var(--space-5) var(--space-8);
+.statValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.grid {
+  margin: 0 var(--space-5) var(--space-5);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -68,8 +111,9 @@ a.tile:hover {
   box-shadow: var(--shadow-md);
 }
 
-.tileWide {
-  grid-column: span 2;
+.tileRecovery {
+  border-left-color: var(--signal);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 10%, transparent), var(--paper-raised) 60%);
 }
 
 .tileNutrition {
@@ -85,15 +129,6 @@ a.tile:hover {
 .tileMind {
   border-left-color: var(--mind);
   background: linear-gradient(150deg, var(--mind-wash), var(--paper-raised) 60%);
-}
-
-.tileJournal {
-  border-left-color: var(--signal);
-  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 10%, transparent), var(--paper-raised) 60%);
-}
-
-.tileHealthspan {
-  grid-column: span 2;
 }
 
 .tileLabel {
@@ -117,6 +152,17 @@ a.tile:hover {
   line-height: 1.5;
 }
 
+.healthspan {
+  margin: 0 var(--space-5) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+}
+
 .healthspanRow {
   display: flex;
   align-items: center;
@@ -124,41 +170,17 @@ a.tile:hover {
   margin-top: 0.3em;
 }
 
-@media (max-width: 640px) {
-  .bento {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tileWide,
-  .tileHealthspan {
-    grid-column: span 2;
-  }
-}
-
 @media (max-width: 560px) {
-  .dials {
-    padding-left: var(--space-3);
-    padding-right: var(--space-3);
-  }
-  .hero, .bento {
+  .hero, .grid, .healthspan {
     margin-left: var(--space-3);
     margin-right: var(--space-3);
   }
-  .bento {
+  .grid {
     grid-template-columns: 1fr;
-  }
-  .tileWide,
-  .tileHealthspan {
-    grid-column: span 1;
   }
   .healthspanRow {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-3);
-  }
-}
-
-@media (max-width: 420px) {
-  .dials {
-    gap: var(--space-1);
   }
 }

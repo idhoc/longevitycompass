@@ -49,25 +49,6 @@
   color: var(--ink);
 }
 
-.progress {
-  width: 100%;
-  max-width: 640px;
-  display: flex;
-  gap: 0.5em;
-  margin-bottom: var(--space-6);
-}
-
-.progressDot {
-  height: 6px;
-  flex: 1;
-  border-radius: 999px;
-  background: var(--line-strong);
-}
-
-.progressDotActive {
-  background: var(--signal);
-}
-
 .card {
   width: 100%;
   max-width: 640px;
@@ -130,16 +111,35 @@
   border-color: var(--signal);
 }
 
-.chipRow {
+/* -- goal compass -- */
+.compassWrap {
+  margin-top: var(--space-5);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6em;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.chip {
+.compassSvg {
+  cursor: grab;
+  touch-action: none;
+}
+
+.compassSvg:active {
+  cursor: grabbing;
+}
+
+.compassButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5em;
+}
+
+.compassButton {
   font-size: var(--text-sm);
   font-weight: 500;
-  padding: 0.75em 1.2em;
+  padding: 0.7em 1.1em;
   min-height: 44px;
   border-radius: 999px;
   border: 2px solid var(--line-strong);
@@ -149,66 +149,80 @@
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.chipActive {
+.compassButtonActive {
   border-color: var(--signal);
   color: var(--ink);
   background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
 }
 
-.goalGrid {
-  margin-top: var(--space-5);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: var(--space-3);
-}
-
-.goalCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 0.35em;
-  min-height: 128px;
-  border: 2px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  background: var(--paper-raised);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.goalCard:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--signal);
-}
-
-.goalCard:has(input:focus-visible) {
-  outline: 3px solid var(--signal);
-  outline-offset: 3px;
-}
-
-.goalCardActive {
-  border-color: var(--signal);
-  background: color-mix(in srgb, var(--signal) 10%, var(--paper-raised));
-}
-
-.goalIcon {
-  font-size: 1.8rem;
-  line-height: 1;
-}
-
-.goalLabel {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--text-md);
-}
-
-.goalHint {
+.compassHint {
+  margin-top: var(--space-3);
   font-size: var(--text-sm);
   color: var(--ink-soft);
   line-height: 1.5;
+  text-align: center;
+}
+
+/* -- sleep slider -- */
+.slider {
+  width: 100%;
+  margin-top: 0.3em;
+  accent-color: var(--signal);
+  height: 6px;
+  cursor: pointer;
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4em;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.sliderValue {
+  margin-top: 0.5em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--signal);
+}
+
+/* -- workout style swipe strip -- */
+.swipeStrip {
+  display: flex;
+  gap: 0.6em;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.3em;
+  -webkit-overflow-scrolling: touch;
+}
+
+.swipeCard {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 0.9em 1.3em;
+  min-height: 52px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: var(--paper-raised);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.swipeCardActive {
+  border-color: var(--signal);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
+}
+
+.swipeHint {
+  margin-top: 0.4em;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
 }
 
 .footer {
@@ -319,36 +333,50 @@
   gap: var(--space-3);
 }
 
-.tourDials {
-  display: flex;
-  gap: var(--space-3);
+.tourHotspot {
+  border: none;
+  background: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 
-.tourDial {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 6px solid;
+.tourHotspot:hover {
   background: var(--paper-sunken);
 }
 
-.tourTiles {
+.tourTileRow {
   display: flex;
   gap: 0.6em;
   width: 100%;
 }
 
-.tourTile {
+.tourHotspotTile {
   flex: 1;
-  height: 40px;
+  min-height: 44px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
   border-radius: var(--radius-sm);
   border: 2px solid;
+  background: var(--paper);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tourHotspotTile:hover {
+  color: var(--ink);
 }
 
 .tourCallout {
   font-size: var(--text-sm);
   color: var(--ink-soft);
   font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* -- action step -- */

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
+import { AppleHealthImport } from "@/components/AppleHealthImport";
+import { GeneticsImport } from "@/components/GeneticsImport";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { clearLoggedData, clearEverything, exportAllData } from "@/lib/resetData";
@@ -15,6 +17,7 @@ import {
   TONE_OPTIONS,
   INTENSITY_OPTIONS,
   UNITS_OPTIONS,
+  LANGUAGE_OPTIONS,
   type UserProfile,
   type DomainKey,
 } from "@/lib/profile";
@@ -228,20 +231,41 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Units</span>
-            <div className={styles.tagRow}>
-              {UNITS_OPTIONS.map((u) => (
-                <button
-                  key={u.key}
-                  type="button"
-                  className={p.units === u.key ? `${styles.tag} ${styles.tagActive}` : styles.tag}
-                  onClick={() => update({ units: u.key })}
-                  aria-pressed={p.units === u.key}
-                >
-                  {u.label}
-                </button>
-              ))}
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Units</span>
+              <div className={styles.tagRow}>
+                {UNITS_OPTIONS.map((u) => (
+                  <button
+                    key={u.key}
+                    type="button"
+                    className={p.units === u.key ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                    onClick={() => update({ units: u.key })}
+                    aria-pressed={p.units === u.key}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="set-language">Coach&apos;s reply language</label>
+              <select
+                id="set-language"
+                className={styles.input}
+                value={p.language || "English"}
+                onChange={(e) => update({ language: e.target.value as UserProfile["language"] })}
+              >
+                {LANGUAGE_OPTIONS.map((l) => (
+                  <option key={l.key} value={l.key}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <p className={styles.optionHint} style={{ margin: 0 }}>
+                Changes what language the Coach writes back in. The rest of the app&apos;s
+                interface stays in English.
+              </p>
             </div>
           </div>
         </section>
@@ -261,6 +285,18 @@ export default function SettingsPage() {
                 <span className={styles.themeLabel}>{t === "dark" ? "Cozy (dark)" : "Warm (light)"}</span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Connected data</h2>
+          <p className={styles.sectionSub}>
+            Optional. Nothing here is required, and nothing here is uploaded — every import runs
+            entirely in this browser tab.
+          </p>
+          <AppleHealthImport />
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)" }}>
+            <GeneticsImport />
           </div>
         </section>
 

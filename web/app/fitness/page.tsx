@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { WORKOUTS, type WorkoutRoutine } from "@/lib/workouts";
+import { GeneticInsightCard } from "@/components/GeneticInsightCard";
 import styles from "./page.module.css";
 
 export default function FitnessLibraryPage() {
@@ -25,6 +26,10 @@ export default function FitnessLibraryPage() {
         <Link href="/fitness/build" className={styles.buildCta}>
           Build your own routine →
         </Link>
+      </div>
+
+      <div style={{ padding: "0 var(--space-6) var(--space-5)" }}>
+        <GeneticInsightCard rsids={["rs1815739"]} color="var(--fitness)" />
       </div>
 
       {customWorkouts.length > 0 && (

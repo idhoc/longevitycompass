@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Display: a high-contrast, characterful serif for hero moments — names,
-// greetings, headlines — the register that carries actual warmth,
-// deliberately different from the flat bold-sans-everywhere pass this
-// app had before.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Display: Bricolage Grotesque — an unusual, high-personality variable
+// grotesque (irregular terminals, a real point of view) for headlines,
+// the compass mark, and hero numbers. Chosen specifically to not read as
+// a safe default — most AI-generated products reach for Inter or a
+// generic serif; this doesn't.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 // Body: IBM's own engineering-heritage sans — the UI-chrome and data
@@ -43,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${bricolage.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.
