@@ -3,8 +3,8 @@
  * check-in (quality rating + awakening count), anchored to typical adult
  * population proportions. This is explicitly an ESTIMATE, not a measurement
  * — the UI must always label it that way. Real stage data would come from
- * a wearable integration (Oura/Whoop/Google Fit), which is a natural next
- * step, not something to fake here.
+ * a real wearable integration, which is a natural next step, not
+ * something to fake here.
  */
 export function estimateSleepStages(quality: number, awakenings: number) {
   let deepPct = 16;

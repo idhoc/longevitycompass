@@ -12,9 +12,9 @@ interface DialProps {
   sublabel?: string;
 }
 
-/** A WHOOP-style ring dial — the same shape for Sleep, Recovery, and
- * Strain, distinguished only by color and scale, matching how WHOOP's
- * own Home screen presents its three core scores side by side. */
+/** A ring dial — the same shape for Sleep, Recovery, and Strain,
+ * distinguished only by color and scale, so the three core scores read
+ * as one consistent instrument set. */
 export function Dial({ value, max, color, display, label, sublabel }: DialProps) {
   const pct = Math.max(0, Math.min(1, value / max));
   const offset = CIRCUMFERENCE * (1 - pct);

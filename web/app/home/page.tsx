@@ -29,7 +29,7 @@ import {
   computeStrain,
   recoveryBand,
   RECOVERY_COLOR,
-} from "@/lib/whoopScores";
+} from "@/lib/recoveryScores";
 import { domainOrderFromProfile, type UserProfile } from "@/lib/profile";
 import { featuredTopics, domainColor } from "@/lib/topics";
 import { t } from "@/lib/i18n";
@@ -276,15 +276,14 @@ export default function HomePage() {
           <div className={styles.healthspanRow}>
             <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
             <p className={styles.tileSub}>
-              Pace of Aging — a self-reported habit estimate, not WHOOP&apos;s real nine-metric
+              Pace of Aging — a self-reported habit estimate, not a lab-validated biological-age
               model. 1.0x is average.
             </p>
           </div>
         ) : (
           <p className={styles.tileSub}>
             Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"}{" "}
-            to unlock your Pace of Aging — a lighter version of WHOOP&apos;s real 21-in-31-days
-            requirement.
+            to unlock your Pace of Aging — five logged days is enough for a first read.
           </p>
         )}
       </motion.div>

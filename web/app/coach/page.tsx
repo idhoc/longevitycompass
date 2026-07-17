@@ -6,7 +6,7 @@ import { Orb, type OrbState } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { weekKey, computeStreak } from "@/lib/domainReach";
-import { computeSleepPerformance, computeRecovery, recoveryBand, RECOVERY_COLOR } from "@/lib/whoopScores";
+import { computeSleepPerformance, computeRecovery, recoveryBand, RECOVERY_COLOR } from "@/lib/recoveryScores";
 import { EMPTY_PROFILE, type UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 

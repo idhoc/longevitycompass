@@ -6,7 +6,7 @@ import Link from "next/link";
 import { getWorkout, getExercise, loadCustomWorkouts, type WorkoutRoutine } from "@/lib/workouts";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { weekKey, todayIndex } from "@/lib/domainReach";
-import { computeStrain } from "@/lib/whoopScores";
+import { computeStrain } from "@/lib/recoveryScores";
 import styles from "./page.module.css";
 
 const RING_SIZE = 148;

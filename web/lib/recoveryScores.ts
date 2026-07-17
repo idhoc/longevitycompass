@@ -1,12 +1,13 @@
 import { minutesBetween } from "./sleepEstimate";
 
 /**
- * WHOOP-style scoring, adapted to what this app can honestly measure:
- * self-reported sleep and an optional manual resting-heart-rate entry,
- * not a continuous HRV/PPG sensor. The score shapes (0-100 Recovery with
- * green/yellow/red bands at 67/34, 0-100 Sleep Performance, 0-21 Strain)
- * mirror WHOOP's real scales; the inputs behind them are plainly weaker,
- * and every surface using these must say so.
+ * A recovery/strain scoring model, adapted to what this app can honestly
+ * measure: self-reported sleep and an optional manual resting-heart-rate
+ * entry, not a continuous HRV/PPG sensor. The score shapes (0-100
+ * Recovery with green/yellow/red bands at 67/34, 0-100 Sleep Performance,
+ * 0-21 Strain) are a deliberately simple, transparent model; the inputs
+ * behind them are plainly weaker than a real wearable's, and every
+ * surface using these must say so.
  */
 
 export type RecoveryBand = "high" | "moderate" | "low";
@@ -30,7 +31,7 @@ interface SleepInputs {
 const SLEEP_NEED_MINUTES = 8 * 60;
 
 /** Sleep Performance: actual duration against an 8h need, blended with
- * the self-reported quality rating — WHOOP's real version also weighs
+ * the self-reported quality rating — a fuller model would also weigh
  * consistency and disturbances, which we don't independently capture. */
 export function computeSleepPerformance(entry: SleepInputs | null): number {
   if (!entry) return 0;
@@ -67,11 +68,10 @@ export function computeRecovery({ sleepPerformance, restingHR, restingHRBaseline
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
-/** Strain: WHOOP derives this from time spent in each heart-rate zone
- * (a Borg-scale-based cardiovascular load, 0-21). Without continuous HR
- * we approximate load from logged workout minutes on a saturating
- * curve — more minutes raise it, but with diminishing returns near the
- * top of the scale, same shape as the real metric. */
+/** Strain: a 0-21 cardiovascular load estimate, the kind normally derived
+ * from time spent in each heart-rate zone. Without continuous HR we
+ * approximate load from logged workout minutes on a saturating curve —
+ * more minutes raise it, but with diminishing returns near the top. */
 export function computeStrain(workoutMinutesToday: number): number {
   if (workoutMinutesToday <= 0) return 0;
   const strain = 21 * (1 - Math.exp(-workoutMinutesToday / 45));
@@ -85,9 +85,9 @@ interface SleepEntryRecord extends SleepInputs {
 
 /** Recovery for every date with a logged sleep entry, using each day's
  * own resting HR against a trailing 7-entry baseline of prior nights —
- * the same "compare against your own recent norm" idea WHOOP uses,
- * just over self-reported nights instead of continuous sensor data.
- * Used to feed the Recovery trend chart. */
+ * a "compare against your own recent norm" approach, just over
+ * self-reported nights instead of continuous sensor data. Used to feed
+ * the Recovery trend chart. */
 export function computeRecoveryHistory(entries: SleepEntryRecord[]): Map<string, number> {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const result = new Map<string, number>();

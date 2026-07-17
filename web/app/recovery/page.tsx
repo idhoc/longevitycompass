@@ -7,7 +7,7 @@ import { TrendBars } from "@/components/TrendBars";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
 import { dateKeyOffset, last7Days } from "@/lib/domainReach";
-import { computeRecoveryHistory, computeStrain } from "@/lib/whoopScores";
+import { computeRecoveryHistory, computeStrain } from "@/lib/recoveryScores";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -99,7 +99,7 @@ export default function RecoveryPage() {
         <h1>Sleep, vitals, and what actually moves them</h1>
         <p className={styles.headerSub}>
           A real check-in on last night, and your resting heart rate trend against your own
-          baseline — WHOOP&apos;s Sleep and Body, together in one place.
+          baseline — sleep and vitals, together in one place.
         </p>
       </div>
 
@@ -145,7 +145,7 @@ export default function RecoveryPage() {
               <li>Respiratory rate</li>
             </ul>
             <p className={styles.vitalNote}>
-              Exactly what WHOOP&apos;s hardware measures continuously. Wiring up a real
+              What dedicated wearable hardware measures continuously. Wiring up a real
               wearable-data API is the honest way to add these — not a simulated number.
             </p>
           </div>
