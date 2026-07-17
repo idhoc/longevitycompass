@@ -1,22 +1,15 @@
 import type { Metadata } from "next";
-import { STIX_Two_Text, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Display face: an actual scientific-journal typeface family (STIX exists to
-// set research papers), used with restraint at large sizes only.
-const stixTwo = STIX_Two_Text({
-  variable: "--font-stix",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-});
-
-// Body: IBM's own engineering-heritage sans — a deliberate alternative to the
-// Inter/system-ui default that shows up on nearly every AI-generated product.
+// Body + display: IBM's own engineering-heritage sans, at heavier weights
+// for headlines — a deliberate alternative to the Inter/system-ui default,
+// and matched to WHOOP's plain, bold, all-business type register (no
+// decorative serif).
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 // Data face: for stats, timestamps, nav labels — the "instrument readout"
@@ -41,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${stixTwo.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${plexMono.variable}`}
     >
       <head>
         {/* Sets the color scheme before first paint so switching themes in

@@ -11,9 +11,10 @@ export default function FitnessLibraryPage() {
 
   return (
     <div className={styles.page}>
-      <SiteNav active="/fitness" />
+      <SiteNav active="/home" />
 
       <div className={styles.header}>
+        <Link href="/home" className={styles.backLink}>← Home</Link>
         <span className="eyebrow">Guided sessions</span>
         <h1>Pick a session</h1>
         <p className={styles.headerSub}>

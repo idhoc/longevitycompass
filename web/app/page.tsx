@@ -16,7 +16,7 @@ export default function RootGate() {
     if (!profile?.completedAt && !skipped) {
       router.replace("/onboarding");
     } else {
-      router.replace("/today");
+      router.replace("/home");
     }
   }, [profileHydrated, skippedHydrated, profile, skipped, router]);
 

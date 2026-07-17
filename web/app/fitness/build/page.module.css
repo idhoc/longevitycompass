@@ -95,7 +95,7 @@
 
 .builderTitle {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-md);
 }
 

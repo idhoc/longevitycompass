@@ -106,12 +106,12 @@ export default function OnboardingPage() {
 
   function skip() {
     setSkipped(true);
-    router.push("/today");
+    router.push("/home");
   }
 
   function finish() {
     setProfile({ ...draft, completedAt: new Date().toISOString() });
-    router.push("/today");
+    router.push("/home");
   }
 
   const plan = domainPlanFromProfile(draft);

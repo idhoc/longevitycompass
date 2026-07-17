@@ -92,7 +92,7 @@
 
 .repsNum {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-3xl);
   color: var(--signal);
   line-height: 1;
@@ -168,7 +168,7 @@
 
 .doneIcon {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-3xl);
   color: var(--signal);
   line-height: 1;

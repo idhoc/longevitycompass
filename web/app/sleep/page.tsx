@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { SleepPanel } from "@/components/panels/SleepPanel";
 import styles from "./page.module.css";
@@ -5,8 +6,9 @@ import styles from "./page.module.css";
 export default function SleepPage() {
   return (
     <div className={styles.page}>
-      <SiteNav active="/sleep" />
+      <SiteNav active="/home" />
       <div className={styles.header}>
+        <Link href="/home" className={styles.backLink}>← Home</Link>
         <span className="eyebrow">Sleep &amp; Recovery</span>
         <h1>Last night, in detail</h1>
         <p className={styles.headerSub}>

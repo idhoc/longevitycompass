@@ -39,7 +39,7 @@
 
 .panelTitle {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-md);
   margin: 0.15em 0 0;
 }
@@ -230,7 +230,7 @@ textarea.input {
 
 .insightHeadline {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-base);
   line-height: 1.4;
 }

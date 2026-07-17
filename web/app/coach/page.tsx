@@ -6,8 +6,15 @@ import { Waveform, type VoiceState } from "@/components/Waveform";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { weekKey, computeStreak } from "@/lib/domainReach";
+import { computeSleepPerformance, computeRecovery, recoveryBand, RECOVERY_COLOR } from "@/lib/whoopScores";
 import { EMPTY_PROFILE, type UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
+
+const RECOVERY_ADVICE: Record<ReturnType<typeof recoveryBand>, string> = {
+  high: "Recovery is high — a good day to push training intensity if you want to.",
+  moderate: "Recovery is moderate — moderate activity is fine, but this isn't the day to max out.",
+  low: "Recovery is low — today favors rest, light movement, or an easy walk over a hard session.",
+};
 
 type Entry = { who: "you" | "coach"; text: string; time: string; escalation?: boolean; error?: boolean };
 
@@ -69,6 +76,23 @@ export default function CoachPage() {
   const logRef = useRef<HTMLDivElement>(null);
 
   const p = profile ?? EMPTY_PROFILE;
+
+  const todaySleepEntry = sleepEntries.find((e) => e.date === todayKey());
+  const priorRHRs = sleepEntries
+    .filter((e) => e.date < todayKey())
+    .slice(-7)
+    .map((e) => Number(e.restingHeartRate))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const restingHRBaseline = priorRHRs.length ? priorRHRs.reduce((s, v) => s + v, 0) / priorRHRs.length : null;
+  const todayRHR = todaySleepEntry ? Number(todaySleepEntry.restingHeartRate) : NaN;
+  const recovery = todaySleepEntry
+    ? computeRecovery({
+        sleepPerformance: computeSleepPerformance(todaySleepEntry),
+        restingHR: Number.isFinite(todayRHR) && todayRHR > 0 ? todayRHR : undefined,
+        restingHRBaseline,
+      })
+    : null;
+  const band = recovery != null ? recoveryBand(recovery) : null;
 
   function buildContext(): string {
     const lines: string[] = [];
@@ -186,6 +210,13 @@ export default function CoachPage() {
   return (
     <div className={styles.page}>
       <SiteNav active="/coach" />
+      {band && recovery != null && (
+        <div className={styles.recoveryBanner}>
+          <span className={styles.recoveryDot} style={{ background: RECOVERY_COLOR[band] }} aria-hidden="true" />
+          <span className={`${styles.recoveryValue} tabular`}>{recovery}%</span>
+          <p className={styles.recoveryText}>{RECOVERY_ADVICE[band]}</p>
+        </div>
+      )}
       <div className={styles.body}>
         <div className={styles.transcript}>
           <div className={styles.sessionHead}>

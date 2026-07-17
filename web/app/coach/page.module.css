@@ -4,6 +4,36 @@
   flex-direction: column;
 }
 
+.recoveryBanner {
+  margin: var(--space-6) var(--space-6) 0;
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper-raised);
+}
+
+.recoveryDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.recoveryValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-base);
+  flex-shrink: 0;
+}
+
+.recoveryText {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
 .body {
   flex: 1;
   display: grid;
@@ -249,6 +279,9 @@
 }
 
 @media (max-width: 860px) {
+  .recoveryBanner {
+    margin: var(--space-4) var(--space-4) 0;
+  }
   .body {
     grid-template-columns: 1fr;
     padding: var(--space-4);

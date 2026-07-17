@@ -1,34 +1,32 @@
-import type { ReadinessBand } from "@/lib/domainReach";
-
-const SIZE = 176;
-const STROKE = 13;
+const SIZE = 148;
+const STROKE = 11;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const BAND_COLOR: Record<ReadinessBand, string> = {
-  low: "#d97757",
-  moderate: "#e0a458",
-  high: "#5eead4",
-};
+interface DialProps {
+  value: number;
+  max: number;
+  color: string;
+  display: string;
+  label: string;
+  sublabel?: string;
+}
 
-const BAND_LABEL: Record<ReadinessBand, string> = {
-  low: "Low",
-  moderate: "Moderate",
-  high: "High",
-};
-
-export function ReadinessRing({ score, band }: { score: number; band: ReadinessBand }) {
-  const offset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, score)) / 100);
-  const color = BAND_COLOR[band];
+/** A WHOOP-style ring dial — the same shape for Sleep, Recovery, and
+ * Strain, distinguished only by color and scale, matching how WHOOP's
+ * own Home screen presents its three core scores side by side. */
+export function Dial({ value, max, color, display, label, sublabel }: DialProps) {
+  const pct = Math.max(0, Math.min(1, value / max));
+  const offset = CIRCUMFERENCE * (1 - pct);
 
   return (
     <div
       role="img"
-      aria-label={`Readiness score ${score} out of 100, ${BAND_LABEL[band]}`}
+      aria-label={`${label}: ${display}${sublabel ? `, ${sublabel}` : ""}`}
       style={{ position: "relative", width: SIZE, height: SIZE, flexShrink: 0 }}
     >
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
-        <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke="var(--line)" strokeWidth={STROKE} />
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke="var(--paper-sunken)" strokeWidth={STROKE} />
         <circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -52,8 +50,8 @@ export function ReadinessRing({ score, band }: { score: number; band: ReadinessB
           justifyContent: "center",
         }}
       >
-        <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "2.7rem", lineHeight: 1, color: "var(--ink)" }}>
-          {score}
+        <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.9rem", lineHeight: 1, color: "var(--ink)" }}>
+          {display}
         </span>
         <span
           style={{
@@ -61,11 +59,11 @@ export function ReadinessRing({ score, band }: { score: number; band: ReadinessB
             fontSize: "var(--text-xs)",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
-            color,
-            marginTop: "0.3em",
+            color: "var(--ink-soft)",
+            marginTop: "0.35em",
           }}
         >
-          {BAND_LABEL[band]}
+          {label}
         </span>
       </div>
     </div>

@@ -86,7 +86,7 @@ export function computeReadiness(components: ReadinessComponents) {
   const score = Math.round(
     ((components.sleep + components.nutrition + components.fitness + components.mind) / 4) * 100
   );
-  const band: ReadinessBand = score < 40 ? "low" : score < 70 ? "moderate" : "high";
+  const band: ReadinessBand = score < 34 ? "low" : score < 67 ? "moderate" : "high";
   const entries = Object.entries(components) as [keyof ReadinessComponents, number][];
   const [weakestKey] = entries.reduce((min, cur) => (cur[1] < min[1] ? cur : min));
   return { score, band, focus: DOMAIN_FOCUS_LABEL[weakestKey] };

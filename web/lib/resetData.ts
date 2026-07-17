@@ -1,3 +1,5 @@
+import { JOURNAL_KEY } from "./journal";
+
 /**
  * Every localStorage key this app writes, in one place, so "reset data" in
  * Settings can never miss one and leave stale data behind (a real bug this
@@ -12,6 +14,7 @@ const LOGGED_DATA_KEYS = [
   "lc_mind_entries_v1",
   "lc_meditation_sessions_v1",
   "lc_focus_sessions_v1",
+  JOURNAL_KEY,
 ];
 
 const PROFILE_KEYS = ["lc_profile_v1", "lc_onboarding_skipped_v1"];

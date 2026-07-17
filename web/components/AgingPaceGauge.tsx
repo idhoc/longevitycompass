@@ -17,9 +17,9 @@ function arcPath(fromDeg: number, toDeg: number) {
 }
 
 const SEGMENTS = [
-  { from: 180, to: 120, color: "#5eead4" },
-  { from: 120, to: 60, color: "#e0a458" },
-  { from: 60, to: 0, color: "#d97757" },
+  { from: 180, to: 120, color: "#16ec06" },
+  { from: 120, to: 60, color: "#ffde00" },
+  { from: 60, to: 0, color: "#ff0026" },
 ];
 
 const BAND_LABEL: Record<AgingPaceBand, string> = {
@@ -58,7 +58,7 @@ export function AgingPaceGauge({ pace, band }: { pace: number; band: AgingPaceBa
         <circle cx={CX} cy={CY} r={5} fill="var(--ink)" />
       </svg>
       <div style={{ position: "absolute", top: 100, left: 0, right: 0, textAlign: "center" }}>
-        <div style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.5rem", color: "var(--ink)" }}>
+        <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.5rem", color: "var(--ink)" }}>
           {pace.toFixed(2)}x
         </div>
         <div

@@ -394,7 +394,7 @@ export function MindPanel() {
                       height: e ? `${(e.purposeRating / 5) * 100}%` : "6%",
                       minHeight: 4,
                       borderRadius: 3,
-                      background: e ? (e.connected ? "#5eead4" : "#c9a66b") : "var(--line)",
+                      background: e ? (e.connected ? "#00f19f" : "#0093e7") : "var(--line)",
                     }}
                   />
                 ))}

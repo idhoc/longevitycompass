@@ -28,3 +28,17 @@
   max-width: 640px;
   padding: 0 var(--space-4) var(--space-8);
 }
+
+.backLink {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.backLink:hover {
+  color: var(--signal);
+}

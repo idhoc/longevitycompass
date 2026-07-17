@@ -45,7 +45,7 @@
 
 .sectionTitle {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-md);
 }
 
@@ -143,7 +143,7 @@
 
 .optionLabel {
   font-family: var(--font-display);
-  font-style: italic;
+  font-weight: 700;
   font-size: var(--text-base);
 }
 
@@ -191,11 +191,11 @@
 }
 
 .themeSwatchDark {
-  background: linear-gradient(135deg, #12151a 50%, #c9a66b 50%);
+  background: linear-gradient(135deg, #0a0a0a 50%, #00f19f 50%);
 }
 
 .themeSwatchLight {
-  background: linear-gradient(135deg, #f1eee6 50%, #3e6b4f 50%);
+  background: linear-gradient(135deg, #f7f7f6 50%, #00a876 50%);
 }
 
 .themeLabel {
