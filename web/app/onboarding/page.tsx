@@ -17,7 +17,13 @@ import {
   WORKOUT_STYLE_OPTIONS,
   NUTRITION_PATTERN_OPTIONS,
   DIETARY_OPTIONS,
+  SEX_OPTIONS,
   domainPlanFromProfile,
+  ageRangeFromExactAge,
+  lbToKg,
+  kgToLb,
+  ftInToCm,
+  cmToFtIn,
   type UserProfile,
   type DomainKey,
 } from "@/lib/profile";
@@ -26,7 +32,7 @@ import styles from "./page.module.css";
 const STEP_ORDER = [
   "welcome",
   "goal",
-  "age",
+  "vitals",
   "sleepHours",
   "sleepComplaints",
   "caffeine",
@@ -41,8 +47,6 @@ const STEP_ORDER = [
 ] as const;
 type StepId = (typeof STEP_ORDER)[number];
 const STEP_COUNT = STEP_ORDER.length;
-
-const AGE_RANGES = ["18-29", "30-44", "45-59", "60+"] as const;
 
 const ACTION_COPY: Record<
   DomainKey | "none",
@@ -86,8 +90,8 @@ function questionForStep(id: StepId, draft: UserProfile): string {
       return `Hi${draft.name ? ` ${draft.name}` : ""} — I'm your coach here at Longevity Compass. I'll ask a few quick things about your goals, sleep, food, movement, and stress, and shape everything after this around your actual life instead of a generic plan. Takes a couple minutes, and you can skip to the app any time.`;
     case "goal":
       return "First — what matters most to you right now?";
-    case "age":
-      return "How old are you, roughly? It changes what I'll actually recommend, especially for movement.";
+    case "vitals":
+      return "A few real numbers that actually matter for longevity: your age, sex, height, and weight. These shape what's normal for you — resting heart rate, protein needs, training load — instead of a generic default.";
     case "sleepHours":
       return "How much sleep do you usually get a night?";
     case "sleepComplaints":
@@ -126,8 +130,19 @@ function summaryForStep(id: StepId, draft: UserProfile): string | null {
       const g = GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0]);
       return g ? g.label : "Not sure yet.";
     }
-    case "age":
-      return draft.ageRange || "Prefer not to say.";
+    case "vitals": {
+      const parts: string[] = [];
+      if (draft.exactAge != null) parts.push(`${draft.exactAge} years old`);
+      if (draft.sex) parts.push(draft.sex.toLowerCase());
+      if (draft.heightCm != null) {
+        const { feet, inches } = cmToFtIn(draft.heightCm);
+        parts.push(draft.units === "metric" ? `${Math.round(draft.heightCm)}cm` : `${feet}'${inches}"`);
+      }
+      if (draft.weightKg != null) {
+        parts.push(draft.units === "metric" ? `${Math.round(draft.weightKg)}kg` : `${Math.round(kgToLb(draft.weightKg))}lb`);
+      }
+      return parts.length ? parts.join(", ") : "Prefer not to say.";
+    }
     case "sleepHours":
       return draft.sleepHours || SLEEP_HOURS_OPTIONS[2];
     case "sleepComplaints":
@@ -290,7 +305,10 @@ export default function OnboardingPage() {
   const [openHotspot, setOpenHotspot] = useState<"compass" | "tiles" | null>(null);
   const [transcript, setTranscript] = useState<Bubble[]>([{ who: "coach", text: questionForStep("welcome", EMPTY_PROFILE) }]);
   const [reflecting, setReflecting] = useState(false);
+  const [awaitingFollowUp, setAwaitingFollowUp] = useState(false);
+  const [followUpAnswer, setFollowUpAnswer] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
+  const priorAnswersRef = useRef<string[]>([]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -298,22 +316,42 @@ export default function OnboardingPage() {
 
   const stepId = STEP_ORDER[stepIndex];
 
+  function proceedToNext() {
+    const nextIndex = stepIndex + 1;
+    if (nextIndex < STEP_COUNT) {
+      setTranscript((t) => [...t, { who: "coach", text: questionForStep(STEP_ORDER[nextIndex], draft) }]);
+    }
+    setStepIndex(nextIndex);
+  }
+
   async function advance() {
     const summary = summaryForStep(stepId, draft);
     if (summary) setTranscript((t) => [...t, { who: "you", text: summary }]);
 
-    const nextIndex = stepIndex + 1;
-
     if (summary) {
       setReflecting(true);
       try {
-        const res = await fetch("/api/onboarding-reflect", {
+        const res = await fetch("/api/onboarding-turn", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: questionForStep(stepId, draft), answer: summary, name: draft.name }),
+          body: JSON.stringify({
+            question: questionForStep(stepId, draft),
+            answer: summary,
+            name: draft.name,
+            priorAnswers: priorAnswersRef.current.slice(-5),
+          }),
         });
         const data = await res.json();
+        priorAnswersRef.current.push(summary);
         if (data?.message) setTranscript((t) => [...t, { who: "coach", text: data.message }]);
+        if (data?.askFollowUp) {
+          // The AI found something worth actually asking about — pause the
+          // scripted flow for one real free-text exchange instead of
+          // reciting the next question regardless of what was just said.
+          setReflecting(false);
+          setAwaitingFollowUp(true);
+          return;
+        }
       } catch {
         // the reflection is a nice-to-have, not required for the flow to continue
       } finally {
@@ -321,10 +359,21 @@ export default function OnboardingPage() {
       }
     }
 
-    if (nextIndex < STEP_COUNT) {
-      setTranscript((t) => [...t, { who: "coach", text: questionForStep(STEP_ORDER[nextIndex], draft) }]);
+    proceedToNext();
+  }
+
+  function submitFollowUp() {
+    const trimmed = followUpAnswer.trim();
+    if (!trimmed) {
+      setAwaitingFollowUp(false);
+      proceedToNext();
+      return;
     }
-    setStepIndex(nextIndex);
+    setTranscript((t) => [...t, { who: "you", text: trimmed }]);
+    setDraft((d) => ({ ...d, onboardingNotes: [...d.onboardingNotes, trimmed] }));
+    setFollowUpAnswer("");
+    setAwaitingFollowUp(false);
+    proceedToNext();
   }
 
   function skip() {
@@ -344,7 +393,12 @@ export default function OnboardingPage() {
   }
 
   function finishAndGo(href: string) {
-    setProfile({ ...draft, disclaimerAcknowledged: true, completedAt: new Date().toISOString() });
+    setProfile({
+      ...draft,
+      ageRange: ageRangeFromExactAge(draft.exactAge),
+      disclaimerAcknowledged: true,
+      completedAt: new Date().toISOString(),
+    });
     router.push(href);
   }
 
@@ -397,7 +451,39 @@ export default function OnboardingPage() {
       </div>
 
       <div className={styles.composer}>
-        {stepId === "welcome" && (
+        {awaitingFollowUp && (
+          <>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="ob-followup">
+                Your answer
+              </label>
+              <textarea
+                id="ob-followup"
+                className={styles.input}
+                rows={2}
+                value={followUpAnswer}
+                onChange={(e) => setFollowUpAnswer(e.target.value)}
+                placeholder="Type as much or as little as you want…"
+                autoFocus
+              />
+            </div>
+            <div className={styles.footer}>
+              <button type="button" className={styles.btn} onClick={submitFollowUp}>
+                Skip
+              </button>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={submitFollowUp}
+                disabled={!followUpAnswer.trim()}
+              >
+                Send
+              </button>
+            </div>
+          </>
+        )}
+
+        {!awaitingFollowUp && stepId === "welcome" && (
           <div className={styles.welcomeComposer}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="ob-name">
@@ -422,7 +508,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {stepId === "goal" && (
+        {!awaitingFollowUp && stepId === "goal" && (
           <>
             <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={chooseGoal} />
             {draft.primaryGoals[0] && (
@@ -441,35 +527,149 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "age" && (
+        {!awaitingFollowUp && stepId === "vitals" && (
           <>
-            <div className={styles.chipRow}>
-              {AGE_RANGES.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  className={draft.ageRange === a ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
-                  onClick={() => setDraft((d) => ({ ...d, ageRange: a }))}
-                  aria-pressed={draft.ageRange === a}
-                >
-                  {a}
-                </button>
-              ))}
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="ob-age">Age</label>
+                <input
+                  id="ob-age"
+                  className={styles.input}
+                  type="number"
+                  min={13}
+                  max={110}
+                  inputMode="numeric"
+                  value={draft.exactAge ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, exactAge: e.target.value ? Number(e.target.value) : null }))}
+                  placeholder="Years"
+                />
+              </div>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Units</span>
+                <div className={styles.chipRow}>
+                  {(["imperial", "metric"] as const).map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      className={draft.units === u ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                      onClick={() => setDraft((d) => ({ ...d, units: u }))}
+                      aria-pressed={draft.units === u}
+                    >
+                      {u === "imperial" ? "lb / ft-in" : "kg / cm"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Sex</span>
+              <div className={styles.chipRow}>
+                {SEX_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={draft.sex === s ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                    onClick={() => setDraft((d) => ({ ...d, sex: s }))}
+                    aria-pressed={draft.sex === s}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {draft.units === "metric" ? (
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="ob-height-cm">Height (cm)</label>
+                  <input
+                    id="ob-height-cm"
+                    className={styles.input}
+                    type="number"
+                    min={100}
+                    max={250}
+                    value={draft.heightCm != null ? Math.round(draft.heightCm) : ""}
+                    onChange={(e) => setDraft((d) => ({ ...d, heightCm: e.target.value ? Number(e.target.value) : null }))}
+                    placeholder="cm"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="ob-weight-kg">Weight (kg)</label>
+                  <input
+                    id="ob-weight-kg"
+                    className={styles.input}
+                    type="number"
+                    min={30}
+                    max={300}
+                    value={draft.weightKg != null ? Math.round(draft.weightKg) : ""}
+                    onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? Number(e.target.value) : null }))}
+                    placeholder="kg"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Height</span>
+                  <div className={styles.fieldRow}>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={3}
+                      max={8}
+                      value={draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : ""}
+                      onChange={(e) => {
+                        const feet = Number(e.target.value) || 0;
+                        const inches = draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : 0;
+                        setDraft((d) => ({ ...d, heightCm: e.target.value ? ftInToCm(feet, inches) : null }));
+                      }}
+                      placeholder="ft"
+                    />
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      max={11}
+                      value={draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : ""}
+                      onChange={(e) => {
+                        const inches = Number(e.target.value) || 0;
+                        const feet = draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : Math.floor(cmToFtIn(170).feet);
+                        setDraft((d) => ({ ...d, heightCm: ftInToCm(feet, inches) }));
+                      }}
+                      placeholder="in"
+                    />
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="ob-weight-lb">Weight (lb)</label>
+                  <input
+                    id="ob-weight-lb"
+                    className={styles.input}
+                    type="number"
+                    min={60}
+                    max={600}
+                    value={draft.weightKg != null ? Math.round(kgToLb(draft.weightKg)) : ""}
+                    onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? lbToKg(Number(e.target.value)) : null }))}
+                    placeholder="lb"
+                  />
+                </div>
+              </div>
+            )}
+
+            <p className={styles.fineprint}>
+              Any of this can be skipped — leave a field blank and move on.
+            </p>
+
             <div className={styles.footer}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={advance}
-                disabled={!draft.ageRange || reflecting}
-              >
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
                 Continue
               </button>
             </div>
           </>
         )}
 
-        {stepId === "sleepHours" && (
+        {!awaitingFollowUp && stepId === "sleepHours" && (
           <>
             <input
               type="range"
@@ -495,7 +695,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "sleepComplaints" && (
+        {!awaitingFollowUp && stepId === "sleepComplaints" && (
           <>
             <div className={styles.chipRow}>
               {SLEEP_COMPLAINT_OPTIONS.map((c) => (
@@ -518,7 +718,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "caffeine" && (
+        {!awaitingFollowUp && stepId === "caffeine" && (
           <>
             <div className={styles.chipRow}>
               {CAFFEINE_OPTIONS.map((c) => (
@@ -546,7 +746,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "activity" && (
+        {!awaitingFollowUp && stepId === "activity" && (
           <>
             <div className={styles.chipRow}>
               {ACTIVITY_LEVEL_OPTIONS.map((a) => (
@@ -574,7 +774,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "workoutStyle" && (
+        {!awaitingFollowUp && stepId === "workoutStyle" && (
           <>
             <div className={styles.swipeStrip}>
               {WORKOUT_STYLE_OPTIONS.map((w) => (
@@ -598,7 +798,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "injuries" && (
+        {!awaitingFollowUp && stepId === "injuries" && (
           <>
             <input
               className={styles.input}
@@ -614,7 +814,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "nutritionPattern" && (
+        {!awaitingFollowUp && stepId === "nutritionPattern" && (
           <>
             <div className={styles.chipRow}>
               {NUTRITION_PATTERN_OPTIONS.map((n) => (
@@ -642,7 +842,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "dietary" && (
+        {!awaitingFollowUp && stepId === "dietary" && (
           <>
             <div className={styles.chipRow}>
               {DIETARY_OPTIONS.map((d) => (
@@ -665,7 +865,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "stress" && (
+        {!awaitingFollowUp && stepId === "stress" && (
           <>
             <input
               type="range"
@@ -690,7 +890,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "tour" && (
+        {!awaitingFollowUp && stepId === "tour" && (
           <>
             <div className={styles.tourPreview}>
               <button
@@ -737,7 +937,7 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {stepId === "action" && (
+        {!awaitingFollowUp && stepId === "action" && (
           <div className={styles.actionStep}>
             {chosenGoal === "mind" ? (
               <div className={styles.orbMoment}>

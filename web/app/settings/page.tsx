@@ -19,6 +19,12 @@ import {
   INTENSITY_OPTIONS,
   UNITS_OPTIONS,
   LANGUAGE_OPTIONS,
+  SEX_OPTIONS,
+  ageRangeFromExactAge,
+  lbToKg,
+  kgToLb,
+  ftInToCm,
+  cmToFtIn,
   type UserProfile,
   type DomainKey,
 } from "@/lib/profile";
@@ -112,23 +118,106 @@ export default function SettingsPage() {
               />
             </div>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Age range</span>
+              <label className={styles.fieldLabel} htmlFor="set-age">Age</label>
+              <input
+                id="set-age"
+                className={styles.input}
+                type="number"
+                min={13}
+                max={110}
+                value={p.exactAge ?? ""}
+                onChange={(e) => {
+                  const age = e.target.value ? Number(e.target.value) : null;
+                  update({ exactAge: age, ageRange: ageRangeFromExactAge(age) });
+                }}
+                placeholder="Years"
+              />
+              <p className={styles.optionHint} style={{ margin: 0 }}>
+                Reorders and reweights what Topics and Fitness show you first, and grounds what the
+                Coach says.
+              </p>
+            </div>
+          </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Sex</span>
               <div className={styles.tagRow}>
-                {(["18-29", "30-44", "45-59", "60+"] as const).map((range) => (
+                {SEX_OPTIONS.map((s) => (
                   <button
-                    key={range}
+                    key={s}
                     type="button"
-                    className={p.ageRange === range ? `${styles.tag} ${styles.tagActive}` : styles.tag}
-                    onClick={() => update({ ageRange: range })}
-                    aria-pressed={p.ageRange === range}
+                    className={p.sex === s ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                    onClick={() => update({ sex: s })}
+                    aria-pressed={p.sex === s}
                   >
-                    {range}
+                    {s}
                   </button>
                 ))}
               </div>
-              <p className={styles.optionHint} style={{ margin: 0 }}>
-                Reorders and reweights what Topics and Fitness show you first — no other effect.
-              </p>
+            </div>
+          </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="set-height">
+                Height ({p.units === "metric" ? "cm" : "ft/in"})
+              </label>
+              {p.units === "metric" ? (
+                <input
+                  id="set-height"
+                  className={styles.input}
+                  type="number"
+                  value={p.heightCm != null ? Math.round(p.heightCm) : ""}
+                  onChange={(e) => update({ heightCm: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="cm"
+                />
+              ) : (
+                <div className={styles.fieldRow}>
+                  <input
+                    id="set-height"
+                    className={styles.input}
+                    type="number"
+                    value={p.heightCm != null ? cmToFtIn(p.heightCm).feet : ""}
+                    onChange={(e) => {
+                      const feet = Number(e.target.value) || 0;
+                      const inches = p.heightCm != null ? cmToFtIn(p.heightCm).inches : 0;
+                      update({ heightCm: e.target.value ? ftInToCm(feet, inches) : null });
+                    }}
+                    placeholder="ft"
+                  />
+                  <input
+                    className={styles.input}
+                    type="number"
+                    value={p.heightCm != null ? cmToFtIn(p.heightCm).inches : ""}
+                    onChange={(e) => {
+                      const inches = Number(e.target.value) || 0;
+                      const feet = p.heightCm != null ? cmToFtIn(p.heightCm).feet : 5;
+                      update({ heightCm: ftInToCm(feet, inches) });
+                    }}
+                    placeholder="in"
+                  />
+                </div>
+              )}
+            </div>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="set-weight">
+                Weight ({p.units === "metric" ? "kg" : "lb"})
+              </label>
+              <input
+                id="set-weight"
+                className={styles.input}
+                type="number"
+                value={
+                  p.weightKg != null
+                    ? Math.round(p.units === "metric" ? p.weightKg : kgToLb(p.weightKg))
+                    : ""
+                }
+                onChange={(e) => {
+                  if (!e.target.value) return update({ weightKg: null });
+                  const n = Number(e.target.value);
+                  update({ weightKg: p.units === "metric" ? n : lbToKg(n) });
+                }}
+                placeholder={p.units === "metric" ? "kg" : "lb"}
+              />
             </div>
           </div>
           <div className={styles.field}>

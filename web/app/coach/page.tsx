@@ -117,12 +117,34 @@ export default function CoachPage() {
 
   const hasEverLogged = sleepEntries.length > 0 || meals.length > 0 || sessions.length > 0 || mindEntries.length > 0;
 
+  function demographicLine(): string | null {
+    const parts: string[] = [];
+    if (p.exactAge != null) parts.push(`${p.exactAge} years old`);
+    if (p.sex && p.sex !== "Prefer not to say") parts.push(p.sex.toLowerCase());
+    if (p.heightCm != null) parts.push(`${Math.round(p.heightCm)}cm tall`);
+    if (p.weightKg != null) parts.push(`${Math.round(p.weightKg)}kg`);
+    return parts.length ? `About them: ${parts.join(", ")}.` : null;
+  }
+
   function buildContext(): string {
+    const demo = demographicLine();
+    const notes = p.onboardingNotes?.length
+      ? `From onboarding, in their own words: ${p.onboardingNotes.join(" | ")}`
+      : null;
+
     if (!hasEverLogged) {
-      return "This is a brand-new account — nothing has ever been logged in any domain (sleep, nutrition, fitness, or mind). Do not reference sleep, meals, movement, or mind check-ins as if you've seen any data, because you haven't.";
+      return [
+        "This is a brand-new account — nothing has ever been logged in any domain (sleep, nutrition, fitness, or mind). Do not reference sleep, meals, movement, or mind check-ins as if you've seen any data, because you haven't.",
+        demo,
+        notes,
+      ]
+        .filter(Boolean)
+        .join("\n");
     }
 
     const lines: string[] = [];
+    if (demo) lines.push(demo);
+    if (notes) lines.push(notes);
     const sleepEntry = sleepEntries.find((e) => e.date === todayKey());
     if (sleepEntry) {
       const hours = (minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime) / 60).toFixed(1);

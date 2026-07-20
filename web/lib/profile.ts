@@ -45,6 +45,36 @@ export const DIETARY_OPTIONS = [
 
 export const CAFFEINE_OPTIONS = ["None", "1 cup a day", "2-3 cups a day", "4+ cups a day"] as const;
 
+export const SEX_OPTIONS = ["Female", "Male", "Intersex", "Prefer not to say"] as const;
+
+/** Buckets an exact age into the coarse range the rest of the app's
+ * age-adaptive logic (Fitness ordering, Topics) already keys off of —
+ * onboarding now collects the real number, but nothing downstream needs
+ * to change to use it. */
+export function ageRangeFromExactAge(age: number | null): UserProfile["ageRange"] {
+  if (age == null || !Number.isFinite(age)) return "";
+  if (age < 30) return "18-29";
+  if (age < 45) return "30-44";
+  if (age < 60) return "45-59";
+  return "60+";
+}
+
+export function lbToKg(lb: number): number {
+  return lb * 0.453592;
+}
+export function kgToLb(kg: number): number {
+  return kg / 0.453592;
+}
+export function ftInToCm(feet: number, inches: number): number {
+  return (feet * 12 + inches) * 2.54;
+}
+export function cmToFtIn(cm: number): { feet: number; inches: number } {
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches - feet * 12);
+  return { feet, inches };
+}
+
 export const TONE_OPTIONS = [
   {
     key: "warm",
@@ -103,6 +133,17 @@ export type CoachLanguage = (typeof LANGUAGE_OPTIONS)[number]["key"];
 export interface UserProfile {
   name: string;
   ageRange: "18-29" | "30-44" | "45-59" | "60+" | "";
+  /** The real number, collected directly instead of only a bucket —
+   * ageRange is still derived from this for the existing age-adaptive
+   * logic elsewhere in the app. */
+  exactAge: number | null;
+  sex: (typeof SEX_OPTIONS)[number] | "";
+  heightCm: number | null;
+  weightKg: number | null;
+  /** Free-text answers to the AI's own follow-up questions during
+   * onboarding — not thrown away after the reflection, fed to the Coach
+   * as real grounding context. */
+  onboardingNotes: string[];
   primaryGoals: DomainKey[];
   sleepHours: (typeof SLEEP_HOURS_OPTIONS)[number] | "";
   sleepComplaints: string[];
@@ -129,6 +170,11 @@ export interface UserProfile {
 export const EMPTY_PROFILE: UserProfile = {
   name: "",
   ageRange: "",
+  exactAge: null,
+  sex: "",
+  heightCm: null,
+  weightKg: null,
+  onboardingNotes: [],
   primaryGoals: [],
   sleepHours: "",
   sleepComplaints: [],
