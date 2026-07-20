@@ -15,10 +15,31 @@ import styles from "./panels.module.css";
 
 interface MindEntry {
   date: string;
-  purposeRating: number;
-  connected: boolean;
+  mood: number;
   note: string;
 }
+
+interface ReflectInsight {
+  headline: string;
+  explanation: string;
+}
+
+const MOODS = [
+  { value: 1, label: "Drained" },
+  { value: 2, label: "Low" },
+  { value: 3, label: "Steady" },
+  { value: 4, label: "Good" },
+  { value: 5, label: "Energized" },
+];
+
+const MOOD_LABEL: Record<number, string> = Object.fromEntries(MOODS.map((m) => [m.value, m.label]));
+
+const VOICE_OPTIONS = [
+  { id: "nova", label: "Nova" },
+  { id: "shimmer", label: "Shimmer" },
+  { id: "onyx", label: "Onyx" },
+  { id: "fable", label: "Fable" },
+];
 
 interface MeditationSession {
   id: string;
@@ -86,7 +107,7 @@ const PROMPTS = [
   "What did you do today that felt worth doing?",
 ];
 
-const BREAK_PRESETS = [25, 50];
+const FOCUS_PRESETS = [25, 50] as const;
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -122,27 +143,76 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function BreakCountdown({ minutes, onComplete }: { minutes: number; onComplete: () => void }) {
-  const [remaining, setRemaining] = useState(minutes * 60);
+type PomodoroPhase = "focus" | "shortBreak";
+
+/**
+ * A real pomodoro cycle, not a single countdown to nothing: focus runs
+ * out, beeps, logs the block, and rolls straight into a short break —
+ * which rolls straight back into the next focus block — until the person
+ * ends the session. Each completed focus block is what gets logged.
+ */
+function PomodoroTimer({
+  focusMinutes,
+  breakMinutes,
+  onFocusComplete,
+}: {
+  focusMinutes: number;
+  breakMinutes: number;
+  onFocusComplete: () => void;
+}) {
+  const [phase, setPhase] = useState<PomodoroPhase>("focus");
+  const [remaining, setRemaining] = useState(focusMinutes * 60);
   const [running, setRunning] = useState(true);
 
   useEffect(() => {
     if (!running) return;
     if (remaining <= 0) {
-      onComplete();
-      return;
+      const t = setTimeout(() => {
+        playBeep();
+        if (phase === "focus") {
+          onFocusComplete();
+          setPhase("shortBreak");
+          setRemaining(breakMinutes * 60);
+        } else {
+          setPhase("focus");
+          setRemaining(focusMinutes * 60);
+        }
+      }, 0);
+      return () => clearTimeout(t);
     }
     const t = setTimeout(() => setRemaining((r) => r - 1), 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining, running]);
+  }, [remaining, running, phase]);
+
+  const total = (phase === "focus" ? focusMinutes : breakMinutes) * 60;
+  const pct = total > 0 ? 1 - remaining / total : 0;
 
   return (
     <div style={{ textAlign: "center" }}>
-      <div className={`${styles.insightHeadline} tabular`} style={{ fontSize: "var(--text-xl)" }}>
+      <span className={styles.panelLabel}>{phase === "focus" ? "Focus" : "Short break"}</span>
+      <div className={`${styles.insightHeadline} tabular`} style={{ fontSize: "var(--text-xl)", marginTop: "0.2em" }}>
         {formatTime(remaining)}
       </div>
-      <button type="button" className={styles.btn} style={{ marginTop: "0.8em" }} onClick={() => setRunning((r) => !r)}>
+      <div
+        style={{
+          height: 6,
+          borderRadius: 3,
+          background: "var(--paper-sunken)",
+          overflow: "hidden",
+          margin: "0.7em 0",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${pct * 100}%`,
+            background: phase === "focus" ? "var(--mind)" : "var(--signal)",
+            transition: "width 0.9s linear",
+          }}
+        />
+      </div>
+      <button type="button" className={styles.btn} onClick={() => setRunning((r) => !r)}>
         {running ? "Pause" : "Resume"}
       </button>
     </div>
@@ -159,10 +229,12 @@ export function MindPanel() {
   }, []);
 
   const [entries, setEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
-  const [rating, setRating] = useState(3);
-  const [connected, setConnected] = useState(false);
+  const [mood, setMood] = useState(3);
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState(false);
+  const [reflectInsight, setReflectInsight] = useState<ReflectInsight | null>(null);
+  const [loadingReflect, setLoadingReflect] = useState(false);
+  const [reflectError, setReflectError] = useState<string | null>(null);
 
   const [meditationSessions, setMeditationSessions] = useLocalStorageState<MeditationSession[]>(
     "lc_meditation_sessions_v1",
@@ -172,6 +244,7 @@ export function MindPanel() {
   const [length, setLength] = useState<MeditationLength>("short");
   const [pace, setPace] = useState<"normal" | "slow">("normal");
   const [ambientOn, setAmbientOn] = useState(false);
+  const [voicePref, setVoicePref] = useLocalStorageState<string>("lc_voice_pref_v1", "nova");
   const [playing, setPlaying] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [usingBrowserVoice, setUsingBrowserVoice] = useState(false);
@@ -191,16 +264,18 @@ export function MindPanel() {
     };
   }, []);
 
-  const [, setFocusSessions] = useLocalStorageState<FocusSession[]>("lc_focus_sessions_v1", []);
-  const [breakMinutes, setBreakMinutes] = useState<number | null>(null);
-  const [breakKey, setBreakKey] = useState(0);
-  const [breakDone, setBreakDone] = useState(false);
+  const [focusSessions, setFocusSessions] = useLocalStorageState<FocusSession[]>("lc_focus_sessions_v1", []);
+  const [focusLen, setFocusLen] = useState<(typeof FOCUS_PRESETS)[number]>(25);
+  const [pomodoroActive, setPomodoroActive] = useState(false);
+  const [pomodoroKey, setPomodoroKey] = useState(0);
 
   const today = todayKey();
   const todaysEntry = entries.find((e) => e.date === today);
   const prompt = PROMPTS[dayOfYear() % PROMPTS.length];
   const streak = computeStreak(entries);
   const lastMeditation = meditationSessions[meditationSessions.length - 1];
+  const breakLen = focusLen === 50 ? 10 : 5;
+  const todaysFocusBlocks = focusSessions.filter((s) => s.date === today);
 
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const date = dateKeyOffset(6 - i);
@@ -208,17 +283,47 @@ export function MindPanel() {
   });
 
   function save() {
-    setEntries((prev) => [...prev.filter((e) => e.date !== today), { date: today, purposeRating: rating, connected, note }]);
+    setEntries((prev) => [...prev.filter((e) => e.date !== today), { date: today, mood, note }]);
     setEditing(false);
+    setReflectInsight(null);
+    setReflectError(null);
   }
 
   function startEdit() {
     if (todaysEntry) {
-      setRating(todaysEntry.purposeRating);
-      setConnected(todaysEntry.connected);
+      setMood(todaysEntry.mood);
       setNote(todaysEntry.note);
     }
     setEditing(true);
+  }
+
+  async function fetchReflectInsight() {
+    if (!todaysEntry?.note.trim()) return;
+    setLoadingReflect(true);
+    setReflectError(null);
+    try {
+      const recentHistory = entries
+        .filter((e) => e.date !== today)
+        .slice(-5)
+        .map((e) => ({ mood: MOOD_LABEL[e.mood] ?? String(e.mood), note: e.note }));
+      const res = await fetch("/api/reflect-insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          mood: MOOD_LABEL[todaysEntry.mood] ?? String(todaysEntry.mood),
+          note: todaysEntry.note,
+          recentHistory,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      setReflectInsight(data.insight);
+    } catch (err) {
+      setReflectError(err instanceof Error ? err.message : "Couldn't reflect on this right now.");
+    } finally {
+      setLoadingReflect(false);
+    }
   }
 
   async function playMeditation(focus: MeditationFocus) {
@@ -257,7 +362,7 @@ export function MindPanel() {
       const res = await fetch("/api/meditation-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: variant.script, speed: pace === "slow" ? 0.85 : 1.0 }),
+        body: JSON.stringify({ text: variant.script, speed: pace === "slow" ? 0.85 : 1.0, voice: voicePref }),
       });
       if (res.status === 200 && audioRef.current) {
         const blob = await res.blob();
@@ -283,18 +388,13 @@ export function MindPanel() {
     setSelectedFocus(null);
   }
 
-  function startBreak(minutes: number) {
-    setBreakMinutes(minutes);
-    setBreakKey((k) => k + 1);
-    setBreakDone(false);
+  function startPomodoro() {
+    setPomodoroKey((k) => k + 1);
+    setPomodoroActive(true);
   }
 
-  function finishBreak() {
-    playBeep();
-    setBreakDone(true);
-    if (breakMinutes) {
-      setFocusSessions((prev) => [...prev, { id: `${Date.now()}`, date: todayKey(), minutes: breakMinutes }]);
-    }
+  function logFocusBlock() {
+    setFocusSessions((prev) => [...prev, { id: `${Date.now()}`, date: todayKey(), minutes: focusLen }]);
   }
 
   const showForm = editing || !todaysEntry;
@@ -334,7 +434,7 @@ export function MindPanel() {
             onClick={() => setMode("break")}
             aria-pressed={mode === "break"}
           >
-            Take a break
+            Focus timer
           </button>
         </div>
 
@@ -343,36 +443,31 @@ export function MindPanel() {
             <>
               <p className={styles.emptyText} style={{ margin: 0 }}>{prompt}</p>
               <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="mind-rating">Sense of purpose today (1-5)</label>
-                <input
-                  id="mind-rating"
-                  className={styles.input}
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={rating}
-                  onChange={(e) => setRating(Number(e.target.value))}
-                />
+                <span className={styles.fieldLabel}>How&apos;s today, really</span>
+                <div className={styles.tagRow} role="group" aria-label="Mood today">
+                  {MOODS.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      className={mood === m.value ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                      onClick={() => setMood(m.value)}
+                      aria-pressed={mood === m.value}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>Notes (optional)</span>
+                <span className={styles.fieldLabel}>What&apos;s actually going on (optional)</span>
                 <textarea
                   className={styles.input}
-                  rows={2}
+                  rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="A sentence is enough."
+                  placeholder="Write as much or as little as you want — this is what gets reflected on, not tossed into the void."
                 />
               </div>
-              <button
-                type="button"
-                className={connected ? `${styles.tag} ${styles.tagActive}` : styles.tag}
-                onClick={() => setConnected((c) => !c)}
-                aria-pressed={connected}
-                style={{ alignSelf: "flex-start" }}
-              >
-                Had a meaningful connection today
-              </button>
               <div className={styles.panelFooter}>
                 {todaysEntry && (
                   <button type="button" className={styles.btn} onClick={() => setEditing(false)}>
@@ -388,8 +483,8 @@ export function MindPanel() {
             <>
               <div
                 role="img"
-                aria-label={`Purpose rating over the last 7 days: ${last7
-                  .map((e) => (e ? `${e.purposeRating} of 5` : "not logged"))
+                aria-label={`Mood over the last 7 days: ${last7
+                  .map((e) => (e ? MOOD_LABEL[e.mood] ?? String(e.mood) : "not logged"))
                   .join(", ")}`}
                 style={{ display: "flex", alignItems: "flex-end", gap: "0.5em", height: 64 }}
               >
@@ -398,10 +493,10 @@ export function MindPanel() {
                     key={i}
                     style={{
                       flex: 1,
-                      height: e ? `${(e.purposeRating / 5) * 100}%` : "6%",
+                      height: e ? `${(e.mood / 5) * 100}%` : "6%",
                       minHeight: 4,
                       borderRadius: 3,
-                      background: e ? (e.connected ? "var(--mind)" : "var(--line-strong)") : "var(--line)",
+                      background: e ? "var(--mind)" : "var(--line)",
                     }}
                   />
                 ))}
@@ -409,11 +504,33 @@ export function MindPanel() {
               {todaysEntry?.note && (
                 <p className={styles.emptyText} style={{ margin: 0 }}>&ldquo;{todaysEntry.note}&rdquo;</p>
               )}
-              <div className={styles.panelFooter}>
-                <button type="button" className={styles.btn} onClick={startEdit}>
-                  Update today
-                </button>
-              </div>
+              {reflectInsight ? (
+                <div className={styles.insight}>
+                  <p className={styles.insightHeadline}>{reflectInsight.headline}</p>
+                  <p className={styles.insightExplanation}>{reflectInsight.explanation}</p>
+                </div>
+              ) : (
+                <div className={styles.panelFooter}>
+                  <button type="button" className={styles.btn} onClick={startEdit}>
+                    Update today
+                  </button>
+                  {todaysEntry?.note.trim() && (
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnPrimary}`}
+                      onClick={fetchReflectInsight}
+                      disabled={loadingReflect}
+                    >
+                      {loadingReflect ? "Thinking…" : "Reflect on this"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {reflectError && (
+                <p className={styles.emptyText} role="alert">
+                  {reflectError}
+                </p>
+              )}
             </>
           ))}
 
@@ -519,6 +636,22 @@ export function MindPanel() {
                     </button>
                   </div>
                 </div>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Voice</span>
+                  <div className={styles.tagRow}>
+                    {VOICE_OPTIONS.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className={voicePref === v.id ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                        onClick={() => setVoicePref(v.id)}
+                        aria-pressed={voicePref === v.id}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {lastMeditation && (
                   <p className={styles.emptyText} style={{ margin: 0 }}>
                     Last session: {lastMeditation.title} ({lastMeditation.length})
@@ -531,36 +664,50 @@ export function MindPanel() {
 
         {mode === "break" && (
           <>
-            {breakMinutes === null ? (
+            {!pomodoroActive ? (
               <>
                 <p className={styles.emptyText} style={{ margin: 0 }}>
-                  A timed nudge to step away from the screen — this runs from a timer you set, not
-                  your device&apos;s actual usage.
+                  A real focus cycle: work, then a short break, automatically — running until you
+                  end it, with every completed focus block logged.
                 </p>
-                <div className={styles.tagRow}>
-                  {BREAK_PRESETS.map((m) => (
-                    <button key={m} type="button" className={styles.tag} onClick={() => startBreak(m)}>
-                      {m} min focus block
-                    </button>
-                  ))}
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Focus length</span>
+                  <div className={styles.tagRow}>
+                    {FOCUS_PRESETS.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={focusLen === m ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                        onClick={() => setFocusLen(m)}
+                        aria-pressed={focusLen === m}
+                      >
+                        {m} min focus / {m === 50 ? 10 : 5} min break
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                <div className={styles.panelFooter}>
+                  <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={startPomodoro}>
+                    Start focus session
+                  </button>
+                </div>
+                {todaysFocusBlocks.length > 0 && (
+                  <p className={styles.emptyText} style={{ margin: 0 }}>
+                    {todaysFocusBlocks.length} focus block{todaysFocusBlocks.length === 1 ? "" : "s"} completed today.
+                  </p>
+                )}
               </>
-            ) : breakDone ? (
-              <div style={{ textAlign: "center" }}>
-                <p className={styles.insightHeadline}>Time for a mindful break.</p>
-                <p className={styles.emptyText} style={{ margin: "0.4em auto 0" }}>
-                  Stand up, look away from the screen, and let your eyes rest for a few minutes.
-                </p>
-                <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} style={{ marginTop: "0.8em" }} onClick={() => setBreakMinutes(null)}>
-                  Start another
-                </button>
-              </div>
             ) : (
               <>
-                <BreakCountdown key={breakKey} minutes={breakMinutes} onComplete={finishBreak} />
+                <PomodoroTimer
+                  key={pomodoroKey}
+                  focusMinutes={focusLen}
+                  breakMinutes={breakLen}
+                  onFocusComplete={logFocusBlock}
+                />
                 <div className={styles.panelFooter}>
-                  <button type="button" className={styles.btn} onClick={() => setBreakMinutes(null)}>
-                    Cancel
+                  <button type="button" className={styles.btn} onClick={() => setPomodoroActive(false)}>
+                    End session
                   </button>
                 </div>
               </>

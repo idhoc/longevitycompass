@@ -102,10 +102,10 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
     {
       id: "mindful-break",
       domain: "mind",
-      title: "Mindful break",
-      description: "A timed nudge to step away from the screen for a few minutes.",
+      title: "Focus timer",
+      description: "A real pomodoro cycle — focus, then a short break, automatically, with every block logged.",
       href: "/mind?topic=break",
-      feature: "Unique feature: a real countdown timer, not just a reminder banner",
+      feature: "Unique feature: focus and break phases that actually cycle, not a single flat countdown",
       icon: "timer",
     },
   ],
