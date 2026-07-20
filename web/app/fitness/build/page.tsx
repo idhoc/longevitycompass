@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
+import { ExercisePose } from "@/components/ExercisePose";
 import {
   EXERCISE_LIBRARY,
   CATEGORY_LABEL,
@@ -10,12 +11,19 @@ import {
   saveCustomWorkout,
   estimateMinutes,
   type ExerciseCategory,
+  type Equipment,
   type RoutineStep,
   type WorkoutRoutine,
 } from "@/lib/workouts";
 import styles from "./page.module.css";
 
 const CATEGORIES: ExerciseCategory[] = ["warmup", "strength", "cardio", "mobility", "cooldown"];
+const EQUIPMENT_OPTIONS: { key: Equipment | "all"; label: string }[] = [
+  { key: "all", label: "All equipment" },
+  { key: "none", label: "No equipment" },
+  { key: "dumbbells", label: "Dumbbells" },
+  { key: "bands", label: "Bands" },
+];
 const INTENSITY_OPTIONS = [
   { value: 0.75, label: "Lighter" },
   { value: 1, label: "Standard" },
@@ -35,6 +43,7 @@ export default function BuildWorkoutPage() {
   const [steps, setSteps] = useState<BuilderStep[]>([]);
   const [title, setTitle] = useState("");
   const [intensity, setIntensity] = useState(1);
+  const [equipmentFilter, setEquipmentFilter] = useState<Equipment | "all">("all");
 
   function addExercise(exerciseId: string) {
     const ex = getExercise(exerciseId);
@@ -107,6 +116,20 @@ export default function BuildWorkoutPage() {
 
       <div className={styles.layout}>
         <div className={styles.library}>
+          <div className={styles.tagRow} role="group" aria-label="Filter by equipment">
+            {EQUIPMENT_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                className={equipmentFilter === opt.key ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                onClick={() => setEquipmentFilter(opt.key)}
+                aria-pressed={equipmentFilter === opt.key}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <button
             type="button"
             className={styles.exerciseRow}
@@ -117,19 +140,26 @@ export default function BuildWorkoutPage() {
             <span className={styles.addBtn}>Add</span>
           </button>
 
-          {CATEGORIES.map((cat) => (
-            <div key={cat}>
-              <span className={styles.categoryLabel}>{CATEGORY_LABEL[cat]}</span>
-              {EXERCISE_LIBRARY.filter((e) => e.category === cat).map((ex) => (
-                <div key={ex.id} className={styles.exerciseRow}>
-                  <span className={styles.exerciseName}>{ex.name}</span>
-                  <button type="button" className={styles.addBtn} onClick={() => addExercise(ex.id)}>
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const inCategory = EXERCISE_LIBRARY.filter(
+              (e) => e.category === cat && (equipmentFilter === "all" || e.equipment === equipmentFilter)
+            );
+            if (!inCategory.length) return null;
+            return (
+              <div key={cat}>
+                <span className={styles.categoryLabel}>{CATEGORY_LABEL[cat]}</span>
+                {inCategory.map((ex) => (
+                  <div key={ex.id} className={styles.exerciseRow}>
+                    <ExercisePose pose={ex.pose} size={28} />
+                    <span className={styles.exerciseName}>{ex.name}</span>
+                    <button type="button" className={styles.addBtn} onClick={() => addExercise(ex.id)}>
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.builder}>

@@ -132,6 +132,87 @@
   }
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  padding: 0 var(--space-6) var(--space-4);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0.6em 1em;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.tagActive {
+  border-color: var(--fitness);
+  color: var(--ink);
+  background: var(--fitness-wash);
+}
+
+.cardProgress {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.librarySection {
+  padding: 0 var(--space-6) var(--space-7);
+}
+
+.libraryToggle {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fitness);
+  padding: 0.8em 0;
+  border-bottom: 1px solid var(--line);
+  width: 100%;
+  text-align: left;
+  margin-bottom: var(--space-4);
+}
+
+.exerciseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.exerciseCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3em;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-raised);
+  color: var(--fitness);
+}
+
+.exerciseCardName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.exerciseCardWhy {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
 .backLink {
   display: block;
   margin-bottom: var(--space-3);

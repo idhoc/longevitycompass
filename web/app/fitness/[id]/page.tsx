@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getWorkout, getExercise, loadCustomWorkouts, type WorkoutRoutine } from "@/lib/workouts";
+import { getWorkout, getExercise, loadCustomWorkouts, applyInjurySubstitutions, type WorkoutRoutine } from "@/lib/workouts";
+import { ExercisePose } from "@/components/ExercisePose";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { weekKey, todayIndex } from "@/lib/domainReach";
 import { computeStrain } from "@/lib/recoveryScores";
+import type { UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 
 const RING_SIZE = 148;
@@ -103,6 +105,10 @@ export default function WorkoutSessionPage() {
   }, [params.id]);
 
   const routine = presetRoutine ?? customRoutine;
+  const [profile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
+  const { steps: substitutedSteps, swaps } = routine
+    ? applyInjurySubstitutions(routine.steps, profile?.injuries ?? "")
+    : { steps: [], swaps: [] };
 
   const [index, setIndex] = useState(0);
   const finishedRef = useRef(false);
@@ -115,7 +121,7 @@ export default function WorkoutSessionPage() {
   );
   const [, setSessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
 
-  const steps = routine?.steps ?? [];
+  const steps = substitutedSteps;
   const done = index >= steps.length;
   const rawStep = !done ? steps[index] : null;
   const exercise = rawStep ? getExercise(rawStep.exerciseId) : null;
@@ -186,6 +192,12 @@ export default function WorkoutSessionPage() {
         </div>
       )}
 
+      {!done && index === 0 && swaps.length > 0 && (
+        <p className={styles.stepCue} style={{ padding: "0 var(--space-4)" }}>
+          Swapped for your reported {profile?.injuries}: {swaps.map((s) => `${s.from} → ${s.to}`).join(", ")}.
+        </p>
+      )}
+
       {done ? (
         <div className={styles.card}>
           <div className={styles.doneIcon}>✓</div>
@@ -202,6 +214,7 @@ export default function WorkoutSessionPage() {
         </div>
       ) : (
         <div className={styles.card}>
+          <ExercisePose pose={exercise!.pose} size={64} />
           <h1 className={styles.stepName}>{exercise!.name}</h1>
           <p className={styles.stepCue}>{exercise!.cue}</p>
 

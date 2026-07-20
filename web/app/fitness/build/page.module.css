@@ -59,6 +59,7 @@
 .exerciseName {
   font-family: var(--font-body);
   font-size: var(--text-sm);
+  flex: 1;
 }
 
 .addBtn {
