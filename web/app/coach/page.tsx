@@ -212,6 +212,7 @@ export default function CoachPage() {
           tone: p.tone,
           intensity: p.intensity,
           language: p.language || "English",
+          allowWebSearch: p.webSearchEnabled !== false,
         }),
       });
       const data = await res.json();

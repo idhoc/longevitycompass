@@ -203,6 +203,22 @@
   font-size: var(--text-sm);
 }
 
+.privacyBlock {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.privacyText {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
 .dataRow {
   display: flex;
   align-items: center;

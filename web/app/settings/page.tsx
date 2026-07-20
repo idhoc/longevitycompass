@@ -126,6 +126,9 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+              <p className={styles.optionHint} style={{ margin: 0 }}>
+                Reorders and reweights what Topics and Fitness show you first — no other effect.
+              </p>
             </div>
           </div>
           <div className={styles.field}>
@@ -143,6 +146,10 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+            <p className={styles.optionHint} style={{ margin: 0 }}>
+              Sets the order of the four domains everywhere in the app — Home, Topics, and the nav
+              all lead with whatever you pick here first.
+            </p>
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -160,6 +167,10 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+              <p className={styles.optionHint} style={{ margin: 0 }}>
+                Sets the baseline Fitness plans against — the Coach mentions it when talking about
+                training load.
+              </p>
             </div>
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Workout style</span>
@@ -176,6 +187,10 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+              <p className={styles.optionHint} style={{ margin: 0 }}>
+                Changes the Fitness page&apos;s written plan focus — doesn&apos;t filter which
+                routines you can open.
+              </p>
             </div>
           </div>
           <div className={styles.field}>
@@ -193,6 +208,10 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+            <p className={styles.optionHint} style={{ margin: 0 }}>
+              Changes the Nutrition page&apos;s written plan focus and what the Coach assumes about
+              how you already eat.
+            </p>
           </div>
         </section>
 
@@ -309,6 +328,44 @@ export default function SettingsPage() {
             nothing is uploaded anywhere except the single photo or message needed to answer a
             specific question.
           </p>
+
+          <div className={styles.privacyBlock}>
+            <span className={styles.dataLabel}>What&apos;s stored, and what leaves this device</span>
+            <p className={styles.privacyText}>
+              Stored only in this browser&apos;s local storage, never transmitted: your profile,
+              sleep and vitals entries, logged meals, workout sessions, mind and meditation
+              entries, coach conversation history, and any Apple Health or 23andMe data you&apos;ve
+              imported.
+            </p>
+            <p className={styles.privacyText}>
+              Sent to an AI provider only at the moment you trigger it, for that one request —
+              never in the background: a meal or fridge photo goes to OpenAI for that one
+              analysis; a coach message or reflection note goes to OpenAI and Anthropic to
+              generate that one reply; a meditation or spoken-reply request goes to OpenAI to
+              synthesize that one audio clip. None of it is stored by this app afterward, and nothing
+              is sent unless you take that specific action.
+            </p>
+          </div>
+
+          <div className={styles.dataRow}>
+            <div>
+              <div className={styles.dataLabel}>Coach web search</div>
+              <p className={styles.dataHint}>
+                Lets the Coach ground replies in current research via a live web search. Turning it
+                off means every reply comes from the model alone — nothing about your conversation
+                leaves this app as a search query.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={p.webSearchEnabled !== false ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+              onClick={() => update({ webSearchEnabled: p.webSearchEnabled === false })}
+              aria-pressed={p.webSearchEnabled !== false}
+            >
+              {p.webSearchEnabled !== false ? "On" : "Off"}
+            </button>
+          </div>
+
           <div className={styles.dataRow}>
             <div>
               <div className={styles.dataLabel}>Export everything</div>

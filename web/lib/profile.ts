@@ -117,6 +117,11 @@ export interface UserProfile {
   intensity: ContentIntensity;
   units: UnitsPreference;
   language: CoachLanguage;
+  /** Whether the Coach may use OpenAI's hosted web search to ground
+   * replies in current research — off means every reply comes only from
+   * the model's own training, nothing about the conversation leaves this
+   * app as a search query. Defaults on. */
+  webSearchEnabled: boolean;
   disclaimerAcknowledged: boolean;
   completedAt: string | null;
 }
@@ -138,6 +143,7 @@ export const EMPTY_PROFILE: UserProfile = {
   intensity: "standard",
   units: "imperial",
   language: "English",
+  webSearchEnabled: true,
   disclaimerAcknowledged: false,
   completedAt: null,
 };
