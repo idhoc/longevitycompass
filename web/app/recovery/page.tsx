@@ -8,6 +8,8 @@ import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
 import { dateKeyOffset, last7Days } from "@/lib/domainReach";
 import { computeRecoveryHistory, computeStrain } from "@/lib/recoveryScores";
+import { crossDomainInsights } from "@/lib/insights";
+import { InsightsPanel } from "@/components/InsightsPanel";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -16,6 +18,9 @@ interface SleepEntry {
   wakeTime: string;
   quality: number;
   restingHeartRate?: string;
+  disruptors?: string[];
+  caffeineAfter?: string;
+  awakenings?: number;
 }
 interface WorkoutSession {
   id: string;
@@ -23,6 +28,9 @@ interface WorkoutSession {
   routineId: string;
   title: string;
   durationMinutes?: number;
+}
+interface MindEntry {
+  date: string;
 }
 
 function todayKey() {
@@ -48,6 +56,14 @@ const STATUS_COLOR: Record<VitalStatus, string> = {
 export default function RecoveryPage() {
   const [sleepEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
+  const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
+  const [meditationSessions] = useLocalStorageState<MindEntry[]>("lc_meditation_sessions_v1", []);
+
+  const insights = crossDomainInsights({
+    sleepEntries,
+    sessions,
+    mindLogs: [...mindEntries, ...meditationSessions],
+  });
 
   const todayEntry = sleepEntries.find((e) => e.date === todayKey());
   const todayRHR = todayEntry ? Number(todayEntry.restingHeartRate) : NaN;
@@ -153,6 +169,11 @@ export default function RecoveryPage() {
               wearable-data API is the honest way to add these — not a simulated number.
             </p>
           </div>
+        </section>
+
+        <section className={styles.section}>
+          <span className={styles.sectionLabel}>Insights</span>
+          <InsightsPanel insights={insights} loggedNights={sleepEntries.length} />
         </section>
       </div>
     </div>

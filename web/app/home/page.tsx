@@ -8,6 +8,7 @@ import { SiteNav } from "@/components/SiteNav";
 import { HabitMomentumGauge } from "@/components/HabitMomentumGauge";
 import { TopicIcon, VITAL_ICONS, DOMAIN_ICONS } from "@/lib/icons";
 import { RoutineCompass } from "@/components/RoutineCompass";
+import { InsightsPanel } from "@/components/InsightsPanel";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
@@ -33,6 +34,7 @@ import {
 } from "@/lib/recoveryScores";
 import { domainOrderFromProfile, type UserProfile } from "@/lib/profile";
 import { featuredTopics, domainColor } from "@/lib/topics";
+import { crossDomainInsights } from "@/lib/insights";
 import { t } from "@/lib/i18n";
 import styles from "./page.module.css";
 
@@ -42,6 +44,9 @@ interface SleepEntry {
   wakeTime: string;
   quality: number;
   restingHeartRate?: string;
+  disruptors?: string[];
+  caffeineAfter?: string;
+  awakenings?: number;
 }
 interface LoggedMeal {
   date: string;
@@ -153,6 +158,12 @@ export default function HomePage() {
     return dailyDomainReach(date, { sleepEntries, meals, sessions, mindEntries, meditationSessions });
   });
 
+  const topInsight = crossDomainInsights({
+    sleepEntries,
+    sessions,
+    mindLogs: [...mindEntries, ...meditationSessions],
+  })[0];
+
   const topics = featuredTopics(domainOrderFromProfile(profile));
   const sleepLogStreak = computeStreak(sleepEntries);
 
@@ -249,6 +260,18 @@ export default function HomePage() {
           </p>
         )}
       </motion.div>
+
+      {topInsight && (
+        <motion.div
+          className={styles.insightSection}
+          initial="hidden"
+          animate="show"
+          variants={fadeUp}
+          transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <InsightsPanel insights={[topInsight]} loggedNights={sleepEntries.length} />
+        </motion.div>
+      )}
 
       <motion.div
         className={styles.grid}

@@ -168,6 +168,10 @@
   text-align: center;
 }
 
+.insightSection {
+  margin: 0 var(--space-5) var(--space-5);
+}
+
 .grid {
   margin: 0 var(--space-5) var(--space-5);
   display: grid;
@@ -261,7 +265,7 @@ a.tile:hover {
 }
 
 @media (max-width: 560px) {
-  .hero, .grid, .healthspan, .vitalsCard {
+  .hero, .grid, .healthspan, .vitalsCard, .insightSection {
     margin-left: var(--space-3);
     margin-right: var(--space-3);
   }
