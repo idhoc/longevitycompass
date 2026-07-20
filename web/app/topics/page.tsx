@@ -15,7 +15,7 @@ export default function TopicsPage() {
   const [genetics] = useLocalStorageState<GeneticProfile | null>(GENETICS_STORAGE_KEY, null);
 
   const order = domainOrderFromProfile(profile);
-  const groups = topicGroupsFromOrder(order);
+  const groups = topicGroupsFromOrder(order, profile);
   const plan = domainPlanFromProfile(profile);
   const hasPriority = !!profile?.primaryGoals.length;
 

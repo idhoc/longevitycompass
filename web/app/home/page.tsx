@@ -164,7 +164,7 @@ export default function HomePage() {
     mindLogs: [...mindEntries, ...meditationSessions],
   })[0];
 
-  const topics = featuredTopics(domainOrderFromProfile(profile));
+  const topics = featuredTopics(domainOrderFromProfile(profile), profile);
   const sleepLogStreak = computeStreak(sleepEntries);
 
   return (

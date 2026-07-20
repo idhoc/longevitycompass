@@ -1,4 +1,4 @@
-import type { DomainKey } from "./profile";
+import type { DomainKey, UserProfile } from "./profile";
 
 export interface Topic {
   id: string;
@@ -125,20 +125,101 @@ export interface TopicGroup {
   topics: Topic[];
 }
 
+const RESTRICTION_WORD: Record<string, string> = {
+  Vegetarian: "vegetarian",
+  Vegan: "vegan",
+  "Gluten-free": "gluten-free",
+  "Dairy-free": "dairy-free",
+};
+
+/**
+ * Real per-profile variation in what each topic card actually says —
+ * not a reorder, an actual rewrite grounded in specific facts already on
+ * the profile (age, sex, injuries, dietary restrictions, stress, weight).
+ * Falls back to the generic copy whenever there's no real fact to draw
+ * on, rather than inventing one — a topic with nothing personal to say
+ * stays honestly generic instead of faking specificity.
+ */
+function personalize(topic: Topic, profile: UserProfile | null): Topic {
+  if (!profile) return topic;
+  const restriction = profile.dietaryRestrictions.find((r) => r !== "No restrictions" && RESTRICTION_WORD[r]);
+
+  switch (topic.id) {
+    case "sleep-tracking": {
+      const complaint = profile.sleepComplaints.find((c) => c !== "No real complaint");
+      if (!complaint) return topic;
+      return {
+        ...topic,
+        description: `Log tonight's bedtime, wake time, and quality — see whether "${complaint.toLowerCase()}" eases as the week goes on.`,
+      };
+    }
+    case "vitals": {
+      if (profile.exactAge == null || profile.exactAge < 45) return topic;
+      return {
+        ...topic,
+        description: "Resting heart rate against your own baseline — worth watching closely past 45, when it becomes a more meaningful signal.",
+      };
+    }
+    case "meal-log": {
+      if (restriction) {
+        return {
+          ...topic,
+          description: `Photograph what you're eating instead of describing it — flagged automatically if anything doesn't fit ${RESTRICTION_WORD[restriction]}.`,
+        };
+      }
+      if (profile.weightKg != null) {
+        const proteinG = Math.round(profile.weightKg * 1.6);
+        return {
+          ...topic,
+          description: `Photograph what you're eating — tracked against a ~${proteinG}g/day protein target (1.6g/kg), a well-supported range for your weight.`,
+        };
+      }
+      return topic;
+    }
+    case "recipe-finder": {
+      if (!restriction) return topic;
+      return {
+        ...topic,
+        description: `Photograph your fridge or pantry and get a ${RESTRICTION_WORD[restriction]} recipe built from what's actually there.`,
+      };
+    }
+    case "guided-workouts": {
+      if (profile.injuries.trim()) {
+        return {
+          ...topic,
+          description: `Step-by-step sessions, paced by a timer, worked around ${profile.injuries.trim().toLowerCase()}.`,
+        };
+      }
+      if (profile.exactAge != null && profile.exactAge >= 60) {
+        return {
+          ...topic,
+          description: "Step-by-step sessions, paced by a timer, leading with lower-impact options first.",
+        };
+      }
+      return topic;
+    }
+    case "guided-meditation": {
+      if (profile.stressLevel < 4) return topic;
+      return {
+        ...topic,
+        description: "A narrated session with a breathing orb — built for the stress level you told us you're carrying right now.",
+      };
+    }
+    default:
+      return topic;
+  }
+}
+
 /** Domains ordered by the user's own stated priorities, each with its
- * topics in place — the personalization the profile actually earns you,
- * beyond just a static feature list. */
-export function topicGroupsFromOrder(domainOrder: DomainKey[]): TopicGroup[] {
+ * topics personalized against real profile facts — the differentiation
+ * the profile actually earns you, beyond just a reordered static list. */
+export function topicGroupsFromOrder(domainOrder: DomainKey[], profile: UserProfile | null = null): TopicGroup[] {
   return domainOrder.map((domain) => ({
     domain,
     label: DOMAIN_META[domain].label,
     color: DOMAIN_META[domain].color,
-    topics: DOMAIN_TOPICS[domain],
+    topics: DOMAIN_TOPICS[domain].map((topic) => personalize(topic, profile)),
   }));
-}
-
-export function allTopics(): Topic[] {
-  return Object.values(DOMAIN_TOPICS).flat();
 }
 
 export function domainColor(domain: DomainKey): string {
@@ -148,6 +229,6 @@ export function domainColor(domain: DomainKey): string {
 /** The lead topic from each domain, in priority order — what Home's
  * preview strip shows, so "Topics" reads as the actual front door instead
  * of a buried nav item. */
-export function featuredTopics(domainOrder: DomainKey[], count = 4): Topic[] {
-  return domainOrder.map((domain) => DOMAIN_TOPICS[domain][0]).slice(0, count);
+export function featuredTopics(domainOrder: DomainKey[], profile: UserProfile | null = null, count = 4): Topic[] {
+  return domainOrder.map((domain) => personalize(DOMAIN_TOPICS[domain][0], profile)).slice(0, count);
 }
