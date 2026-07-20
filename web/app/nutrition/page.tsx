@@ -6,6 +6,8 @@ import { NutritionPanel } from "@/components/panels/NutritionPanel";
 import { MacroRings } from "@/components/MacroRings";
 import { GeneticInsightCard } from "@/components/GeneticInsightCard";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { macroTargetsFromProfile } from "@/lib/nutritionTargets";
+import type { UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 
 interface LoggedMeal {
@@ -15,20 +17,18 @@ interface LoggedMeal {
   fatG: number | null;
 }
 
-const PROTEIN_TARGET = 100;
-const CARBS_TARGET = 250;
-const FAT_TARGET = 70;
-
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function NutritionPage() {
   const [meals] = useLocalStorageState<LoggedMeal[]>("lc_meals_v1", []);
+  const [profile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const todaysMeals = meals.filter((m) => m.date === todayKey());
   const proteinG = todaysMeals.reduce((sum, m) => sum + (m.proteinG || 0), 0);
   const carbsG = todaysMeals.reduce((sum, m) => sum + (m.carbsG || 0), 0);
   const fatG = todaysMeals.reduce((sum, m) => sum + (m.fatG || 0), 0);
+  const targets = macroTargetsFromProfile(profile);
 
   return (
     <div className={styles.page}>
@@ -50,12 +50,14 @@ export default function NutritionPage() {
               proteinG={proteinG}
               carbsG={carbsG}
               fatG={fatG}
-              proteinTarget={PROTEIN_TARGET}
-              carbsTarget={CARBS_TARGET}
-              fatTarget={FAT_TARGET}
+              proteinTarget={targets.proteinG}
+              carbsTarget={targets.carbsG}
+              fatTarget={targets.fatG}
             />
             <p className={styles.macroNote}>
-              General adult targets, not personalized to your body weight yet.
+              {targets.personalized
+                ? "Targets from your age, sex, height, and weight (Mifflin-St Jeor), not a lab measurement of your actual metabolism."
+                : "General adult targets — add your age, sex, height, and weight in Settings to personalize these."}
             </p>
           </div>
         )}

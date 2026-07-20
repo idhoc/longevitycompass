@@ -1,3 +1,5 @@
+export type DietTag = "Vegetarian" | "Vegan" | "Gluten-free" | "Dairy-free";
+
 export interface MealIdea {
   id: string;
   title: string;
@@ -9,6 +11,10 @@ export interface MealIdea {
   description: string;
   ingredients: string[];
   steps: string[];
+  /** What this recipe, as written, actually satisfies — used to sort
+   * ideas toward whatever the profile's real dietary restrictions are,
+   * never to silently hide the rest. */
+  dietTags: DietTag[];
 }
 
 /** A small, real, curated set of meal ideas with actual recipes and
@@ -27,6 +33,7 @@ export const MEAL_IDEAS: MealIdea[] = [
     description: "High-protein, ready in 3 minutes — a strong default when you're rushed.",
     ingredients: ["1 cup plain Greek yogurt", "1/2 cup mixed berries", "2 tbsp walnuts", "1 tsp honey"],
     steps: ["Spoon yogurt into a bowl.", "Top with berries and walnuts.", "Drizzle with honey."],
+    dietTags: ["Vegetarian", "Gluten-free"],
   },
   {
     id: "veggie-scramble",
@@ -44,6 +51,7 @@ export const MEAL_IDEAS: MealIdea[] = [
       "Add beaten eggs, stir gently until just set.",
       "Season and serve.",
     ],
+    dietTags: ["Vegetarian", "Gluten-free", "Dairy-free"],
   },
   {
     id: "chicken-rice-bowl",
@@ -56,6 +64,7 @@ export const MEAL_IDEAS: MealIdea[] = [
     description: "Meal-prep friendly — make four at once on a Sunday.",
     ingredients: ["6 oz grilled chicken breast", "3/4 cup cooked rice", "1 cup steamed broccoli", "1 tbsp soy sauce"],
     steps: ["Slice the chicken.", "Layer rice, broccoli, and chicken in a bowl.", "Drizzle with soy sauce."],
+    dietTags: ["Dairy-free"],
   },
   {
     id: "lentil-soup",
@@ -68,6 +77,7 @@ export const MEAL_IDEAS: MealIdea[] = [
     description: "Fiber-heavy and filling — freezes well for busy weeks.",
     ingredients: ["1 cup red lentils", "1 diced carrot", "1 diced celery stalk", "4 cups vegetable broth", "1 tsp cumin"],
     steps: ["Sauté carrot and celery 5 minutes.", "Add lentils, broth, and cumin.", "Simmer 20 minutes until lentils are soft."],
+    dietTags: ["Vegetarian", "Vegan", "Gluten-free", "Dairy-free"],
   },
   {
     id: "salmon-sweet-potato",
@@ -85,6 +95,7 @@ export const MEAL_IDEAS: MealIdea[] = [
       "Steam green beans 5 minutes.",
       "Plate together.",
     ],
+    dietTags: ["Gluten-free", "Dairy-free"],
   },
   {
     id: "tofu-stir-fry",
@@ -102,6 +113,7 @@ export const MEAL_IDEAS: MealIdea[] = [
       "Return tofu, add sauce, toss to coat.",
       "Serve over rice.",
     ],
+    dietTags: ["Vegetarian", "Vegan", "Dairy-free"],
   },
   {
     id: "apple-almond-butter",
@@ -114,6 +126,7 @@ export const MEAL_IDEAS: MealIdea[] = [
     description: "Fiber plus healthy fat — a steadier blood-sugar response than juice or crackers.",
     ingredients: ["1 medium apple, sliced", "2 tbsp almond butter"],
     steps: ["Slice the apple.", "Serve with almond butter for dipping."],
+    dietTags: ["Vegetarian", "Vegan", "Gluten-free", "Dairy-free"],
   },
   {
     id: "cottage-cheese-pineapple",
@@ -126,5 +139,6 @@ export const MEAL_IDEAS: MealIdea[] = [
     description: "An underrated high-protein snack that actually keeps you full.",
     ingredients: ["3/4 cup cottage cheese", "1/2 cup pineapple chunks"],
     steps: ["Combine in a bowl and serve chilled."],
+    dietTags: ["Vegetarian", "Gluten-free"],
   },
 ];
