@@ -34,6 +34,7 @@
   color: var(--ink-soft);
   display: inline-flex;
   align-items: center;
+  gap: 0.45em;
   padding: 0.9em 0.3em 0.7em;
   min-height: 44px;
   transition: color 0.15s ease;
@@ -41,6 +42,13 @@
 
 .link:hover {
   color: var(--ink);
+}
+
+.linkIcon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+  flex-shrink: 0;
 }
 
 .linkActive {

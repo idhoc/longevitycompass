@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { t } from "@/lib/i18n";
+import { NAV_ICONS } from "@/lib/icons";
 import type { UserProfile } from "@/lib/profile";
 import styles from "./SiteNav.module.css";
 
@@ -35,12 +36,14 @@ export function SiteNav() {
       <nav className={styles.links}>
         {LINKS.map((l) => {
           const isActive = pathname === l.href || pathname?.startsWith(`${l.href}/`);
+          const Icon = NAV_ICONS[l.href];
           return (
             <Link
               key={l.href}
               href={l.href}
               className={isActive ? `${styles.link} ${styles.linkActive}` : styles.link}
             >
+              <Icon className={styles.linkIcon} aria-hidden="true" />
               {t(lang, l.label)}
               {isActive && (
                 <motion.span

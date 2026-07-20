@@ -172,7 +172,7 @@ export default function WorkoutSessionPage() {
         </Link>
         {!done && (
           <div className={styles.topRowRight}>
-            <span className={`${styles.liveStrain} tabular`}>Strain {liveStrain.toFixed(1)}</span>
+            <span className={`${styles.liveStrain} tabular`}>Load {liveStrain.toFixed(1)}</span>
             <span className={`${styles.stepCount} tabular`}>
               {index + 1} / {steps.length}
             </span>

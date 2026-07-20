@@ -47,19 +47,19 @@ export function computeStreak(entries: { date: string }[]): number {
 
 export function fitnessReachFromDays(days: boolean[]): number {
   const completed = days.filter(Boolean).length;
-  return Math.max(0.04, completed / 7);
+  return completed / 7;
 }
 
 export function nutritionReachFromMealsToday(count: number): number {
-  return Math.max(0.04, Math.min(1, count / 3));
+  return Math.min(1, count / 3);
 }
 
 export function sleepReachFromMinutes(minutes: number): number {
-  return Math.max(0.04, Math.min(1, minutes / (8 * 60)));
+  return Math.min(1, minutes / (8 * 60));
 }
 
 export function mindReachFromStreak(streak: number): number {
-  return Math.max(0.04, Math.min(1, streak / 7));
+  return Math.min(1, streak / 7);
 }
 
 export interface DomainDayReach {

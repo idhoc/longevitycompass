@@ -132,10 +132,14 @@ export default function RecoveryPage() {
               <TrendBars values={recoveryTrend} color="var(--signal)" />
             </div>
             <div className={styles.vitalCard}>
-              <span className={styles.vitalLabel}>Strain, 7 days</span>
+              <span className={styles.vitalLabel}>Workout load, 7 days</span>
               <TrendBars values={strainTrend} color="var(--strain)" />
             </div>
           </div>
+          <p className={styles.vitalNote}>
+            Load is estimated from workout duration, not heart-rate zones — a real
+            physiological strain number needs a wearable&apos;s continuous heart-rate data.
+          </p>
           <div className={styles.unavailableBlock}>
             <span className={styles.categoryLabel}>Not available without a wearable</span>
             <ul className={styles.unavailableList}>

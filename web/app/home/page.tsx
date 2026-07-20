@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { SiteNav } from "@/components/SiteNav";
-import { AgingPaceGauge } from "@/components/AgingPaceGauge";
+import { HabitMomentumGauge } from "@/components/HabitMomentumGauge";
+import { TopicIcon, VITAL_ICONS, DOMAIN_ICONS } from "@/lib/icons";
 import { RoutineCompass } from "@/components/RoutineCompass";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
@@ -22,7 +23,7 @@ import {
   computeReadiness,
   type DomainDayReach,
 } from "@/lib/domainReach";
-import { computeAgingPace } from "@/lib/agingPace";
+import { computeHabitMomentum } from "@/lib/habitMomentum";
 import {
   computeSleepPerformance,
   computeRecovery,
@@ -127,15 +128,16 @@ export default function HomePage() {
   const totalCalories = todaysMeals.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
   const totalProtein = todaysMeals.reduce((sum, m) => sum + (m.proteinG || 0), 0);
 
-  const durationReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0.04;
+  const durationReach = sleepEntry ? sleepReachFromMinutes(minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime)) : 0;
   const sleepReach = sleepEntry?.quality ? (durationReach + sleepEntry.quality / 5) / 2 : durationReach;
   const nutritionReach = nutritionReachFromMealsToday(todaysMeals.length);
   const fitnessReach = fitnessReachFromDays(fitnessDays);
   const mindDates = [...mindEntries, ...meditationSessions].map((e) => ({ date: e.date }));
   const mindStreak = computeStreak(mindDates);
   const mindReach = mindReachFromStreak(mindStreak);
-  const agingPace = computeAgingPace({ sleepReach, fitnessReach, nutritionReach, mindReach });
+  const habitMomentum = computeHabitMomentum({ sleepReach, fitnessReach, nutritionReach, mindReach });
   const readiness = computeReadiness({ sleep: sleepReach, nutrition: nutritionReach, fitness: fitnessReach, mind: mindReach });
+  const hasReadinessData = sleepReach > 0 || nutritionReach > 0 || fitnessReach > 0 || mindReach > 0;
 
   const loggedDayCount = new Set([
     ...sleepEntries.map((e) => e.date),
@@ -163,7 +165,11 @@ export default function HomePage() {
         <h1 className={styles.heroTitle}>
           {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
         </h1>
-        <p className={styles.headerSub}>{readiness.focus} is the biggest lever right now.</p>
+        <p className={styles.headerSub}>
+          {hasReadinessData
+            ? `${readiness.focus} is the biggest lever right now.`
+            : "Log your first check-in below to see where to focus."}
+        </p>
       </motion.div>
 
       <motion.div
@@ -182,7 +188,12 @@ export default function HomePage() {
         <div className={styles.topicsStrip}>
           {topics.map((topic) => (
             <Link key={topic.id} href={topic.href} className={styles.topicCard} style={{ borderTopColor: domainColor(topic.domain) }}>
-              <span className={styles.topicIcon} aria-hidden="true">{topic.icon}</span>
+              <TopicIcon
+                name={topic.icon}
+                className={styles.topicIcon}
+                aria-hidden="true"
+                style={{ color: domainColor(topic.domain) }}
+              />
               <span className={styles.topicTitle}>{topic.title}</span>
               <p className={styles.topicDesc}>{topic.description}</p>
             </Link>
@@ -197,9 +208,14 @@ export default function HomePage() {
         variants={fadeUp}
         transition={{ duration: 0.4, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
       >
-        <RoutineCompass days={compassDays} centerLabel="Readiness" centerValue={`${readiness.score}%`} />
+        <RoutineCompass
+          days={compassDays}
+          centerLabel={hasReadinessData ? "Readiness" : "No data yet"}
+          centerValue={hasReadinessData ? `${readiness.score}%` : "—"}
+        />
         <div className={styles.vitalsGrid}>
           <Link href="/recovery" className={styles.vitalCell}>
+            <VITAL_ICONS.sleep className={styles.vitalIcon} aria-hidden="true" />
             <span className={styles.vitalValue}>
               {sleepEntry ? (minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime) / 60).toFixed(1) : "—"}
               {sleepEntry && <span className={styles.vitalUnit}>h</span>}
@@ -207,6 +223,7 @@ export default function HomePage() {
             <span className={styles.vitalLabel}>Sleep</span>
           </Link>
           <Link href="/recovery" className={styles.vitalCell}>
+            <VITAL_ICONS.restingHR className={styles.vitalIcon} aria-hidden="true" />
             <span className={styles.vitalValue}>
               {hasRestingHR ? restingHR : "—"}
               {hasRestingHR && <span className={styles.vitalUnit}>bpm</span>}
@@ -214,16 +231,23 @@ export default function HomePage() {
             <span className={styles.vitalLabel}>Resting HR</span>
           </Link>
           <Link href="/recovery" className={styles.vitalCell}>
+            <VITAL_ICONS.recovery className={styles.vitalIcon} aria-hidden="true" style={{ color: RECOVERY_COLOR[band] }} />
             <span className={styles.vitalValue} style={{ color: RECOVERY_COLOR[band] }}>
               {sleepEntry ? `${recovery}%` : "—"}
             </span>
             <span className={styles.vitalLabel}>Recovery</span>
           </Link>
           <Link href="/fitness" className={styles.vitalCell}>
+            <VITAL_ICONS.load className={styles.vitalIcon} aria-hidden="true" />
             <span className={styles.vitalValue}>{strain.toFixed(1)}</span>
-            <span className={styles.vitalLabel}>Strain</span>
+            <span className={styles.vitalLabel}>Load</span>
           </Link>
         </div>
+        {!hasReadinessData && (
+          <p className={styles.tileSub}>
+            Readiness unavailable — complete your first recovery check-in and log activity to begin.
+          </p>
+        )}
       </motion.div>
 
       <motion.div
@@ -234,12 +258,14 @@ export default function HomePage() {
         transition={{ duration: 0.4, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
       >
         <Link href="/recovery" className={`${styles.tile} ${styles.tileRecovery}`}>
+          <DOMAIN_ICONS.sleep className={styles.tileIcon} aria-hidden="true" />
           <span className={styles.tileLabel}>Recovery</span>
           <span className={styles.tileStat}>{sleepLogStreak > 0 ? `${sleepLogStreak}d streak` : "Not logged yet"}</span>
           <p className={styles.tileSub}>{sleepEntry ? "Last night logged" : "Log last night"}</p>
         </Link>
 
         <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition}`}>
+          <DOMAIN_ICONS.nutrition className={styles.tileIcon} aria-hidden="true" />
           <span className={styles.tileLabel}>Nutrition</span>
           <span className={styles.tileStat}>{todaysMeals.length ? `${Math.round(totalCalories)} kcal` : "Nothing logged"}</span>
           <p className={styles.tileSub}>
@@ -248,6 +274,7 @@ export default function HomePage() {
         </Link>
 
         <Link href="/fitness" className={`${styles.tile} ${styles.tileFitness}`}>
+          <DOMAIN_ICONS.fitness className={styles.tileIcon} aria-hidden="true" />
           <span className={styles.tileLabel}>Fitness</span>
           <span className={styles.tileStat}>{completedDays}/7 days</span>
           <p className={styles.tileSub}>
@@ -258,6 +285,7 @@ export default function HomePage() {
         </Link>
 
         <Link href="/mind" className={`${styles.tile} ${styles.tileMind}`}>
+          <DOMAIN_ICONS.mind className={styles.tileIcon} aria-hidden="true" />
           <span className={styles.tileLabel}>Mind</span>
           <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "Not logged yet"}</span>
           <p className={styles.tileSub}>Reflect, meditate, or take a break</p>
@@ -274,16 +302,16 @@ export default function HomePage() {
         <span className={styles.tileLabel}>{t(profile?.language, "Healthspan")}</span>
         {healthspanUnlocked ? (
           <div className={styles.healthspanRow}>
-            <AgingPaceGauge pace={agingPace.pace} band={agingPace.band} />
+            <HabitMomentumGauge momentum={habitMomentum.momentum} band={habitMomentum.band} />
             <p className={styles.tileSub}>
-              Pace of Aging — a self-reported habit estimate, not a lab-validated biological-age
-              model. 1.0x is average.
+              Habit Momentum — a self-reported consistency trend across the four domains, not a
+              lab-validated biological-age model. 1.0x is an average week.
             </p>
           </div>
         ) : (
           <p className={styles.tileSub}>
             Log {daysToUnlock} more day{daysToUnlock === 1 ? "" : "s"}{" "}
-            to unlock your Pace of Aging — five logged days is enough for a first read.
+            to unlock your Habit Momentum — five logged days is enough for a first read.
           </p>
         )}
       </motion.div>

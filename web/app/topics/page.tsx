@@ -6,6 +6,8 @@ import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { domainOrderFromProfile, domainPlanFromProfile, type UserProfile } from "@/lib/profile";
 import { topicGroupsFromOrder } from "@/lib/topics";
 import { GENETICS_STORAGE_KEY, type GeneticProfile } from "@/lib/genetics23andme";
+import { TopicIcon } from "@/lib/icons";
+import { Dna } from "lucide-react";
 import styles from "./page.module.css";
 
 export default function TopicsPage() {
@@ -44,7 +46,7 @@ export default function TopicsPage() {
             <div className={styles.grid}>
               {group.topics.map((topic) => (
                 <Link key={topic.id} href={topic.href} className={styles.card} style={{ borderTopColor: group.color }}>
-                  <span className={styles.cardIcon} aria-hidden="true">{topic.icon}</span>
+                  <TopicIcon name={topic.icon} className={styles.cardIcon} aria-hidden="true" style={{ color: group.color }} />
                   <span className={styles.cardTitle}>{topic.title}</span>
                   <p className={styles.cardDesc}>{topic.description}</p>
                   <span className={styles.cardFeature} style={{ color: group.color }}>{topic.feature}</span>
@@ -53,7 +55,7 @@ export default function TopicsPage() {
 
               {!genetics && (group.domain === "nutrition" || group.domain === "fitness") && (
                 <Link href="/settings" className={`${styles.card} ${styles.cardGhost}`} style={{ borderTopColor: group.color }}>
-                  <span className={styles.cardIcon} aria-hidden="true">🧬</span>
+                  <Dna className={styles.cardIcon} aria-hidden="true" style={{ color: group.color }} />
                   <span className={styles.cardTitle}>Add 23andMe data</span>
                   <p className={styles.cardDesc}>
                     Optional — import your raw data in Settings to unlock genetic context right

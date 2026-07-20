@@ -19,7 +19,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Log tonight's bedtime, wake time, and quality — see an estimated stage breakdown.",
       href: "/recovery",
       feature: "Unique feature: estimated sleep-stage bar, built from your own check-in",
-      icon: "🌙",
+      icon: "moon",
     },
     {
       id: "apple-watch-import",
@@ -28,7 +28,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Pull real sleep and resting heart rate straight from your Health app export.",
       href: "/settings",
       feature: "Unique feature: parses your real export.xml, entirely on this device",
-      icon: "⌚",
+      icon: "watch",
     },
     {
       id: "vitals",
@@ -37,7 +37,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Resting heart rate against your own baseline, tracked night over night.",
       href: "/recovery",
       feature: "Unique feature: compares tonight against your own last 7 nights, not a population norm",
-      icon: "💓",
+      icon: "heart-pulse",
     },
   ],
   nutrition: [
@@ -48,7 +48,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Photograph what you're eating instead of describing it — get calories and macros back.",
       href: "/nutrition",
       feature: "Unique feature: real vision-AI meal analysis, no manual food search",
-      icon: "🍽️",
+      icon: "camera",
     },
     {
       id: "recipe-finder",
@@ -57,7 +57,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Photograph your fridge or pantry and get a recipe built from what's actually there.",
       href: "/nutrition?topic=recipe",
       feature: "Unique feature: recipes generated from a photo of your real ingredients",
-      icon: "🥘",
+      icon: "chef-hat",
     },
   ],
   fitness: [
@@ -67,8 +67,8 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       title: "Guided workouts",
       description: "Step-by-step sessions, paced by a timer, with the reasoning behind each exercise.",
       href: "/fitness",
-      feature: "Unique feature: live strain tracking while the session runs",
-      icon: "🏋️",
+      feature: "Unique feature: a real-time workout-load estimate while the session runs",
+      icon: "dumbbell",
     },
     {
       id: "build-routine",
@@ -77,7 +77,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "Pick your own exercises, sets, reps, and rest — save it for next time.",
       href: "/fitness/build",
       feature: "Unique feature: fully custom routines, saved to this device",
-      icon: "🛠️",
+      icon: "wrench",
     },
   ],
   mind: [
@@ -88,7 +88,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "A narrated session with a breathing orb that expands and settles with your breath.",
       href: "/mind?topic=meditate",
       feature: "Unique feature: a reactive glowing orb, paced to real narrated audio",
-      icon: "🧘",
+      icon: "wind",
     },
     {
       id: "reflect",
@@ -97,7 +97,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "A short daily prompt on purpose and connection — the habit of noticing.",
       href: "/mind?topic=reflect",
       feature: "Unique feature: a rotating prompt bank, tracked as a real streak",
-      icon: "📝",
+      icon: "notebook-pen",
     },
     {
       id: "mindful-break",
@@ -106,7 +106,7 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       description: "A timed nudge to step away from the screen for a few minutes.",
       href: "/mind?topic=break",
       feature: "Unique feature: a real countdown timer, not just a reminder banner",
-      icon: "⏱️",
+      icon: "timer",
     },
   ],
 };

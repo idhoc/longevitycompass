@@ -83,8 +83,9 @@
 }
 
 .topicIcon {
-  font-size: 1.5rem;
-  line-height: 1;
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.75;
 }
 
 .topicTitle {
@@ -134,6 +135,13 @@
 .vitalCell:hover {
   border-color: var(--signal);
   transform: translateY(-2px);
+}
+
+.vitalIcon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  color: var(--ink-faint);
 }
 
 .vitalValue {
@@ -203,6 +211,14 @@ a.tile:hover {
 .tileMind {
   border-left-color: var(--mind);
   background: linear-gradient(150deg, var(--mind-wash), var(--paper-raised) 60%);
+}
+
+.tileIcon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.75;
+  color: var(--ink-soft);
+  margin-bottom: 0.1em;
 }
 
 .tileLabel {

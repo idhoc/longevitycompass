@@ -1,4 +1,4 @@
-import type { AgingPaceBand } from "@/lib/agingPace";
+import type { HabitMomentumBand } from "@/lib/habitMomentum";
 
 const CX = 90;
 const CY = 84;
@@ -22,14 +22,14 @@ const SEGMENTS = [
   { from: 60, to: 0, color: "#d0625a" },
 ];
 
-const BAND_LABEL: Record<AgingPaceBand, string> = {
-  slower: "Slower",
-  typical: "Typical",
-  faster: "Faster",
+const BAND_LABEL: Record<HabitMomentumBand, string> = {
+  strong: "Strong",
+  steady: "Steady",
+  light: "Light",
 };
 
-export function AgingPaceGauge({ pace, band }: { pace: number; band: AgingPaceBand }) {
-  const t = Math.max(0, Math.min(1, (pace - 0.7) / 0.6));
+export function HabitMomentumGauge({ momentum, band }: { momentum: number; band: HabitMomentumBand }) {
+  const t = Math.max(0, Math.min(1, (momentum - 0.7) / 0.6));
   const needleAngleDeg = 180 - t * 180;
   const needleRad = (needleAngleDeg * Math.PI) / 180;
   const needleLen = RADIUS - 20;
@@ -39,7 +39,7 @@ export function AgingPaceGauge({ pace, band }: { pace: number; band: AgingPaceBa
   return (
     <div
       role="img"
-      aria-label={`Estimated pace of aging: ${pace.toFixed(2)}x, ${BAND_LABEL[band].toLowerCase()} than average`}
+      aria-label={`Habit momentum: ${momentum.toFixed(2)}x, a ${BAND_LABEL[band].toLowerCase()} week compared with average`}
       style={{ width: 180, height: 140, position: "relative", flexShrink: 0 }}
     >
       <svg width={180} height={100} viewBox="0 0 180 100" aria-hidden="true">
@@ -59,7 +59,7 @@ export function AgingPaceGauge({ pace, band }: { pace: number; band: AgingPaceBa
       </svg>
       <div style={{ position: "absolute", top: 100, left: 0, right: 0, textAlign: "center" }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.5rem", color: "var(--ink)" }}>
-          {pace.toFixed(2)}x
+          {momentum.toFixed(2)}x
         </div>
         <div
           style={{
@@ -70,7 +70,7 @@ export function AgingPaceGauge({ pace, band }: { pace: number; band: AgingPaceBa
             color: "var(--ink-soft)",
           }}
         >
-          {BAND_LABEL[band]} pace
+          {BAND_LABEL[band]} week
         </div>
       </div>
     </div>

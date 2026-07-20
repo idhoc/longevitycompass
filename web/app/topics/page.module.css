@@ -80,8 +80,9 @@
 }
 
 .cardIcon {
-  font-size: 1.6rem;
-  line-height: 1;
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.75;
 }
 
 .cardTitle {
