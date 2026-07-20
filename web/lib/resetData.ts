@@ -14,6 +14,8 @@ const LOGGED_DATA_KEYS = [
   "lc_focus_sessions_v1",
   "lc_genetics_v1",
   "lc_journal_v1", // retired feature — still cleared for anyone with old data
+  "lc_coach_history_v1",
+  "lc_voice_pref_v1",
 ];
 
 const PROFILE_KEYS = ["lc_profile_v1", "lc_onboarding_skipped_v1"];

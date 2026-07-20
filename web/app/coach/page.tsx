@@ -7,6 +7,7 @@ import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { weekKey, computeStreak } from "@/lib/domainReach";
 import { computeSleepPerformance, computeRecovery, recoveryBand, RECOVERY_COLOR } from "@/lib/recoveryScores";
+import { crossDomainInsights } from "@/lib/insights";
 import { EMPTY_PROFILE, type UserProfile } from "@/lib/profile";
 import styles from "./page.module.css";
 
@@ -24,6 +25,8 @@ interface SleepEntry {
   wakeTime: string;
   quality: number;
   restingHeartRate?: string;
+  disruptors?: string[];
+  caffeineAfter?: string;
 }
 interface LoggedMeal {
   date: string;
@@ -36,7 +39,7 @@ interface WorkoutSession {
 }
 interface MindEntry {
   date: string;
-  purposeRating: number;
+  mood: number;
   note: string;
 }
 
@@ -79,8 +82,9 @@ export default function CoachPage() {
   );
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
   const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
+  const [meditationSessions] = useLocalStorageState<{ date: string }[]>("lc_meditation_sessions_v1", []);
 
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const [entries, setEntries, entriesHydrated] = useLocalStorageState<Entry[]>("lc_coach_history_v1", []);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -111,7 +115,13 @@ export default function CoachPage() {
     : null;
   const band = recovery != null ? recoveryBand(recovery) : null;
 
+  const hasEverLogged = sleepEntries.length > 0 || meals.length > 0 || sessions.length > 0 || mindEntries.length > 0;
+
   function buildContext(): string {
+    if (!hasEverLogged) {
+      return "This is a brand-new account — nothing has ever been logged in any domain (sleep, nutrition, fitness, or mind). Do not reference sleep, meals, movement, or mind check-ins as if you've seen any data, because you haven't.";
+    }
+
     const lines: string[] = [];
     const sleepEntry = sleepEntries.find((e) => e.date === todayKey());
     if (sleepEntry) {
@@ -143,6 +153,15 @@ export default function CoachPage() {
         : "Mind: no reflection logged recently."
     );
 
+    const insights = crossDomainInsights({ sleepEntries, sessions, mindLogs: [...mindEntries, ...meditationSessions] });
+    if (insights.length) {
+      lines.push(
+        `Real patterns already found in their own logged data: ${insights
+          .map((i) => `${i.headline} — ${i.detail}`)
+          .join(" ")}`
+      );
+    }
+
     return lines.join("\n");
   }
 
@@ -170,7 +189,7 @@ export default function CoachPage() {
     if (!isKickoff) {
       const trimmed = (userText || "").trim();
       if (!trimmed || busy) return;
-      setEntries((e) => [...e, { who: "you", text: trimmed, time: timeNow() }]);
+      setEntries((e) => [...e, { who: "you" as const, text: trimmed, time: timeNow() }].slice(-200));
       setDraft("");
     }
     setBusy(true);
@@ -184,7 +203,9 @@ export default function CoachPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: isKickoff
-            ? "Open today's check-in. Reference at least one specific thing I've actually logged, in one or two short sentences, then ask one open question."
+            ? hasEverLogged
+              ? "Open today's check-in. Reference at least one specific thing I've actually logged, in one or two short sentences, then ask one open question."
+              : "This is the very first time this person has opened the coach and nothing has been logged in any domain yet. Give a short, warm one-sentence welcome — do not claim to have seen any data, movement, sleep, or anything else, because there is none — then ask one open question to get a sense of where they want to start."
             : userText,
           history,
           context: buildContext(),
@@ -196,18 +217,22 @@ export default function CoachPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
       const reply: string = data.reply || "";
-      setEntries((e) => [...e, { who: "coach", text: reply, time: timeNow(), escalation: !!data.escalation }]);
+      setEntries((e) =>
+        [...e, { who: "coach" as const, text: reply, time: timeNow(), escalation: !!data.escalation }].slice(-200)
+      );
       if (reply) void speak(reply);
     } catch {
-      setEntries((e) => [
-        ...e,
-        {
-          who: "coach",
-          text: "That request didn't go through — try again in a moment.",
-          time: timeNow(),
-          error: true,
-        },
-      ]);
+      setEntries((e) =>
+        [
+          ...e,
+          {
+            who: "coach" as const,
+            text: "That request didn't go through — try again in a moment.",
+            time: timeNow(),
+            error: true,
+          },
+        ].slice(-200)
+      );
     } finally {
       setBusy(false);
       setOrbState((s) => (s === "speaking" ? s : "idle"));
@@ -257,12 +282,20 @@ export default function CoachPage() {
     }
   }
 
+  // Only ever auto-opens the conversation once, on a genuinely empty
+  // history — the coach used to re-kick off a fresh "session" every time
+  // this page mounted, which is exactly why it never felt like it
+  // remembered anything. History now persists, so a return visit just
+  // shows what was already said.
   useEffect(() => {
-    if (startedRef.current) return;
+    if (!entriesHydrated || startedRef.current) return;
     startedRef.current = true;
-    void sendToCoach(null);
+    if (entries.length === 0) {
+      const t = setTimeout(() => void sendToCoach(null), 0);
+      return () => clearTimeout(t);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [entriesHydrated]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
