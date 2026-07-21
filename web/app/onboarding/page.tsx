@@ -2,11 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
-import { Orb } from "@/components/Orb";
-import { RoutineCompass } from "@/components/RoutineCompass";
-import { dateKeyOffset, type DomainDayReach } from "@/lib/domainReach";
 import {
   EMPTY_PROFILE,
   GOAL_OPTIONS,
@@ -18,7 +15,6 @@ import {
   NUTRITION_PATTERN_OPTIONS,
   DIETARY_OPTIONS,
   SEX_OPTIONS,
-  domainPlanFromProfile,
   ageRangeFromExactAge,
   lbToKg,
   kgToLb,
@@ -29,173 +25,18 @@ import {
 } from "@/lib/profile";
 import styles from "./page.module.css";
 
-const STEP_ORDER = [
-  "welcome",
-  "goal",
-  "vitals",
-  "sleepHours",
-  "sleepComplaints",
-  "caffeine",
-  "activity",
-  "workoutStyle",
-  "injuries",
-  "nutritionPattern",
-  "dietary",
-  "stress",
-  "tour",
-  "action",
-] as const;
-type StepId = (typeof STEP_ORDER)[number];
-const STEP_COUNT = STEP_ORDER.length;
-
-const ACTION_COPY: Record<DomainKey | "none", { title: string; body: string }> = {
-  sleep: {
-    title: "You're set up",
-    body: "Your dashboard is ready. Log tonight's sleep whenever you actually go to bed — no rush.",
-  },
-  nutrition: {
-    title: "You're set up",
-    body: "Your dashboard is ready. Snap a photo next time you eat — whenever that happens to be.",
-  },
-  fitness: {
-    title: "You're set up",
-    body: "Your dashboard is ready. Pick a session whenever you're ready to move.",
-  },
-  mind: {
-    title: "You're set up",
-    body: "Your dashboard is ready. Reflect, breathe, or take a break whenever you have a moment.",
-  },
-  none: {
-    title: "You're all set",
-    body: "Explore at your own pace — every screen is ready when you are.",
-  },
-};
-
-function questionForStep(id: StepId, draft: UserProfile): string {
-  switch (id) {
-    case "welcome":
-      return `Hi${draft.name ? ` ${draft.name}` : ""} — I'm your coach here at Longevity Compass. I'll ask a few quick things about your goals, sleep, food, movement, and stress, and shape everything after this around your actual life instead of a generic plan. Takes a couple minutes, and you can skip to the app any time.`;
-    case "goal":
-      return "First — what matters most to you right now?";
-    case "vitals":
-      return "A few real numbers that actually matter for longevity: your age, sex, height, and weight. These shape what's normal for you — resting heart rate, protein needs, training load — instead of a generic default.";
-    case "sleepHours":
-      return "How much sleep do you usually get a night?";
-    case "sleepComplaints":
-      return "What tends to get in the way of good sleep, if anything?";
-    case "caffeine":
-      return "How much caffeine do you usually have in a day?";
-    case "activity":
-      return "How would you describe your current activity level?";
-    case "workoutStyle":
-      return "And what kind of movement do you actually enjoy?";
-    case "injuries":
-      return "Anything I should work around — an old injury, a joint issue, anything like that? Fine to skip.";
-    case "nutritionPattern":
-      return "How would you describe how you eat day to day?";
-    case "dietary":
-      return "Any dietary restrictions I should keep in mind?";
-    case "stress":
-      return "Last one before I show you around — how's your stress level lately, 1 to 5?";
-    case "tour":
-      return "Here's the actual dashboard you'll land on — tap around, then let's get you started.";
-    case "action": {
-      const chosenGoal = draft.primaryGoals[0] ?? "none";
-      const action = ACTION_COPY[chosenGoal];
-      return draft.name ? `${action.title}, ${draft.name}.` : `${action.title}.`;
-    }
-    default:
-      return "";
-  }
-}
-
-function summaryForStep(id: StepId, draft: UserProfile): string | null {
-  switch (id) {
-    case "welcome":
-      return draft.name ? `I'm ${draft.name}.` : null;
-    case "goal": {
-      const g = GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0]);
-      return g ? g.label : "Not sure yet.";
-    }
-    case "vitals": {
-      const parts: string[] = [];
-      if (draft.exactAge != null) parts.push(`${draft.exactAge} years old`);
-      if (draft.sex) parts.push(draft.sex.toLowerCase());
-      if (draft.heightCm != null) {
-        const { feet, inches } = cmToFtIn(draft.heightCm);
-        parts.push(draft.units === "metric" ? `${Math.round(draft.heightCm)}cm` : `${feet}'${inches}"`);
-      }
-      if (draft.weightKg != null) {
-        parts.push(draft.units === "metric" ? `${Math.round(draft.weightKg)}kg` : `${Math.round(kgToLb(draft.weightKg))}lb`);
-      }
-      return parts.length ? parts.join(", ") : "Prefer not to say.";
-    }
-    case "sleepHours":
-      return draft.sleepHours || SLEEP_HOURS_OPTIONS[2];
-    case "sleepComplaints":
-      return draft.sleepComplaints.length ? draft.sleepComplaints.join(", ") : "No real complaint.";
-    case "caffeine":
-      return draft.caffeineHabit || "None";
-    case "activity":
-      return ACTIVITY_LEVEL_OPTIONS.find((a) => a.key === draft.activityLevel)?.label ?? "Not sure yet.";
-    case "workoutStyle":
-      return draft.workoutStyle || "Not sure yet";
-    case "injuries":
-      return draft.injuries.trim() ? draft.injuries.trim() : "Nothing to work around.";
-    case "nutritionPattern":
-      return draft.nutritionPattern || "No real pattern";
-    case "dietary":
-      return draft.dietaryRestrictions.length ? draft.dietaryRestrictions.join(", ") : "No restrictions";
-    case "stress":
-      return `${draft.stressLevel} out of 5`;
-    default:
-      return null;
-  }
-}
-
-function BloomMark() {
-  const dots = Array.from({ length: 8 }, (_, i) => (i / 8) * 360);
-  return (
-    <div className={styles.bloomWrap} aria-hidden="true">
-      {dots.map((angle, i) => (
-        <motion.span
-          key={i}
-          className={styles.bloomDot}
-          initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
-          animate={{
-            x: Math.cos((angle * Math.PI) / 180) * 46,
-            y: Math.sin((angle * Math.PI) / 180) * 46,
-            opacity: 0.8,
-            scale: 1,
-          }}
-          transition={{ duration: 1, delay: 0.1 + i * 0.04, ease: "easeOut" }}
-        />
-      ))}
-      <motion.span
-        className={styles.bloomMark}
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      >
-        LC
-      </motion.span>
-    </div>
-  );
-}
-
-const COMPASS_SIZE = 220;
+const COMPASS_SIZE = 200;
 const COMPASS_CENTER = COMPASS_SIZE / 2;
-const COMPASS_RADIUS = 78;
-const COMPASS_RING = 24;
+const COMPASS_RADIUS = 70;
+const COMPASS_RING = 22;
 
 function angleForGoalIndex(i: number) {
   return -90 + i * 90; // N, E, S, W — matches GOAL_OPTIONS order
 }
 
-/** The goal picker, reimagined as an actual compass — tap or drag
- * anywhere on the dial to point the needle at what matters most, instead
- * of picking from a grid of buttons. The four real buttons underneath
- * keep it fully reachable by keyboard and screen reader. */
+/** The goal picker as an actual compass dial — tap or drag anywhere on
+ * the ring to point the needle at what matters most. The four real
+ * buttons underneath keep it fully reachable by keyboard/screen reader. */
 function GoalCompass({ value, onChange }: { value: DomainKey | null; onChange: (key: DomainKey) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -251,8 +92,8 @@ function GoalCompass({ value, onChange }: { value: DomainKey | null; onChange: (
           const y = COMPASS_CENTER + (COMPASS_RADIUS + COMPASS_RING) * Math.sin((a * Math.PI) / 180);
           return (
             <g key={g.key} transform={`translate(${x} ${y})`}>
-              <circle r={20} fill={value === g.key ? "var(--signal)" : "var(--paper)"} stroke="var(--line-strong)" strokeWidth={1.5} />
-              <text textAnchor="middle" dominantBaseline="central" fontSize="18">
+              <circle r={19} fill={value === g.key ? "var(--signal)" : "var(--paper)"} stroke="var(--line-strong)" strokeWidth={1.5} />
+              <text textAnchor="middle" dominantBaseline="central" fontSize="17">
                 {g.icon}
               </text>
             </g>
@@ -282,84 +123,8 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [, setProfile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [, setSkipped] = useLocalStorageState<boolean>("lc_onboarding_skipped_v1", false);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [, setTourPending] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
   const [draft, setDraft] = useState<UserProfile>(EMPTY_PROFILE);
-  const [openHotspot, setOpenHotspot] = useState<"compass" | "tiles" | null>(null);
-  const [displayText, setDisplayText] = useState(questionForStep("welcome", EMPTY_PROFILE));
-  const [coachNote, setCoachNote] = useState<string | null>(null);
-  const [reflecting, setReflecting] = useState(false);
-  const [awaitingFollowUp, setAwaitingFollowUp] = useState(false);
-  const [followUpAnswer, setFollowUpAnswer] = useState("");
-  const priorAnswersRef = useRef<string[]>([]);
-
-  const stepId = STEP_ORDER[stepIndex];
-
-  function proceedToNext() {
-    const nextIndex = stepIndex + 1;
-    if (nextIndex < STEP_COUNT) {
-      setDisplayText(questionForStep(STEP_ORDER[nextIndex], draft));
-    }
-    setStepIndex(nextIndex);
-  }
-
-  async function advance() {
-    const summary = summaryForStep(stepId, draft);
-    setCoachNote(null);
-
-    if (summary) {
-      setReflecting(true);
-      try {
-        const res = await fetch("/api/onboarding-turn", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            question: questionForStep(stepId, draft),
-            answer: summary,
-            name: draft.name,
-            priorAnswers: priorAnswersRef.current.slice(-5),
-          }),
-        });
-        const data = await res.json();
-        priorAnswersRef.current.push(summary);
-        if (data?.askFollowUp && data?.message) {
-          // The AI found something worth actually asking about — pause the
-          // scripted flow for one real free-text exchange instead of
-          // reciting the next question regardless of what was just said.
-          setReflecting(false);
-          setDisplayText(data.message);
-          setAwaitingFollowUp(true);
-          return;
-        }
-        if (data?.message) setCoachNote(data.message);
-      } catch {
-        // the reflection is a nice-to-have, not required for the flow to continue
-      } finally {
-        setReflecting(false);
-      }
-    }
-
-    proceedToNext();
-  }
-
-  function submitFollowUp() {
-    const trimmed = followUpAnswer.trim();
-    if (trimmed) {
-      setDraft((d) => ({ ...d, onboardingNotes: [...d.onboardingNotes, trimmed] }));
-      setCoachNote("Thanks — that helps me understand your situation better.");
-    }
-    setFollowUpAnswer("");
-    setAwaitingFollowUp(false);
-    proceedToNext();
-  }
-
-  function skip() {
-    setSkipped(true);
-    router.push("/home");
-  }
-
-  function chooseGoal(key: DomainKey) {
-    setDraft((d) => ({ ...d, primaryGoals: [key] }));
-  }
 
   function toggleMulti(field: "sleepComplaints" | "dietaryRestrictions", value: string) {
     setDraft((d) => {
@@ -368,28 +133,24 @@ export default function OnboardingPage() {
     });
   }
 
-  function finishAndGo(href: string) {
+  function skip() {
+    setSkipped(true);
+    router.push("/home");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
     setProfile({
       ...draft,
       ageRange: ageRangeFromExactAge(draft.exactAge),
       disclaimerAcknowledged: true,
       completedAt: new Date().toISOString(),
     });
-    router.push(href);
+    setTourPending(true);
+    router.push("/home");
   }
 
-  const chosenGoal: DomainKey | "none" = draft.primaryGoals.length > 0 ? draft.primaryGoals[0] : "none";
-  const action = ACTION_COPY[chosenGoal];
-  const goalLabel = GOAL_OPTIONS.find((g) => g.key === chosenGoal)?.label;
-  const plan = domainPlanFromProfile(draft);
   const sleepIndex = (SLEEP_HOURS_OPTIONS as readonly string[]).indexOf(draft.sleepHours);
-  const previewDays: DomainDayReach[] = Array.from({ length: 7 }, (_, i) => ({
-    date: dateKeyOffset(6 - i),
-    sleep: 0,
-    nutrition: 0,
-    fitness: 0,
-    mind: 0,
-  }));
 
   return (
     <div className={styles.page}>
@@ -400,272 +161,171 @@ export default function OnboardingPage() {
         </button>
       </div>
 
-      <span className={styles.srOnly} role="status">
-        Step {stepIndex + 1} of {STEP_COUNT}
-      </span>
+      <form className={styles.form} onSubmit={submit}>
+        <div className={styles.intro}>
+          <h1 className={styles.introTitle}>Set up your coach</h1>
+          <p className={styles.introSub}>
+            A few real questions about your goals, sleep, food, movement, and stress. Everything is
+            optional — leave a field blank and it just won&apos;t be used. Takes about two minutes.
+          </p>
+        </div>
 
-      <div className={styles.progressTrack} aria-hidden="true">
-        <div
-          className={styles.progressFill}
-          style={{ width: `${((stepIndex + 1) / STEP_COUNT) * 100}%` }}
-        />
-      </div>
-
-      <div className={styles.stage} aria-live="polite">
-        {stepIndex === 0 && <BloomMark />}
-        {coachNote && !awaitingFollowUp && (
-          <motion.p
-            key={coachNote}
-            className={styles.coachNote}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {coachNote}
-          </motion.p>
-        )}
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={displayText}
-            className={styles.question}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {displayText}
-          </motion.p>
-        </AnimatePresence>
-        {reflecting && (
-          <div className={styles.typing}>
-            <span />
-            <span />
-            <span />
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>About you</h2>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="ob-name">Name (optional)</label>
+            <input
+              id="ob-name"
+              className={styles.input}
+              value={draft.name}
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              placeholder="First name"
+              autoComplete="given-name"
+            />
           </div>
-        )}
-      </div>
 
-      <div className={styles.composer}>
-        {awaitingFollowUp && (
-          <>
+          <div className={styles.fieldRow}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="ob-followup">
-                Your answer
-              </label>
-              <textarea
-                id="ob-followup"
-                className={styles.input}
-                rows={2}
-                value={followUpAnswer}
-                onChange={(e) => setFollowUpAnswer(e.target.value)}
-                placeholder="Type as much or as little as you want…"
-                autoFocus
-              />
-            </div>
-            <div className={styles.footer}>
-              <button type="button" className={styles.btn} onClick={submitFollowUp}>
-                Skip
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={submitFollowUp}
-                disabled={!followUpAnswer.trim()}
-              >
-                Send
-              </button>
-            </div>
-          </>
-        )}
-
-        {!awaitingFollowUp && stepId === "welcome" && (
-          <div className={styles.welcomeComposer}>
-            <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="ob-name">
-                What should we call you? (optional)
-              </label>
+              <label className={styles.fieldLabel} htmlFor="ob-age">Age</label>
               <input
-                id="ob-name"
+                id="ob-age"
                 className={styles.input}
-                value={draft.name}
-                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                placeholder="First name"
-                autoComplete="given-name"
+                type="number"
+                min={13}
+                max={110}
+                inputMode="numeric"
+                value={draft.exactAge ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, exactAge: e.target.value ? Number(e.target.value) : null }))}
+                placeholder="Years"
               />
             </div>
-            <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`} onClick={advance}>
-              Let&apos;s begin
-            </button>
-            <p className={styles.fineprint}>
-              This app offers friendly coaching, not medical advice — it&apos;ll always say so
-              plainly if something needs a real doctor.
-            </p>
-          </div>
-        )}
-
-        {!awaitingFollowUp && stepId === "goal" && (
-          <>
-            <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={chooseGoal} />
-            {draft.primaryGoals[0] && (
-              <p className={styles.compassHint}>{GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0])?.hint}</p>
-            )}
-            <div className={styles.footer}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={advance}
-                disabled={draft.primaryGoals.length === 0 || reflecting}
-              >
-                Continue
-              </button>
-            </div>
-          </>
-        )}
-
-        {!awaitingFollowUp && stepId === "vitals" && (
-          <>
-            <div className={styles.fieldRow}>
-              <div className={styles.field}>
-                <label className={styles.fieldLabel} htmlFor="ob-age">Age</label>
-                <input
-                  id="ob-age"
-                  className={styles.input}
-                  type="number"
-                  min={13}
-                  max={110}
-                  inputMode="numeric"
-                  value={draft.exactAge ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, exactAge: e.target.value ? Number(e.target.value) : null }))}
-                  placeholder="Years"
-                />
-              </div>
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>Units</span>
-                <div className={styles.chipRow}>
-                  {(["imperial", "metric"] as const).map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      className={draft.units === u ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
-                      onClick={() => setDraft((d) => ({ ...d, units: u }))}
-                      aria-pressed={draft.units === u}
-                    >
-                      {u === "imperial" ? "lb / ft-in" : "kg / cm"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Sex</span>
+              <span className={styles.fieldLabel}>Units</span>
               <div className={styles.chipRow}>
-                {SEX_OPTIONS.map((s) => (
+                {(["imperial", "metric"] as const).map((u) => (
                   <button
-                    key={s}
+                    key={u}
                     type="button"
-                    className={draft.sex === s ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
-                    onClick={() => setDraft((d) => ({ ...d, sex: s }))}
-                    aria-pressed={draft.sex === s}
+                    className={draft.units === u ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+                    onClick={() => setDraft((d) => ({ ...d, units: u }))}
+                    aria-pressed={draft.units === u}
                   >
-                    {s}
+                    {u === "imperial" ? "lb / ft-in" : "kg / cm"}
                   </button>
                 ))}
               </div>
             </div>
+          </div>
 
-            {draft.units === "metric" ? (
-              <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="ob-height-cm">Height (cm)</label>
-                  <input
-                    id="ob-height-cm"
-                    className={styles.input}
-                    type="number"
-                    min={100}
-                    max={250}
-                    value={draft.heightCm != null ? Math.round(draft.heightCm) : ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, heightCm: e.target.value ? Number(e.target.value) : null }))}
-                    placeholder="cm"
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="ob-weight-kg">Weight (kg)</label>
-                  <input
-                    id="ob-weight-kg"
-                    className={styles.input}
-                    type="number"
-                    min={30}
-                    max={300}
-                    value={draft.weightKg != null ? Math.round(draft.weightKg) : ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? Number(e.target.value) : null }))}
-                    placeholder="kg"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className={styles.fieldRow}>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Height</span>
-                  <div className={styles.fieldRow}>
-                    <input
-                      className={styles.input}
-                      type="number"
-                      min={3}
-                      max={8}
-                      value={draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : ""}
-                      onChange={(e) => {
-                        const feet = Number(e.target.value) || 0;
-                        const inches = draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : 0;
-                        setDraft((d) => ({ ...d, heightCm: e.target.value ? ftInToCm(feet, inches) : null }));
-                      }}
-                      placeholder="ft"
-                    />
-                    <input
-                      className={styles.input}
-                      type="number"
-                      min={0}
-                      max={11}
-                      value={draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : ""}
-                      onChange={(e) => {
-                        const inches = Number(e.target.value) || 0;
-                        const feet = draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : Math.floor(cmToFtIn(170).feet);
-                        setDraft((d) => ({ ...d, heightCm: ftInToCm(feet, inches) }));
-                      }}
-                      placeholder="in"
-                    />
-                  </div>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.fieldLabel} htmlFor="ob-weight-lb">Weight (lb)</label>
-                  <input
-                    id="ob-weight-lb"
-                    className={styles.input}
-                    type="number"
-                    min={60}
-                    max={600}
-                    value={draft.weightKg != null ? Math.round(kgToLb(draft.weightKg)) : ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? lbToKg(Number(e.target.value)) : null }))}
-                    placeholder="lb"
-                  />
-                </div>
-              </div>
-            )}
-
-            <p className={styles.fineprint}>
-              Any of this can be skipped — leave a field blank and move on.
-            </p>
-
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Sex</span>
+            <div className={styles.chipRow}>
+              {SEX_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={draft.sex === s ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+                  onClick={() => setDraft((d) => ({ ...d, sex: s }))}
+                  aria-pressed={draft.sex === s}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "sleepHours" && (
-          <>
+          {draft.units === "metric" ? (
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="ob-height-cm">Height (cm)</label>
+                <input
+                  id="ob-height-cm"
+                  className={styles.input}
+                  type="number"
+                  min={100}
+                  max={250}
+                  value={draft.heightCm != null ? Math.round(draft.heightCm) : ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, heightCm: e.target.value ? Number(e.target.value) : null }))}
+                  placeholder="cm"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="ob-weight-kg">Weight (kg)</label>
+                <input
+                  id="ob-weight-kg"
+                  className={styles.input}
+                  type="number"
+                  min={30}
+                  max={300}
+                  value={draft.weightKg != null ? Math.round(draft.weightKg) : ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? Number(e.target.value) : null }))}
+                  placeholder="kg"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Height</span>
+                <div className={styles.fieldRow}>
+                  <input
+                    className={styles.input}
+                    type="number"
+                    min={3}
+                    max={8}
+                    value={draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : ""}
+                    onChange={(e) => {
+                      const feet = Number(e.target.value) || 0;
+                      const inches = draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : 0;
+                      setDraft((d) => ({ ...d, heightCm: e.target.value ? ftInToCm(feet, inches) : null }));
+                    }}
+                    placeholder="ft"
+                  />
+                  <input
+                    className={styles.input}
+                    type="number"
+                    min={0}
+                    max={11}
+                    value={draft.heightCm != null ? cmToFtIn(draft.heightCm).inches : ""}
+                    onChange={(e) => {
+                      const inches = Number(e.target.value) || 0;
+                      const feet = draft.heightCm != null ? cmToFtIn(draft.heightCm).feet : Math.floor(cmToFtIn(170).feet);
+                      setDraft((d) => ({ ...d, heightCm: ftInToCm(feet, inches) }));
+                    }}
+                    placeholder="in"
+                  />
+                </div>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="ob-weight-lb">Weight (lb)</label>
+                <input
+                  id="ob-weight-lb"
+                  className={styles.input}
+                  type="number"
+                  min={60}
+                  max={600}
+                  value={draft.weightKg != null ? Math.round(kgToLb(draft.weightKg)) : ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, weightKg: e.target.value ? lbToKg(Number(e.target.value)) : null }))}
+                  placeholder="lb"
+                />
+              </div>
+            </div>
+          )}
+          <p className={styles.sectionHint}>Shapes what&apos;s normal for you — resting heart rate, protein needs, training load — instead of a generic default.</p>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>What matters most right now</h2>
+          <GoalCompass value={draft.primaryGoals[0] ?? null} onChange={(key) => setDraft((d) => ({ ...d, primaryGoals: [key] }))} />
+          {draft.primaryGoals[0] && (
+            <p className={styles.sectionHint}>{GOAL_OPTIONS.find((g) => g.key === draft.primaryGoals[0])?.hint}</p>
+          )}
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Sleep</h2>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Usual hours a night</label>
             <input
               type="range"
               min={0}
@@ -682,22 +342,16 @@ export default function OnboardingPage() {
               ))}
             </div>
             <p className={styles.sliderValue}>{draft.sleepHours || SLEEP_HOURS_OPTIONS[2]}</p>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "sleepComplaints" && (
-          <>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>What gets in the way, if anything</span>
             <div className={styles.chipRow}>
               {SLEEP_COMPLAINT_OPTIONS.map((c) => (
                 <button
                   key={c}
                   type="button"
-                  className={draft.sleepComplaints.includes(c) ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.sleepComplaints.includes(c) ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => toggleMulti("sleepComplaints", c)}
                   aria-pressed={draft.sleepComplaints.includes(c)}
                 >
@@ -705,22 +359,16 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "caffeine" && (
-          <>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Caffeine, typical day</span>
             <div className={styles.chipRow}>
               {CAFFEINE_OPTIONS.map((c) => (
                 <button
                   key={c}
                   type="button"
-                  className={draft.caffeineHabit === c ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.caffeineHabit === c ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => setDraft((d) => ({ ...d, caffeineHabit: c }))}
                   aria-pressed={draft.caffeineHabit === c}
                 >
@@ -728,27 +376,19 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.footer}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={advance}
-                disabled={!draft.caffeineHabit || reflecting}
-              >
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+        </section>
 
-        {!awaitingFollowUp && stepId === "activity" && (
-          <>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Activity</h2>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Current activity level</span>
             <div className={styles.chipRow}>
               {ACTIVITY_LEVEL_OPTIONS.map((a) => (
                 <button
                   key={a.key}
                   type="button"
-                  className={draft.activityLevel === a.key ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.activityLevel === a.key ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => setDraft((d) => ({ ...d, activityLevel: a.key }))}
                   aria-pressed={draft.activityLevel === a.key}
                 >
@@ -756,27 +396,16 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.footer}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={advance}
-                disabled={!draft.activityLevel || reflecting}
-              >
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "workoutStyle" && (
-          <>
-            <div className={styles.swipeStrip}>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Movement you enjoy</span>
+            <div className={styles.chipRow}>
               {WORKOUT_STYLE_OPTIONS.map((w) => (
                 <button
                   key={w}
                   type="button"
-                  className={draft.workoutStyle === w ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.workoutStyle === w ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => setDraft((d) => ({ ...d, workoutStyle: w }))}
                   aria-pressed={draft.workoutStyle === w}
                 >
@@ -784,39 +413,30 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <p className={styles.swipeHint}>Swipe to see all options →</p>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "injuries" && (
-          <>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor="ob-injuries">Anything to work around (optional)</label>
             <input
+              id="ob-injuries"
               className={styles.input}
               value={draft.injuries}
               onChange={(e) => setDraft((d) => ({ ...d, injuries: e.target.value }))}
-              placeholder="e.g. bad left knee — or leave this blank"
+              placeholder="e.g. bad left knee"
             />
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+        </section>
 
-        {!awaitingFollowUp && stepId === "nutritionPattern" && (
-          <>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Nutrition</h2>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>How you eat day to day</span>
             <div className={styles.chipRow}>
               {NUTRITION_PATTERN_OPTIONS.map((n) => (
                 <button
                   key={n}
                   type="button"
-                  className={draft.nutritionPattern === n ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.nutritionPattern === n ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => setDraft((d) => ({ ...d, nutritionPattern: n }))}
                   aria-pressed={draft.nutritionPattern === n}
                 >
@@ -824,27 +444,16 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.footer}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={advance}
-                disabled={!draft.nutritionPattern || reflecting}
-              >
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
 
-        {!awaitingFollowUp && stepId === "dietary" && (
-          <>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Dietary restrictions</span>
             <div className={styles.chipRow}>
               {DIETARY_OPTIONS.map((d) => (
                 <button
                   key={d}
                   type="button"
-                  className={draft.dietaryRestrictions.includes(d) ? `${styles.swipeCard} ${styles.swipeCardActive}` : styles.swipeCard}
+                  className={draft.dietaryRestrictions.includes(d) ? `${styles.chip} ${styles.chipActive}` : styles.chip}
                   onClick={() => toggleMulti("dietaryRestrictions", d)}
                   aria-pressed={draft.dietaryRestrictions.includes(d)}
                 >
@@ -852,16 +461,13 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+        </section>
 
-        {!awaitingFollowUp && stepId === "stress" && (
-          <>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Stress</h2>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Level lately, 1 to 5</label>
             <input
               type="range"
               min={1}
@@ -877,82 +483,35 @@ export default function OnboardingPage() {
               <span>High</span>
             </div>
             <p className={styles.sliderValue}>{draft.stressLevel} / 5</p>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
-
-        {!awaitingFollowUp && stepId === "tour" && (
-          <>
-            <div className={styles.tourPreview}>
-              <button
-                type="button"
-                className={styles.tourHotspot}
-                onClick={() => setOpenHotspot((h) => (h === "compass" ? null : "compass"))}
-                aria-expanded={openHotspot === "compass"}
-              >
-                <RoutineCompass days={previewDays} centerLabel="This week" centerValue="—" />
-              </button>
-              {openHotspot === "compass" && (
-                <p className={styles.tourCallout}>
-                  Every ring is a domain — sleep, nutrition, fitness, mind. Every wedge is a day.
-                  Log something and it fills in for real; today always sits on top.
-                </p>
-              )}
-
-              <div className={styles.tourTileRow} role="group" aria-label="Domains">
-                {(["nutrition", "fitness", "mind"] as const).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={styles.tourHotspotTile}
-                    style={{ borderColor: `var(--${d})` }}
-                    onClick={() => setOpenHotspot((h) => (h === "tiles" ? null : "tiles"))}
-                    aria-expanded={openHotspot === "tiles"}
-                  >
-                    {d === "nutrition" ? "Nutrition" : d === "fitness" ? "Fitness" : "Mind"}
-                  </button>
-                ))}
-              </div>
-              {openHotspot === "tiles" && (
-                <p className={styles.tourCallout}>
-                  Tap any domain on Home to log something or dig in — guided workouts, meal
-                  photos, guided meditation, sleep tracking, all one tap deep.
-                </p>
-              )}
-            </div>
-            <div className={styles.footer}>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={advance} disabled={reflecting}>
-                Continue
-              </button>
-            </div>
-          </>
-        )}
-
-        {!awaitingFollowUp && stepId === "action" && (
-          <div className={styles.actionStep}>
-            {chosenGoal === "mind" ? (
-              <div className={styles.orbMoment}>
-                <Orb state="idle" size={140} color="var(--mind)" />
-              </div>
-            ) : (
-              <div className={styles.doneIcon}>✓</div>
-            )}
-            {goalLabel && chosenGoal !== "none" && <p className={styles.planLine}>{plan[chosenGoal as DomainKey]}</p>}
-            <p className={styles.subtitle}>{action.body}</p>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`}
-              onClick={() => finishAndGo("/home")}
-            >
-              Go to your dashboard
-            </button>
           </div>
-        )}
-      </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Anything else? (optional)</h2>
+          <div className={styles.field}>
+            <textarea
+              className={styles.input}
+              rows={3}
+              value={draft.onboardingNotes[0] ?? ""}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, onboardingNotes: e.target.value ? [e.target.value] : [] }))
+              }
+              placeholder="Anything about your situation that doesn't fit the questions above — this gets fed to the Coach as real context, word for word."
+            />
+          </div>
+        </section>
+
+        <div className={styles.formFooter}>
+          <p className={styles.fineprint}>
+            This app offers friendly coaching, not medical advice — it&apos;ll always say so plainly
+            if something needs a real doctor. Everything you enter here stays on this device; see{" "}
+            <Link href="/privacy" className={styles.fineprintLink}>what leaves it and when</Link>.
+          </p>
+          <button type="submit" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`}>
+            Finish setup
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

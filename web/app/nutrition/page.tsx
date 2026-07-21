@@ -36,7 +36,7 @@ export default function NutritionPage() {
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
         <span className="eyebrow" style={{ color: "var(--nutrition)" }}>Nutrition</span>
-        <h1>What you actually ate</h1>
+        <h1>Your meals today</h1>
         <p className={styles.headerSub}>
           Photograph each meal instead of describing it, or photograph what&apos;s in your fridge
           for a recipe built around it.

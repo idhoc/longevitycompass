@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { AppleHealthImport } from "@/components/AppleHealthImport";
 import { GeneticsImport } from "@/components/GeneticsImport";
@@ -32,12 +33,24 @@ import styles from "./page.module.css";
 
 type ConfirmState = "none" | "clear" | "reset";
 
+const TABS = [
+  { key: "profile", label: "Profile" },
+  { key: "coach", label: "Coach voice" },
+  { key: "appearance", label: "Appearance" },
+  { key: "connected", label: "Connected data" },
+  { key: "privacy", label: "Privacy & data" },
+  { key: "about", label: "About" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function SettingsPage() {
   const router = useRouter();
   const [profile, setProfile, hydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
+  const [, setTourPending] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
   const [theme, setTheme] = useState<Theme>("light");
   const [confirming, setConfirming] = useState<ConfirmState>("none");
   const [exportedNote, setExportedNote] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("profile");
 
   useEffect(() => {
     // Mirrors the boot script's own localStorage read — must happen
@@ -88,6 +101,11 @@ export default function SettingsPage() {
     router.push("/onboarding");
   }
 
+  function replayTour() {
+    setTourPending(true);
+    router.push("/home");
+  }
+
   if (!hydrated) return null;
 
   return (
@@ -103,9 +121,25 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <div className={styles.tabBar} role="tablist">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={activeTab === tab.key ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {t(p.language, tab.label)}
+          </button>
+        ))}
+      </div>
+
       <div className={styles.sections}>
-        <details className={styles.section} open>
-          <summary className={styles.sectionTitle}>{t(p.language, "Profile")}</summary>
+        {activeTab === "profile" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Profile")}</h2>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="set-name">Name</label>
@@ -302,10 +336,12 @@ export default function SettingsPage() {
               how you already eat.
             </p>
           </div>
-        </details>
+        </div>
+        )}
 
-        <details className={styles.section}>
-          <summary className={styles.sectionTitle}>{t(p.language, "How it talks to you")}</summary>
+        {activeTab === "coach" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "How it talks to you")}</h2>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>Tone</span>
             <div className={styles.optionGrid}>
@@ -378,10 +414,12 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-        </details>
+        </div>
+        )}
 
-        <details className={styles.section}>
-          <summary className={styles.sectionTitle}>{t(p.language, "Appearance")}</summary>
+        {activeTab === "appearance" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Appearance")}</h2>
           <div className={styles.themeRow}>
             {(["light", "dark"] as Theme[]).map((t) => (
               <button
@@ -396,10 +434,12 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-        </details>
+        </div>
+        )}
 
-        <details className={styles.section}>
-          <summary className={styles.sectionTitle}>{t(p.language, "Connected data")}</summary>
+        {activeTab === "connected" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Connected data")}</h2>
           <p className={styles.sectionSub}>
             Optional. Nothing here is required, and nothing here is uploaded — every import runs
             entirely in this browser tab.
@@ -408,10 +448,12 @@ export default function SettingsPage() {
           <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)" }}>
             <GeneticsImport />
           </div>
-        </details>
+        </div>
+        )}
 
-        <details className={styles.section}>
-          <summary className={styles.sectionTitle}>{t(p.language, "Your data")}</summary>
+        {activeTab === "privacy" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Privacy & data")}</h2>
           <p className={styles.sectionSub}>
             Everything you&apos;ve logged lives only in this browser — there is no account and
             nothing is uploaded anywhere except the single photo or message needed to answer a
@@ -434,6 +476,16 @@ export default function SettingsPage() {
               synthesize that one audio clip. None of it is stored by this app afterward, and nothing
               is sent unless you take that specific action.
             </p>
+            <p className={styles.privacyText}>
+              23andMe data is the one exception worth calling out on its own: importing it parses
+              the raw file entirely in this browser tab and keeps the result in local storage like
+              everything else. It is never sent anywhere automatically — it only reaches an AI
+              provider if you explicitly ask the Coach a question that draws on it, the same
+              one-request-at-a-time rule as everything above.
+            </p>
+            <Link href="/privacy" className={styles.privacyLink}>
+              Read the full privacy page →
+            </Link>
           </div>
 
           <div className={styles.dataRow}>
@@ -503,16 +555,28 @@ export default function SettingsPage() {
               </button>
             )}
           </div>
-        </details>
+        </div>
+        )}
 
-        <details className={styles.section}>
-          <summary className={styles.sectionTitle}>{t(p.language, "About")}</summary>
+        {activeTab === "about" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "About")}</h2>
           <p className={styles.sectionSub}>
             Longevity Compass is a coaching tool, not a medical device — every insight is grounded
             in cited research or plainly labeled as an estimate, and anything outside wellness
             coaching gets a direct referral to a licensed professional instead of a guess.
           </p>
-        </details>
+          <div className={styles.dataRow}>
+            <div>
+              <div className={styles.dataLabel}>Guided tour</div>
+              <p className={styles.dataHint}>Replay the walkthrough that highlights each part of the dashboard.</p>
+            </div>
+            <button type="button" className={styles.btn} onClick={replayTour}>
+              Replay tour
+            </button>
+          </div>
+        </div>
+        )}
       </div>
     </div>
   );

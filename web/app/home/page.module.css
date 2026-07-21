@@ -29,6 +29,36 @@
   font-size: var(--text-md);
 }
 
+.nextActionBtn {
+  margin-top: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.9em 1.4em;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: var(--text-base);
+  color: var(--paper);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.15s ease;
+}
+
+.nextActionBtn:hover {
+  transform: translateY(-2px);
+}
+
+.nextActionIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.nextActionDone {
+  margin-top: var(--space-4);
+  font-weight: 600;
+  color: var(--signal);
+  font-size: var(--text-base);
+}
+
 .topicsSection {
   padding: 0 var(--space-5) var(--space-5);
 }

@@ -60,9 +60,9 @@ export default function FitnessLibraryPage() {
         <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness</span>
         <h1>Pick a session</h1>
         <p className={styles.headerSub}>
-          Step-by-step, paced by a timer or a tempo cue — illustrated, not video, since that&apos;s
-          what this app can actually deliver honestly. Every exercise explains why it&apos;s there.
-          Finishing one marks today done on your weekly tracker.
+          Step-by-step, paced by a timer or a tempo cue, with illustrated form instead of video.
+          Every exercise explains why it&apos;s there, and finishing one marks today done on your
+          weekly tracker.
         </p>
         <Link href="/fitness/build" className={styles.buildCta}>
           Build your own routine →

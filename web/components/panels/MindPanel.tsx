@@ -443,7 +443,7 @@ export function MindPanel() {
             <>
               <p className={styles.emptyText} style={{ margin: 0 }}>{prompt}</p>
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>How&apos;s today, really</span>
+                <span className={styles.fieldLabel}>How are you feeling today</span>
                 <div className={styles.tagRow} role="group" aria-label="Mood today">
                   {MOODS.map((m) => (
                     <button

@@ -7,7 +7,7 @@
 
 .header {
   width: 100%;
-  max-width: 640px;
+  max-width: min(880px, 94vw);
   padding: var(--space-7) var(--space-4) var(--space-5);
 }
 
@@ -25,8 +25,8 @@
 
 .sections {
   width: 100%;
-  max-width: 640px;
-  padding: 0 var(--space-4) var(--space-8);
+  max-width: min(880px, 94vw);
+  padding: var(--space-5) var(--space-4) var(--space-8);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -47,28 +47,41 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-md);
-  cursor: pointer;
-  list-style: none;
+}
+
+.tabBar {
+  width: 100%;
+  max-width: min(880px, 94vw);
+  padding: 0 var(--space-4);
+  margin: 0 auto;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5em;
 }
 
-.sectionTitle::-webkit-details-marker {
-  display: none;
-}
-
-.sectionTitle::after {
-  content: "+";
+.tab {
   font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--ink-faint);
-  font-size: var(--text-lg);
-  transition: transform 0.15s ease;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.7em 1.1em;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-details[open] > .sectionTitle::after {
-  content: "−";
+.tab:hover {
+  color: var(--ink);
+}
+
+.tabActive {
+  border-color: var(--signal);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
 }
 
 .sectionSub {
@@ -239,6 +252,14 @@ details[open] > .sectionTitle::after {
   font-size: var(--text-sm);
   color: var(--ink-soft);
   line-height: 1.6;
+}
+
+.privacyLink {
+  align-self: flex-start;
+  margin-top: 0.4em;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--signal);
 }
 
 .dataRow {

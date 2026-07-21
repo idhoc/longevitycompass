@@ -25,7 +25,7 @@ export default function TopicsPage() {
 
       <div className={styles.header}>
         <span className="eyebrow" style={{ color: "var(--signal)" }}>Topics</span>
-        <h1>Where the actual work happens</h1>
+        <h1>Where the work happens</h1>
         <p className={styles.headerSub}>
           {hasPriority
             ? "Ordered around what you told us matters most — every domain is still one tap away."
