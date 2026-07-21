@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Utensils, ChevronDown } from "lucide-react";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { MEAL_IDEAS, type MealIdea } from "@/lib/mealIdeas";
 import { dateKeyOffset } from "@/lib/domainReach";
@@ -138,8 +139,8 @@ function MealCard({
   onRemoveMeal: () => void;
 }) {
   return (
-    <div className={styles.mealCard} style={{ gridColumn: expanded ? "1 / -1" : undefined }}>
-      <button type="button" onClick={onToggle} style={{ all: "unset", cursor: "pointer", display: "contents" }}>
+    <div className={styles.mealCard}>
+      <button type="button" onClick={onToggle} className={styles.mealCardHead} aria-expanded={expanded}>
         {meal.thumbnail ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -149,15 +150,22 @@ function MealCard({
           />
         ) : (
           <div className={styles.mealThumbIcon} aria-hidden="true">
-            🍽️
+            <Utensils size={22} />
           </div>
         )}
-        <span className={styles.mealCardName}>{meal.foods.map((f) => f.name).join(", ") || "Meal"}</span>
-        {meal.totalCalories != null && <span className={styles.mealCardKcal}>{Math.round(meal.totalCalories)} kcal</span>}
+        <div className={styles.mealCardBody}>
+          <span className={styles.mealCardName}>{meal.foods.map((f) => f.name).join(", ") || "Meal"}</span>
+          {meal.proteinG != null && <span className={styles.mealMacroPill}>{Math.round(meal.proteinG)}g protein</span>}
+        </div>
+        <div className={styles.mealCardRight}>
+          {meal.totalCalories != null && <span className={styles.mealCardKcal}>{Math.round(meal.totalCalories)}</span>}
+          <span className={styles.mealCardKcalUnit}>kcal</span>
+          <ChevronDown size={16} className={styles.mealChevron} style={{ transform: expanded ? "rotate(180deg)" : undefined }} />
+        </div>
       </button>
 
       {expanded && (
-        <div style={{ marginTop: "0.6em", display: "flex", flexDirection: "column", gap: "0.5em" }}>
+        <div style={{ padding: "0 0.8em 0.8em", borderTop: "1px solid var(--line)", paddingTop: "0.7em", display: "flex", flexDirection: "column", gap: "0.5em" }}>
           <ul className={styles.ingredientList}>
             {meal.foods.map((food, i) => (
               <li key={i} className={styles.ingredientItem} style={{ alignItems: "center", gap: "0.5em" }}>

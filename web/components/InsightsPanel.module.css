@@ -3,23 +3,28 @@
   flex-direction: column;
   gap: var(--space-3);
   border: 1px solid var(--line);
+  border-left: 4px solid var(--signal);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
-  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 8%, transparent), var(--paper-raised) 65%);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 10%, transparent), var(--paper-raised) 60%);
+  box-shadow: var(--shadow-md);
 }
 
 .head {
   display: flex;
   align-items: center;
-  gap: 0.5em;
+  gap: 0.6em;
 }
 
 .headIcon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2;
-  color: var(--signal);
+  width: 30px;
+  height: 30px;
+  padding: 7px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  stroke-width: 2.25;
+  color: var(--paper);
+  background: var(--signal);
 }
 
 .headLabel {

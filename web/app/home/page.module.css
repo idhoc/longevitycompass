@@ -8,15 +8,17 @@
 }
 
 .hero {
-  padding: var(--space-6) var(--space-5) var(--space-4);
-  background: radial-gradient(ellipse 600px 260px at 30% 0%, color-mix(in srgb, var(--signal) 6%, transparent), transparent 70%);
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: radial-gradient(ellipse 700px 320px at 20% 0%, color-mix(in srgb, var(--signal) 14%, transparent), transparent 65%);
+  position: relative;
 }
 
 .heroTitle {
-  margin-top: 0.25em;
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  margin-top: 0.2em;
+  font-size: clamp(2.6rem, 9vw, var(--text-3xl));
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
 }
 
 .headerSub {
@@ -24,6 +26,7 @@
   color: var(--ink-soft);
   max-width: 56ch;
   line-height: 1.6;
+  font-size: var(--text-md);
 }
 
 .topicsSection {
@@ -110,7 +113,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--paper-raised);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .vitalsGrid {
@@ -124,30 +127,41 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2em;
-  padding: 0.7em 0.4em;
+  gap: 0.35em;
+  padding: 0.9em 0.4em 0.8em;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--paper);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .vitalCell:hover {
   border-color: var(--signal);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-sm);
+}
+
+.vitalIconBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--signal);
 }
 
 .vitalIcon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2;
-  color: var(--ink-faint);
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.25;
+  color: var(--paper);
 }
 
 .vitalValue {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -187,42 +201,47 @@
   padding: var(--space-4);
   background: var(--paper-raised);
   border: 1px solid var(--line);
-  border-left: 3px solid transparent;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 108px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  min-height: 116px;
 }
 
 a.tile:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
 }
 
-.tileRecovery {
-  border-left-color: var(--signal);
-  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 10%, transparent), var(--paper-raised) 60%);
+.tileIconBadge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.3em;
 }
 
-.tileNutrition {
-  border-left-color: var(--nutrition);
-  background: linear-gradient(150deg, var(--nutrition-wash), var(--paper-raised) 60%);
+.tileRecovery .tileIconBadge {
+  background: var(--signal);
 }
 
-.tileFitness {
-  border-left-color: var(--fitness);
-  background: linear-gradient(150deg, var(--fitness-wash), var(--paper-raised) 60%);
+.tileNutrition .tileIconBadge {
+  background: var(--nutrition);
 }
 
-.tileMind {
-  border-left-color: var(--mind);
-  background: linear-gradient(150deg, var(--mind-wash), var(--paper-raised) 60%);
+.tileFitness .tileIconBadge {
+  background: var(--fitness);
+}
+
+.tileMind .tileIconBadge {
+  background: var(--mind);
 }
 
 .tileIcon {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.75;
-  color: var(--ink-soft);
-  margin-bottom: 0.1em;
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+  color: var(--paper);
 }
 
 .tileLabel {
@@ -235,8 +254,8 @@ a.tile:hover {
 
 .tileStat {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--text-lg);
+  font-weight: 700;
+  font-size: var(--text-xl);
   color: var(--ink);
 }
 
@@ -251,10 +270,11 @@ a.tile:hover {
   display: flex;
   flex-direction: column;
   gap: 0.3em;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-4);
-  background: var(--paper-raised);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--mind) 8%, transparent), var(--paper-raised) 55%);
   border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
 }
 
 .healthspanRow {

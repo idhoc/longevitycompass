@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { Orb } from "@/components/Orb";
 import { RoutineCompass } from "@/components/RoutineCompass";
@@ -291,11 +291,6 @@ function GoalCompass({ value, onChange }: { value: DomainKey | null; onChange: (
   );
 }
 
-interface Bubble {
-  who: "coach" | "you";
-  text: string;
-}
-
 export default function OnboardingPage() {
   const router = useRouter();
   const [, setProfile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
@@ -303,30 +298,26 @@ export default function OnboardingPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<UserProfile>(EMPTY_PROFILE);
   const [openHotspot, setOpenHotspot] = useState<"compass" | "tiles" | null>(null);
-  const [transcript, setTranscript] = useState<Bubble[]>([{ who: "coach", text: questionForStep("welcome", EMPTY_PROFILE) }]);
+  const [displayText, setDisplayText] = useState(questionForStep("welcome", EMPTY_PROFILE));
+  const [coachNote, setCoachNote] = useState<string | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [awaitingFollowUp, setAwaitingFollowUp] = useState(false);
   const [followUpAnswer, setFollowUpAnswer] = useState("");
-  const logRef = useRef<HTMLDivElement>(null);
   const priorAnswersRef = useRef<string[]>([]);
-
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
-  }, [transcript, reflecting]);
 
   const stepId = STEP_ORDER[stepIndex];
 
   function proceedToNext() {
     const nextIndex = stepIndex + 1;
     if (nextIndex < STEP_COUNT) {
-      setTranscript((t) => [...t, { who: "coach", text: questionForStep(STEP_ORDER[nextIndex], draft) }]);
+      setDisplayText(questionForStep(STEP_ORDER[nextIndex], draft));
     }
     setStepIndex(nextIndex);
   }
 
   async function advance() {
     const summary = summaryForStep(stepId, draft);
-    if (summary) setTranscript((t) => [...t, { who: "you", text: summary }]);
+    setCoachNote(null);
 
     if (summary) {
       setReflecting(true);
@@ -343,15 +334,16 @@ export default function OnboardingPage() {
         });
         const data = await res.json();
         priorAnswersRef.current.push(summary);
-        if (data?.message) setTranscript((t) => [...t, { who: "coach", text: data.message }]);
-        if (data?.askFollowUp) {
+        if (data?.askFollowUp && data?.message) {
           // The AI found something worth actually asking about — pause the
           // scripted flow for one real free-text exchange instead of
           // reciting the next question regardless of what was just said.
           setReflecting(false);
+          setDisplayText(data.message);
           setAwaitingFollowUp(true);
           return;
         }
+        if (data?.message) setCoachNote(data.message);
       } catch {
         // the reflection is a nice-to-have, not required for the flow to continue
       } finally {
@@ -364,13 +356,10 @@ export default function OnboardingPage() {
 
   function submitFollowUp() {
     const trimmed = followUpAnswer.trim();
-    if (!trimmed) {
-      setAwaitingFollowUp(false);
-      proceedToNext();
-      return;
+    if (trimmed) {
+      setDraft((d) => ({ ...d, onboardingNotes: [...d.onboardingNotes, trimmed] }));
+      setCoachNote("Thanks — that helps me understand your situation better.");
     }
-    setTranscript((t) => [...t, { who: "you", text: trimmed }]);
-    setDraft((d) => ({ ...d, onboardingNotes: [...d.onboardingNotes, trimmed] }));
     setFollowUpAnswer("");
     setAwaitingFollowUp(false);
     proceedToNext();
@@ -428,19 +417,38 @@ export default function OnboardingPage() {
         Step {stepIndex + 1} of {STEP_COUNT}
       </span>
 
-      <div className={styles.transcript} ref={logRef} aria-live="polite">
+      <div className={styles.progressTrack} aria-hidden="true">
+        <div
+          className={styles.progressFill}
+          style={{ width: `${((stepIndex + 1) / STEP_COUNT) * 100}%` }}
+        />
+      </div>
+
+      <div className={styles.stage} aria-live="polite">
         {stepIndex === 0 && <BloomMark />}
-        {transcript.map((b, i) => (
-          <motion.div
-            key={i}
-            className={b.who === "coach" ? styles.bubbleCoach : styles.bubbleYou}
-            initial={{ opacity: 0, y: 8 }}
+        {coachNote && !awaitingFollowUp && (
+          <motion.p
+            key={coachNote}
+            className={styles.coachNote}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {coachNote}
+          </motion.p>
+        )}
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={displayText}
+            className={styles.question}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
           >
-            {b.text}
-          </motion.div>
-        ))}
+            {displayText}
+          </motion.p>
+        </AnimatePresence>
         {reflecting && (
           <div className={styles.typing}>
             <span />

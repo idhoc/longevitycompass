@@ -226,7 +226,9 @@ export default function HomePage() {
         />
         <div className={styles.vitalsGrid}>
           <Link href="/recovery" className={styles.vitalCell}>
-            <VITAL_ICONS.sleep className={styles.vitalIcon} aria-hidden="true" />
+            <span className={styles.vitalIconBadge} style={{ background: "var(--signal)" }}>
+              <VITAL_ICONS.sleep className={styles.vitalIcon} aria-hidden="true" />
+            </span>
             <span className={styles.vitalValue}>
               {sleepEntry ? (minutesBetween(sleepEntry.bedtime, sleepEntry.wakeTime) / 60).toFixed(1) : "—"}
               {sleepEntry && <span className={styles.vitalUnit}>h</span>}
@@ -234,7 +236,9 @@ export default function HomePage() {
             <span className={styles.vitalLabel}>Sleep</span>
           </Link>
           <Link href="/recovery" className={styles.vitalCell}>
-            <VITAL_ICONS.restingHR className={styles.vitalIcon} aria-hidden="true" />
+            <span className={styles.vitalIconBadge} style={{ background: "var(--signal)" }}>
+              <VITAL_ICONS.restingHR className={styles.vitalIcon} aria-hidden="true" />
+            </span>
             <span className={styles.vitalValue}>
               {hasRestingHR ? restingHR : "—"}
               {hasRestingHR && <span className={styles.vitalUnit}>bpm</span>}
@@ -242,14 +246,18 @@ export default function HomePage() {
             <span className={styles.vitalLabel}>Resting HR</span>
           </Link>
           <Link href="/recovery" className={styles.vitalCell}>
-            <VITAL_ICONS.recovery className={styles.vitalIcon} aria-hidden="true" style={{ color: RECOVERY_COLOR[band] }} />
+            <span className={styles.vitalIconBadge} style={{ background: RECOVERY_COLOR[band] }}>
+              <VITAL_ICONS.recovery className={styles.vitalIcon} aria-hidden="true" />
+            </span>
             <span className={styles.vitalValue} style={{ color: RECOVERY_COLOR[band] }}>
               {sleepEntry ? `${recovery}%` : "—"}
             </span>
             <span className={styles.vitalLabel}>Recovery</span>
           </Link>
           <Link href="/fitness" className={styles.vitalCell}>
-            <VITAL_ICONS.load className={styles.vitalIcon} aria-hidden="true" />
+            <span className={styles.vitalIconBadge} style={{ background: "var(--fitness)" }}>
+              <VITAL_ICONS.load className={styles.vitalIcon} aria-hidden="true" />
+            </span>
             <span className={styles.vitalValue}>{strain.toFixed(1)}</span>
             <span className={styles.vitalLabel}>Load</span>
           </Link>
@@ -281,14 +289,18 @@ export default function HomePage() {
         transition={{ duration: 0.4, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
       >
         <Link href="/recovery" className={`${styles.tile} ${styles.tileRecovery}`}>
-          <DOMAIN_ICONS.sleep className={styles.tileIcon} aria-hidden="true" />
+          <span className={styles.tileIconBadge}>
+            <DOMAIN_ICONS.sleep className={styles.tileIcon} aria-hidden="true" />
+          </span>
           <span className={styles.tileLabel}>Recovery</span>
           <span className={styles.tileStat}>{sleepLogStreak > 0 ? `${sleepLogStreak}d streak` : "Not logged yet"}</span>
           <p className={styles.tileSub}>{sleepEntry ? "Last night logged" : "Log last night"}</p>
         </Link>
 
         <Link href="/nutrition" className={`${styles.tile} ${styles.tileNutrition}`}>
-          <DOMAIN_ICONS.nutrition className={styles.tileIcon} aria-hidden="true" />
+          <span className={styles.tileIconBadge}>
+            <DOMAIN_ICONS.nutrition className={styles.tileIcon} aria-hidden="true" />
+          </span>
           <span className={styles.tileLabel}>Nutrition</span>
           <span className={styles.tileStat}>{todaysMeals.length ? `${Math.round(totalCalories)} kcal` : "Nothing logged"}</span>
           <p className={styles.tileSub}>
@@ -297,7 +309,9 @@ export default function HomePage() {
         </Link>
 
         <Link href="/fitness" className={`${styles.tile} ${styles.tileFitness}`}>
-          <DOMAIN_ICONS.fitness className={styles.tileIcon} aria-hidden="true" />
+          <span className={styles.tileIconBadge}>
+            <DOMAIN_ICONS.fitness className={styles.tileIcon} aria-hidden="true" />
+          </span>
           <span className={styles.tileLabel}>Fitness</span>
           <span className={styles.tileStat}>{completedDays}/7 days</span>
           <p className={styles.tileSub}>
@@ -308,7 +322,9 @@ export default function HomePage() {
         </Link>
 
         <Link href="/mind" className={`${styles.tile} ${styles.tileMind}`}>
-          <DOMAIN_ICONS.mind className={styles.tileIcon} aria-hidden="true" />
+          <span className={styles.tileIconBadge}>
+            <DOMAIN_ICONS.mind className={styles.tileIcon} aria-hidden="true" />
+          </span>
           <span className={styles.tileLabel}>Mind</span>
           <span className={styles.tileStat}>{mindStreak > 0 ? `${mindStreak}d streak` : "Not logged yet"}</span>
           <p className={styles.tileSub}>Reflect, meditate, or take a break</p>
