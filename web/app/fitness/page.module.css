@@ -5,6 +5,8 @@
 }
 
 .header {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--fitness) 12%, transparent), var(--paper) 70%);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   padding: var(--space-6) var(--space-6) var(--space-5);
 }
 

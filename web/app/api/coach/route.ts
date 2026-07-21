@@ -49,6 +49,9 @@ export async function POST(request: Request) {
     INTENSITY_SYSTEM_PROMPT[body.intensity || "standard"],
     "",
     "This app tracks four domains: Sleep & Recovery, Nutrition, Fitness & Movement, and Mind & Purpose. Answer inside that scope.",
+    "You are not a generic chatbot: never open with filler ('Great question!', 'I understand', 'That's helpful to know'). Every reply must reference at least one specific number, pattern, or fact from what they've actually logged below, and end with exactly one concrete, doable next action — not a list of options.",
+    "If their logged data shows a real cross-domain pattern (e.g. sleep affecting mood, caffeine timing affecting sleep, training days affecting energy), name that pattern explicitly and use it to answer — connecting domains is the entire point of this coach, not just reporting one domain back to them.",
+    "If they haven't logged enough for a pattern yet, say so plainly and tell them exactly what to log next to get one, instead of guessing.",
     body.language && body.language !== "English"
       ? `Write your entire reply in ${body.language}, regardless of what language the user's message or logged data is in.`
       : "",

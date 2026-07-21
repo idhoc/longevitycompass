@@ -1,26 +1,23 @@
 import type { Metadata } from "next";
-import { Bitter, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Space_Grotesk, Manrope, IBM_Plex_Mono } from "next/font/google";
 import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
-// Display: Bitter — a bold slab serif for headlines, the compass mark,
-// and hero numbers. Slab serifs read as sturdy and grounded ("outward")
-// without the aggression of a grotesque or the fragility of a delicate
-// old-style serif — the calm half of "bolder yet calm." Distinct from
-// every display face this project has tried before (Fraunces, Bricolage
-// Grotesque, system-default Inter).
-const bitter = Bitter({
+// Display: Space Grotesk — a bold geometric sans for headlines, the
+// compass mark, and hero numbers. Reads as modern health-tech rather
+// than the editorial slab-serif register this project used before.
+const spaceGrotesk = Space_Grotesk({
   variable: "--font-bitter",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800", "900"],
+  weight: ["500", "600", "700"],
 });
 
-// Body: IBM's own engineering-heritage sans — the UI-chrome and data
-// register, a deliberate alternative to the Inter/system-ui default.
-const plexSans = IBM_Plex_Sans({
+// Body: Manrope — a clean, rounded modern sans for UI chrome, warmer
+// than a pure grotesque without losing legibility at small sizes.
+const plexSans = Manrope({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 // Data face: for stats, timestamps, nav labels — the "instrument readout"
@@ -45,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bitter.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.

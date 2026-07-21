@@ -6,8 +6,10 @@
 }
 
 .header {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 12%, transparent), var(--paper) 70%);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   width: 100%;
-  max-width: 680px;
+  max-width: min(920px, 94vw);
   padding: var(--space-7) var(--space-4) var(--space-5);
 }
 
@@ -39,7 +41,7 @@
 
 .content {
   width: 100%;
-  max-width: 680px;
+  max-width: min(920px, 94vw);
   padding: 0 var(--space-4) var(--space-8);
   display: flex;
   flex-direction: column;

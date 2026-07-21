@@ -48,39 +48,26 @@ const STEP_ORDER = [
 type StepId = (typeof STEP_ORDER)[number];
 const STEP_COUNT = STEP_ORDER.length;
 
-const ACTION_COPY: Record<
-  DomainKey | "none",
-  { title: string; body: string; cta: string; href: string }
-> = {
+const ACTION_COPY: Record<DomainKey | "none", { title: string; body: string }> = {
   sleep: {
-    title: "Let's start with last night",
-    body: "One honest check-in on how you slept is all it takes to get going.",
-    cta: "Log last night's sleep",
-    href: "/recovery",
+    title: "You're set up",
+    body: "Your dashboard is ready. Log tonight's sleep whenever you actually go to bed — no rush.",
   },
   nutrition: {
-    title: "Let's see what's actually on your plate",
-    body: "Photograph your next meal instead of describing it — that's the whole first step.",
-    cta: "Log a meal",
-    href: "/nutrition",
+    title: "You're set up",
+    body: "Your dashboard is ready. Snap a photo next time you eat — whenever that happens to be.",
   },
   fitness: {
-    title: "Let's ease in",
-    body: "A short, guided session — no equipment, no pressure to go hard.",
-    cta: "Start a quick session",
-    href: "/fitness",
+    title: "You're set up",
+    body: "Your dashboard is ready. Pick a session whenever you're ready to move.",
   },
   mind: {
-    title: "Let's take one mindful breath",
-    body: "Follow the glow for a few seconds — in as it grows, out as it settles.",
-    cta: "Continue to Home",
-    href: "/home",
+    title: "You're set up",
+    body: "Your dashboard is ready. Reflect, breathe, or take a break whenever you have a moment.",
   },
   none: {
     title: "You're all set",
     body: "Explore at your own pace — every screen is ready when you are.",
-    cta: "Go to Home",
-    href: "/home",
   },
 };
 
@@ -959,9 +946,9 @@ export default function OnboardingPage() {
             <button
               type="button"
               className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBig}`}
-              onClick={() => finishAndGo(action.href)}
+              onClick={() => finishAndGo("/home")}
             >
-              {action.cta}
+              Go to your dashboard
             </button>
           </div>
         )}

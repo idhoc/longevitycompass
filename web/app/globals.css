@@ -8,63 +8,62 @@
    a font/copy pass.
    ============================================================ */
 :root {
-  /* -- palette: cool, crisp, saturated (default) -- */
-  --paper: #eef2ef;         /* cool pale sage-gray, not cream */
+  /* -- palette: cool neutral, indigo-forward, saturated (default) -- */
+  --paper: #f4f5f8;         /* cool neutral light gray, not sage, not cream */
   --paper-raised: #ffffff;
-  --paper-sunken: #dfe6e1;  /* recessed wells (ring tracks, inputs) */
-  --ink: #10181a;           /* cool near-black slate, not warm brown-black */
-  --ink-soft: #48565a;
-  --ink-faint: #7d8b8a;
-  --signal: #0c8f79;        /* vivid deep teal — Recovery domain + general CTA/highlight */
-  --signal-bright: #13b89d;
-  --vital: #0c8f79;         /* alias — kept for existing "live data" call sites */
-  --strain: #2f66e0;        /* saturated blue — the Strain score specifically */
-  --recovery-high: #2b9d54; /* saturated green — Recovery 67-100% */
-  --recovery-med: #d99a12;  /* saturated gold — Recovery 34-66% */
-  --recovery-low: #d1453a;  /* saturated red — Recovery 0-33% */
-  --nutrition: #d9660c;     /* saturated burnt orange — Nutrition domain */
-  --nutrition-wash: rgba(217, 102, 12, 0.13);
-  --fitness: #d1382b;       /* saturated red — Fitness domain */
-  --fitness-wash: rgba(209, 56, 43, 0.13);
-  --mind: #6b4fd6;          /* saturated violet — Mind domain */
-  --mind-wash: rgba(107, 79, 214, 0.13);
-  --caution: #b5590f;       /* saturated amber-brown, distinct for safety escalations */
-  --caution-wash: rgba(181, 89, 15, 0.11);
-  --line: #cdd6d0;          /* hairline rule colour */
-  --line-strong: #b3bfb8;
+  --paper-sunken: #e7e9ee;  /* recessed wells (ring tracks, inputs) */
+  --ink: #12141a;           /* cool near-black */
+  --ink-soft: #4a4f5c;
+  --ink-faint: #868c99;
+  --signal: #3457d5;        /* vivid indigo — Recovery domain + general CTA/highlight */
+  --signal-bright: #5b78e6;
+  --vital: #3457d5;         /* alias — kept for existing "live data" call sites */
+  --strain: #0891b2;        /* saturated cyan — the Strain score specifically */
+  --recovery-high: #16a34a; /* saturated green — Recovery 67-100% */
+  --recovery-med: #d97706;  /* saturated amber — Recovery 34-66% */
+  --recovery-low: #dc2626;  /* saturated red — Recovery 0-33% */
+  --nutrition: #ea580c;     /* saturated orange — Nutrition domain */
+  --nutrition-wash: rgba(234, 88, 12, 0.13);
+  --fitness: #e11d48;       /* vivid rose-red — Fitness domain */
+  --fitness-wash: rgba(225, 29, 72, 0.13);
+  --mind: #7c3aed;          /* vivid violet — Mind domain */
+  --mind-wash: rgba(124, 58, 237, 0.13);
+  --caution: #b45309;       /* saturated amber-brown, distinct for safety escalations */
+  --caution-wash: rgba(180, 83, 9, 0.11);
+  --line: #dde1e6;          /* hairline rule colour */
+  --line-strong: #c3c9d1;
 
-  --shadow-sm: 0 1px 3px rgba(8, 20, 18, 0.09), 0 1px 2px rgba(8, 20, 18, 0.06);
-  --shadow-md: 0 10px 28px rgba(8, 20, 18, 0.13), 0 3px 9px rgba(8, 20, 18, 0.08);
+  --shadow-sm: 0 1px 3px rgba(15, 20, 30, 0.08), 0 1px 2px rgba(15, 20, 30, 0.05);
+  --shadow-md: 0 12px 30px rgba(15, 20, 30, 0.12), 0 3px 10px rgba(15, 20, 30, 0.07);
   color-scheme: light;
 }
 
-/* Dark theme — cool near-black instead of warm charcoal, brighter
-   saturated accents so it reads as the same identity as light mode
-   rather than a different app. */
+/* Dark theme — same indigo-forward identity, brighter saturated
+   accents on a cool near-black. */
 :root[data-theme="dark"] {
-  --paper: #0a1211;
-  --paper-raised: #121d1b;
-  --paper-sunken: #060b0a;
-  --ink: #eaf3f0;
-  --ink-soft: #a3b4b0;
-  --ink-faint: #677875;
-  --signal: #1fd1b3;
-  --signal-bright: #4de3c8;
-  --vital: #1fd1b3;
-  --strain: #6089ff;
-  --recovery-high: #4bcf78;
-  --recovery-med: #f0be4a;
-  --recovery-low: #ec6b5e;
-  --nutrition: #ff9d4d;
-  --nutrition-wash: rgba(255, 157, 77, 0.16);
-  --fitness: #ff7461;
-  --fitness-wash: rgba(255, 116, 97, 0.16);
-  --mind: #a58cff;
-  --mind-wash: rgba(165, 140, 255, 0.16);
-  --caution: #f0a34d;
-  --caution-wash: rgba(240, 163, 77, 0.14);
-  --line: #1b2926;
-  --line-strong: #283a36;
+  --paper: #0d0f14;
+  --paper-raised: #171a21;
+  --paper-sunken: #090a0d;
+  --ink: #eef0f4;
+  --ink-soft: #a7adba;
+  --ink-faint: #6b7280;
+  --signal: #6b8cff;
+  --signal-bright: #90a8ff;
+  --vital: #6b8cff;
+  --strain: #22d3ee;
+  --recovery-high: #4ade80;
+  --recovery-med: #fbbf24;
+  --recovery-low: #f87171;
+  --nutrition: #fb923c;
+  --nutrition-wash: rgba(251, 146, 60, 0.16);
+  --fitness: #fb7185;
+  --fitness-wash: rgba(251, 113, 133, 0.16);
+  --mind: #a78bfa;
+  --mind-wash: rgba(167, 139, 250, 0.16);
+  --caution: #fbbf24;
+  --caution-wash: rgba(251, 191, 36, 0.14);
+  --line: #232733;
+  --line-strong: #323848;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.45), 0 3px 10px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
@@ -98,9 +97,9 @@
   --space-7: 6.8rem;
   --space-8: 11rem;
 
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
+  --radius-sm: 8px;
+  --radius-md: 13px;
+  --radius-lg: 18px;
   --max-measure: 62ch;
 }
 

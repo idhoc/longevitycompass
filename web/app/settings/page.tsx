@@ -104,8 +104,8 @@ export default function SettingsPage() {
       </div>
 
       <div className={styles.sections}>
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "Profile")}</h2>
+        <details className={styles.section} open>
+          <summary className={styles.sectionTitle}>{t(p.language, "Profile")}</summary>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label className={styles.fieldLabel} htmlFor="set-name">Name</label>
@@ -302,10 +302,10 @@ export default function SettingsPage() {
               how you already eat.
             </p>
           </div>
-        </section>
+        </details>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "How it talks to you")}</h2>
+        <details className={styles.section}>
+          <summary className={styles.sectionTitle}>{t(p.language, "How it talks to you")}</summary>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>Tone</span>
             <div className={styles.optionGrid}>
@@ -378,10 +378,10 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-        </section>
+        </details>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "Appearance")}</h2>
+        <details className={styles.section}>
+          <summary className={styles.sectionTitle}>{t(p.language, "Appearance")}</summary>
           <div className={styles.themeRow}>
             {(["light", "dark"] as Theme[]).map((t) => (
               <button
@@ -396,10 +396,10 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-        </section>
+        </details>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "Connected data")}</h2>
+        <details className={styles.section}>
+          <summary className={styles.sectionTitle}>{t(p.language, "Connected data")}</summary>
           <p className={styles.sectionSub}>
             Optional. Nothing here is required, and nothing here is uploaded — every import runs
             entirely in this browser tab.
@@ -408,10 +408,10 @@ export default function SettingsPage() {
           <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-3)" }}>
             <GeneticsImport />
           </div>
-        </section>
+        </details>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "Your data")}</h2>
+        <details className={styles.section}>
+          <summary className={styles.sectionTitle}>{t(p.language, "Your data")}</summary>
           <p className={styles.sectionSub}>
             Everything you&apos;ve logged lives only in this browser — there is no account and
             nothing is uploaded anywhere except the single photo or message needed to answer a
@@ -503,16 +503,16 @@ export default function SettingsPage() {
               </button>
             )}
           </div>
-        </section>
+        </details>
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t(p.language, "About")}</h2>
+        <details className={styles.section}>
+          <summary className={styles.sectionTitle}>{t(p.language, "About")}</summary>
           <p className={styles.sectionSub}>
             Longevity Compass is a coaching tool, not a medical device — every insight is grounded
             in cited research or plainly labeled as an estimate, and anything outside wellness
             coaching gets a direct referral to a licensed professional instead of a guess.
           </p>
-        </section>
+        </details>
       </div>
     </div>
   );
