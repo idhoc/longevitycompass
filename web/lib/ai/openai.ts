@@ -115,9 +115,16 @@ function extractResponsesText(data: any): string {
 }
 
 function mockReply(userMessage: string): string {
-  return `[MOCK — OPENAI_API_KEY not set] I'd ground a real answer to "${userMessage.slice(0, 80)}" in published research here. Set OPENAI_API_KEY to see it for real.`;
+  if (!hasOpenAIKey()) {
+    console.warn("[openai] OPENAI_API_KEY not set — serving a placeholder reply instead of a real completion.");
+  }
+  void userMessage;
+  return "I'm having trouble reaching my research backend right now, so I can't give you a grounded answer this moment — please try again shortly.";
 }
 
 function mockVisionDescription(): string {
-  return "[MOCK — OPENAI_API_KEY not set] A plate with a portion of grilled chicken, a cup of steamed rice, and a side of broccoli.";
+  if (!hasOpenAIKey()) {
+    console.warn("[openai] OPENAI_API_KEY not set — serving a placeholder vision reply instead of a real completion.");
+  }
+  return "I couldn't analyze this photo right now — please try again in a moment.";
 }

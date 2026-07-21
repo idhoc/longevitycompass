@@ -192,11 +192,11 @@
 }
 
 .themeSwatchDark {
-  background: linear-gradient(135deg, #1e1b17 50%, #6bbba8 50%);
+  background: linear-gradient(135deg, #0a1211 50%, #1fd1b3 50%);
 }
 
 .themeSwatchLight {
-  background: linear-gradient(135deg, #fbf8f3 50%, #4f9a8c 50%);
+  background: linear-gradient(135deg, #eef2ef 50%, #0c8f79 50%);
 }
 
 .themeLabel {

@@ -1,74 +1,72 @@
 /* ============================================================
-   Design tokens, v3 — a calm, warm, accessible register, moved off
-   the near-black/neon instrument-panel palette. Warm cream paper,
-   soft muted domain hues (not saturated neon), generous rounded
-   corners, gentle low-contrast shadows — the "soft, puffy, calming"
-   register health apps actually use (Headspace, Apple Health, Calm),
-   not a control-room aesthetic. Light is the default first
-   impression; a softened dark mode is the alternate in Settings, not
-   the other way around. Fraunces stays for display warmth, paired
-   with Plex Sans/Mono for UI chrome and data.
+   Design tokens, v4 — off the warm cream register entirely. Cool
+   ink-and-paper base (a deep slate-black ink on a cool, faintly
+   green-gray paper, not beige), with punchier, more saturated
+   domain accents instead of muted pastel washes. Same structural
+   tokens as before so components didn't need touching — only the
+   values changed, which is the point: a real identity shift, not
+   a font/copy pass.
    ============================================================ */
 :root {
-  /* -- palette: warm, light, calm (default) -- */
-  --paper: #fbf8f3;         /* warm cream, not clinical white */
+  /* -- palette: cool, crisp, saturated (default) -- */
+  --paper: #eef2ef;         /* cool pale sage-gray, not cream */
   --paper-raised: #ffffff;
-  --paper-sunken: #f2ede2;  /* recessed wells (ring tracks, inputs) */
-  --ink: #2e2b26;           /* warm near-black, not stark #000 */
-  --ink-soft: #665f54;
-  --ink-faint: #948d7d;
-  --signal: #4f9a8c;        /* soft teal — Recovery domain + general CTA/highlight */
-  --signal-bright: #6bbba8;
-  --vital: #4f9a8c;         /* alias — kept for existing "live data" call sites */
-  --strain: #5b8fbf;        /* soft blue — the Strain score specifically */
-  --recovery-high: #5fae71; /* soft green — Recovery 67-100% */
-  --recovery-med: #e0a83e;  /* soft gold — Recovery 34-66% */
-  --recovery-low: #d0625a;  /* soft coral-red — Recovery 0-33%, calmer than alarm red */
-  --nutrition: #e08e45;     /* warm orange — Nutrition domain */
-  --nutrition-wash: rgba(224, 142, 69, 0.12);
-  --fitness: #e0724f;       /* warm terracotta — Fitness domain */
-  --fitness-wash: rgba(224, 114, 79, 0.12);
-  --mind: #8b7fd1;          /* soft lavender — Mind domain */
-  --mind-wash: rgba(139, 127, 209, 0.12);
-  --caution: #c97a3d;       /* muted amber-brown, distinct for safety escalations */
-  --caution-wash: rgba(201, 122, 61, 0.1);
-  --line: #e6e0d3;          /* hairline rule colour */
-  --line-strong: #d3cbb8;
+  --paper-sunken: #dfe6e1;  /* recessed wells (ring tracks, inputs) */
+  --ink: #10181a;           /* cool near-black slate, not warm brown-black */
+  --ink-soft: #48565a;
+  --ink-faint: #7d8b8a;
+  --signal: #0c8f79;        /* vivid deep teal — Recovery domain + general CTA/highlight */
+  --signal-bright: #13b89d;
+  --vital: #0c8f79;         /* alias — kept for existing "live data" call sites */
+  --strain: #2f66e0;        /* saturated blue — the Strain score specifically */
+  --recovery-high: #2b9d54; /* saturated green — Recovery 67-100% */
+  --recovery-med: #d99a12;  /* saturated gold — Recovery 34-66% */
+  --recovery-low: #d1453a;  /* saturated red — Recovery 0-33% */
+  --nutrition: #d9660c;     /* saturated burnt orange — Nutrition domain */
+  --nutrition-wash: rgba(217, 102, 12, 0.13);
+  --fitness: #d1382b;       /* saturated red — Fitness domain */
+  --fitness-wash: rgba(209, 56, 43, 0.13);
+  --mind: #6b4fd6;          /* saturated violet — Mind domain */
+  --mind-wash: rgba(107, 79, 214, 0.13);
+  --caution: #b5590f;       /* saturated amber-brown, distinct for safety escalations */
+  --caution-wash: rgba(181, 89, 15, 0.11);
+  --line: #cdd6d0;          /* hairline rule colour */
+  --line-strong: #b3bfb8;
 
-  --shadow-sm: 0 1px 3px rgba(60, 50, 30, 0.06), 0 1px 2px rgba(60, 50, 30, 0.04);
-  --shadow-md: 0 8px 24px rgba(60, 50, 30, 0.08), 0 2px 6px rgba(60, 50, 30, 0.05);
+  --shadow-sm: 0 1px 3px rgba(8, 20, 18, 0.09), 0 1px 2px rgba(8, 20, 18, 0.06);
+  --shadow-md: 0 10px 28px rgba(8, 20, 18, 0.13), 0 3px 9px rgba(8, 20, 18, 0.08);
   color-scheme: light;
 }
 
-/* Dark theme — a real second choice in Settings, softened the same
-   way: warm charcoal instead of near-black, muted hues instead of
-   neon, so switching modes never feels like a different app. */
+/* Dark theme — cool near-black instead of warm charcoal, brighter
+   saturated accents so it reads as the same identity as light mode
+   rather than a different app. */
 :root[data-theme="dark"] {
-  --paper: #1e1b17;
-  --paper-raised: #29251f;
-  --paper-sunken: #14120e;
-  --ink: #f2ece0;
-  --ink-soft: #b6ae9e;
-  --ink-faint: #7c7566;
-  --signal: #6bbba8;
-  --signal-bright: #8ed2c0;
-  --vital: #6bbba8;
-  --strain: #7fa3d4;
-  --recovery-high: #7cc28d;
-  --recovery-med: #e8be5f;
-  --recovery-low: #db8b80;
-  --nutrition: #eda466;
-  --nutrition-wash: rgba(237, 164, 102, 0.14);
-  --fitness: #e8916f;
-  --fitness-wash: rgba(232, 145, 111, 0.14);
-  --mind: #a99be0;
-  --mind-wash: rgba(169, 155, 224, 0.14);
-  --caution: #dda05e;
-  --caution-wash: rgba(221, 160, 94, 0.12);
-  --line: #3a342c;
-  --line-strong: #4a4338;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --paper: #0a1211;
+  --paper-raised: #121d1b;
+  --paper-sunken: #060b0a;
+  --ink: #eaf3f0;
+  --ink-soft: #a3b4b0;
+  --ink-faint: #677875;
+  --signal: #1fd1b3;
+  --signal-bright: #4de3c8;
+  --vital: #1fd1b3;
+  --strain: #6089ff;
+  --recovery-high: #4bcf78;
+  --recovery-med: #f0be4a;
+  --recovery-low: #ec6b5e;
+  --nutrition: #ff9d4d;
+  --nutrition-wash: rgba(255, 157, 77, 0.16);
+  --fitness: #ff7461;
+  --fitness-wash: rgba(255, 116, 97, 0.16);
+  --mind: #a58cff;
+  --mind-wash: rgba(165, 140, 255, 0.16);
+  --caution: #f0a34d;
+  --caution-wash: rgba(240, 163, 77, 0.14);
+  --line: #1b2926;
+  --line-strong: #283a36;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.45), 0 3px 10px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 
