@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Manrope, IBM_Plex_Mono } from "next/font/google";
+import { Fredoka, Manrope, IBM_Plex_Mono } from "next/font/google";
 import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
-// Display: Space Grotesk — a bold geometric sans for headlines, the
-// compass mark, and hero numbers. Reads as modern health-tech rather
-// than the editorial slab-serif register this project used before.
-const spaceGrotesk = Space_Grotesk({
+// Display: Fredoka — a rounded, friendly bold sans for headlines and
+// hero numbers. Deliberately soft-geometric (Headspace's own register)
+// instead of the techy Space Grotesk this project used before: this
+// redesign takes its whole visual cue from Headspace's warmth, and the
+// typeface has to carry that, not fight it.
+const fredoka = Fredoka({
   variable: "--font-bitter",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
@@ -42,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${fredoka.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { ExercisePose } from "@/components/ExercisePose";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
 import {
   WORKOUTS,
   EXERCISE_LIBRARY,
@@ -12,6 +13,8 @@ import {
   orderWorkoutsForProfile,
   recommendationReason,
   workoutEquipment,
+  getAnyWorkout,
+  estimateMinutes,
   type WorkoutRoutine,
   type Equipment,
   type ExerciseCategory,
@@ -51,13 +54,22 @@ export default function FitnessLibraryPage() {
 
   const completionCount = (routineId: string) => sessions.filter((s) => s.routineId === routineId).length;
 
+  const sessionMinutes = (s: WorkoutSession) => {
+    const routine = getAnyWorkout(s.routineId);
+    return routine ? estimateMinutes(routine.steps) : 15;
+  };
+  const last7Keys = new Set(Array.from({ length: 7 }, (_, i) => dateKeyOffset(i)));
+  const sessionsThisWeek = sessions.filter((s) => last7Keys.has(s.date));
+  const minutesThisWeek = sessionsThisWeek.reduce((sum, s) => sum + sessionMinutes(s), 0);
+  const streak = computeStreak(sessions);
+
   return (
     <div className={styles.page}>
       <SiteNav />
 
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness</span>
+        <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness · Movement &amp; Resilience</span>
         <h1>Pick a session</h1>
         <p className={styles.headerSub}>
           Step-by-step, paced by a timer or a tempo cue, with illustrated form instead of video.
@@ -67,6 +79,21 @@ export default function FitnessLibraryPage() {
         <Link href="/fitness/build" className={styles.buildCta}>
           Build your own routine →
         </Link>
+      </div>
+
+      <div className={styles.statsStrip}>
+        <div className={styles.statCell}>
+          <span className={styles.statValue}>{sessionsThisWeek.length}</span>
+          <span className={styles.statLabel}>Sessions this week</span>
+        </div>
+        <div className={styles.statCell}>
+          <span className={styles.statValue}>{minutesThisWeek}</span>
+          <span className={styles.statLabel}>Minutes this week</span>
+        </div>
+        <div className={styles.statCell}>
+          <span className={styles.statValue}>{streak}</span>
+          <span className={styles.statLabel}>Day streak</span>
+        </div>
       </div>
 
       <div style={{ padding: "0 var(--space-6) var(--space-5)" }}>

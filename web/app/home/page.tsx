@@ -8,6 +8,7 @@ import { SiteNav } from "@/components/SiteNav";
 import { HabitMomentumGauge } from "@/components/HabitMomentumGauge";
 import { TopicIcon, VITAL_ICONS, DOMAIN_ICONS } from "@/lib/icons";
 import { RoutineCompass } from "@/components/RoutineCompass";
+import { Gauge } from "@/components/Gauge";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
@@ -277,13 +278,8 @@ export default function HomePage() {
         </div>
         <div className={styles.topicsStrip}>
           {topics.map((topic) => (
-            <Link key={topic.id} href={topic.href} className={styles.topicCard} style={{ borderTopColor: domainColor(topic.domain) }}>
-              <TopicIcon
-                name={topic.icon}
-                className={styles.topicIcon}
-                aria-hidden="true"
-                style={{ color: domainColor(topic.domain) }}
-              />
+            <Link key={topic.id} href={topic.href} className={styles.topicCard} style={{ background: domainColor(topic.domain) }}>
+              <TopicIcon name={topic.icon} className={styles.topicIcon} aria-hidden="true" />
               <span className={styles.topicTitle}>{topic.title}</span>
               <p className={styles.topicDesc}>{topic.description}</p>
             </Link>
@@ -299,11 +295,21 @@ export default function HomePage() {
         variants={fadeUp}
         transition={{ duration: 0.4, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
       >
-        <RoutineCompass
-          days={compassDays}
-          centerLabel={hasReadinessData ? "Readiness" : "No data yet"}
-          centerValue={hasReadinessData ? `${readiness.score}%` : "—"}
+        <Gauge
+          size={260}
+          value={hasReadinessData ? readiness.score : 0}
+          valueText={hasReadinessData ? `${readiness.score}%` : "—"}
+          label={hasReadinessData ? "Aging Pace" : "No data yet"}
+          color="var(--signal)"
         />
+        <details className={styles.weekDetails}>
+          <summary className={styles.weekSummary}>This week, by domain</summary>
+          <RoutineCompass
+            days={compassDays}
+            centerLabel={hasReadinessData ? "Readiness" : "No data yet"}
+            centerValue={hasReadinessData ? `${readiness.score}%` : "—"}
+          />
+        </details>
         <div className={styles.vitalsGrid}>
           <Link href="/recovery" className={styles.vitalCell}>
             <span className={styles.vitalIconBadge} style={{ background: "var(--signal)" }}>

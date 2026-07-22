@@ -51,27 +51,28 @@
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
   border: 1px solid var(--line);
-  border-top: 3px solid var(--line-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-4);
   background: var(--paper-raised);
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 .card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+  border-color: var(--line-strong);
 }
 
 .cardGhost {
@@ -79,23 +80,40 @@
   border-style: dashed;
 }
 
+.cardIconBadge {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .cardIcon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   stroke-width: 1.75;
+  color: var(--paper);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  min-width: 0;
 }
 
 .cardTitle {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-base);
+  font-weight: 600;
+  font-size: var(--text-md);
 }
 
 .cardDesc {
   color: var(--ink-soft);
   font-size: var(--text-sm);
   line-height: 1.5;
-  flex: 1;
 }
 
 .cardFeature {
@@ -103,6 +121,19 @@
   font-size: 0.68rem;
   letter-spacing: 0.02em;
   line-height: 1.4;
+}
+
+.cardChevron {
+  width: 22px;
+  height: 22px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.card:hover .cardChevron {
+  transform: translateX(3px);
+  color: var(--ink-soft);
 }
 
 @media (max-width: 560px) {

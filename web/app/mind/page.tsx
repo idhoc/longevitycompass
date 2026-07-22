@@ -9,7 +9,7 @@ export default function MindPage() {
       <SiteNav />
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--mind)" }}>Mind &amp; Purpose</span>
+        <span className="eyebrow" style={{ color: "var(--mind)" }}>Mind · Stress &amp; Purpose</span>
         <h1>Reflect, breathe, or step away</h1>
         <p className={styles.headerSub}>
           A daily reflection, a real guided meditation with a reactive breathing visual, and a

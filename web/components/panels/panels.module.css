@@ -179,6 +179,69 @@ textarea.input {
   background: color-mix(in srgb, var(--signal) 12%, transparent);
 }
 
+.mindModeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6em;
+}
+
+.mindModeCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding: var(--space-3);
+  min-height: 118px;
+  border-radius: var(--radius-md);
+  border: 3px solid transparent;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.mindModeCard:hover {
+  opacity: 0.8;
+  transform: translateY(-2px);
+}
+
+.mindModeCardActive {
+  opacity: 1;
+  border-color: var(--ink);
+}
+
+.mindModeIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--paper);
+}
+
+.mindModeTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--paper);
+}
+
+.mindModeStat {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--paper) 85%, transparent);
+  line-height: 1.35;
+}
+
+@media (max-width: 420px) {
+  .mindModeGrid {
+    grid-template-columns: 1fr;
+  }
+  .mindModeCard {
+    flex-direction: row;
+    align-items: center;
+    min-height: 0;
+    padding: 0.9em 1em;
+  }
+}
+
 .meditationOption {
   text-align: left;
   border: 1px solid var(--line-strong);

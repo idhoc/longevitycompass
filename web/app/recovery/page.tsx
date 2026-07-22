@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { SleepPanel } from "@/components/panels/SleepPanel";
 import { TrendBars } from "@/components/TrendBars";
+import { Gauge } from "@/components/Gauge";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { getAnyWorkout, estimateMinutes } from "@/lib/workouts";
 import { dateKeyOffset, last7Days } from "@/lib/domainReach";
@@ -89,6 +90,7 @@ export default function RecoveryPage() {
   });
 
   const recoveryByDate = computeRecoveryHistory(sleepEntries);
+  const todayRecovery = recoveryByDate.get(todayKey()) ?? null;
   const recoveryTrend = Array.from({ length: 7 }, (_, i) => {
     const date = dateKeyOffset(6 - i);
     const v = recoveryByDate.get(date);
@@ -111,7 +113,7 @@ export default function RecoveryPage() {
       <SiteNav />
       <div className={styles.header}>
         <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--signal)" }}>Recovery</span>
+        <span className="eyebrow" style={{ color: "var(--signal)" }}>Recovery · Repair &amp; Restoration</span>
         <h1>Sleep, vitals, and what moves them</h1>
         <p className={styles.headerSub}>
           A real check-in on last night, and your resting heart rate trend against your own
@@ -144,7 +146,17 @@ export default function RecoveryPage() {
           </div>
           <div className={styles.vitalRow}>
             <div className={styles.vitalCard}>
-              <span className={styles.vitalLabel}>Recovery, 7 days</span>
+              <span className={styles.vitalLabel}>Recovery</span>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Gauge
+                  size={140}
+                  value={todayRecovery ?? 0}
+                  valueText={todayRecovery != null ? `${Math.round(todayRecovery)}%` : "—"}
+                  needle={false}
+                  color="var(--signal)"
+                />
+              </div>
+              <span className={styles.vitalLabel}>Last 7 days</span>
               <TrendBars values={recoveryTrend} color="var(--signal)" />
             </div>
             <div className={styles.vitalCard}>

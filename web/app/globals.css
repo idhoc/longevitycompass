@@ -97,9 +97,10 @@
   --space-7: 6.8rem;
   --space-8: 11rem;
 
-  --radius-sm: 8px;
-  --radius-md: 13px;
-  --radius-lg: 18px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-pill: 999px;
   --max-measure: 62ch;
 }
 

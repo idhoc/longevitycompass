@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PenLine, Wind, Timer } from "lucide-react";
 import { Orb } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
@@ -411,30 +412,41 @@ export function MindPanel() {
       </div>
 
       <div className={styles.panelBody}>
-        <div className={styles.tagRow} role="group" aria-label="Mind mode">
+        <div className={styles.mindModeGrid} role="group" aria-label="Mind mode">
           <button
             type="button"
-            className={mode === "reflect" ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+            className={mode === "reflect" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
+            style={{ background: "var(--mind)" }}
             onClick={() => setMode("reflect")}
             aria-pressed={mode === "reflect"}
           >
-            Reflect
+            <PenLine className={styles.mindModeIcon} aria-hidden="true" />
+            <span className={styles.mindModeTitle}>Reflect</span>
+            <span className={styles.mindModeStat}>{streak > 0 ? `${streak} day streak` : "Start today"}</span>
           </button>
           <button
             type="button"
-            className={mode === "meditate" ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+            className={mode === "meditate" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
+            style={{ background: "var(--signal)" }}
             onClick={() => setMode("meditate")}
             aria-pressed={mode === "meditate"}
           >
-            Meditate
+            <Wind className={styles.mindModeIcon} aria-hidden="true" />
+            <span className={styles.mindModeTitle}>Meditate</span>
+            <span className={styles.mindModeStat}>{lastMeditation ? `Last: ${lastMeditation.title}` : "Guided & narrated"}</span>
           </button>
           <button
             type="button"
-            className={mode === "break" ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+            className={mode === "break" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
+            style={{ background: "var(--caution)" }}
             onClick={() => setMode("break")}
             aria-pressed={mode === "break"}
           >
-            Focus timer
+            <Timer className={styles.mindModeIcon} aria-hidden="true" />
+            <span className={styles.mindModeTitle}>Focus timer</span>
+            <span className={styles.mindModeStat}>
+              {todaysFocusBlocks.length > 0 ? `${todaysFocusBlocks.length} block${todaysFocusBlocks.length === 1 ? "" : "s"} today` : "Real pomodoro cycle"}
+            </span>
           </button>
         </div>
 
