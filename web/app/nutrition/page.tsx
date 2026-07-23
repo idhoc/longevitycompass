@@ -52,13 +52,15 @@ export default function NutritionPage() {
     <div className={styles.page}>
       <SiteNav />
       <div className={styles.header}>
-        <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--nutrition)" }}>Nutrition · Fuel &amp; Metabolism</span>
-        <h1>Your meals today</h1>
-        <p className={styles.headerSub}>
-          Photograph each meal instead of describing it, or photograph what&apos;s in your fridge
-          for a recipe built around it.
-        </p>
+        <div className={styles.headerInner}>
+          <Link href="/home" className={styles.backLink}>← Home</Link>
+          <span className="eyebrow" style={{ color: "var(--nutrition)" }}>Nutrition · Fuel &amp; Metabolism</span>
+          <h1>Your meals today</h1>
+          <p className={styles.headerSub}>
+            Photograph each meal instead of describing it, or photograph what&apos;s in your fridge
+            for a recipe built around it.
+          </p>
+        </div>
       </div>
       <div className={styles.content}>
         <div className={styles.calorieCard}>

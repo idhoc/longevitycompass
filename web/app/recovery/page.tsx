@@ -112,13 +112,15 @@ export default function RecoveryPage() {
     <div className={styles.page}>
       <SiteNav />
       <div className={styles.header}>
-        <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--signal)" }}>Recovery · Repair &amp; Restoration</span>
-        <h1>Sleep, vitals, and what moves them</h1>
-        <p className={styles.headerSub}>
-          A real check-in on last night, and your resting heart rate trend against your own
-          baseline — sleep and vitals, together in one place.
-        </p>
+        <div className={styles.headerInner}>
+          <Link href="/home" className={styles.backLink}>← Home</Link>
+          <span className="eyebrow" style={{ color: "var(--signal)" }}>Recovery · Repair &amp; Restoration</span>
+          <h1>Sleep, vitals, and what moves them</h1>
+          <p className={styles.headerSub}>
+            A real check-in on last night, and your resting heart rate trend against your own
+            baseline — sleep and vitals, together in one place.
+          </p>
+        </div>
       </div>
 
       <div className={styles.content}>

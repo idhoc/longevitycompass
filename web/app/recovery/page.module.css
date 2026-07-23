@@ -13,7 +13,11 @@
     transparent 85%
   );
   width: 100%;
+}
+
+.headerInner {
   max-width: min(var(--content-medium), 94vw);
+  margin: 0 auto;
   padding: var(--space-7) var(--space-4) var(--space-5);
 }
 

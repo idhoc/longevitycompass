@@ -248,27 +248,29 @@ export default function HomePage() {
       <SiteNav />
       {tourHydrated && tourPending && <ProductTour steps={tourSteps} onDone={finishTour} />}
 
-      <div className={styles.container}>
       <motion.div data-tour="hero" className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-        <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
-        <h1 className={styles.heroTitle}>
-          {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
-        </h1>
-        <p className={styles.headerSub}>
-          {hasReadinessData
-            ? `${readiness.focus} is the biggest lever right now.`
-            : "Log your first check-in below to see where to focus."}
-        </p>
-        {nextAction ? (
-          <Link href={nextAction.href} className={styles.nextActionBtn} style={{ background: nextAction.color }}>
-            <nextAction.Icon className={styles.nextActionIcon} aria-hidden="true" />
-            {nextAction.label}
-          </Link>
-        ) : (
-          <p className={styles.nextActionDone}>All four logged today — nice work.</p>
-        )}
+        <div className={styles.heroInner}>
+          <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
+          <h1 className={styles.heroTitle}>
+            {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
+          </h1>
+          <p className={styles.headerSub}>
+            {hasReadinessData
+              ? `${readiness.focus} is the biggest lever right now.`
+              : "Log your first check-in below to see where to focus."}
+          </p>
+          {nextAction ? (
+            <Link href={nextAction.href} className={styles.nextActionBtn} style={{ background: nextAction.color }}>
+              <nextAction.Icon className={styles.nextActionIcon} aria-hidden="true" />
+              {nextAction.label}
+            </Link>
+          ) : (
+            <p className={styles.nextActionDone}>All four logged today — nice work.</p>
+          )}
+        </div>
       </motion.div>
 
+      <div className={styles.container}>
       <motion.div
         data-tour="topics"
         className={styles.topicsSection}

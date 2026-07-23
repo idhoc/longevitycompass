@@ -12,14 +12,16 @@ export default function PrivacyPage() {
       <SiteNav />
 
       <div className={styles.header}>
-        <Link href="/settings" className={styles.backLink}>← Settings</Link>
-        <span className="eyebrow">Privacy</span>
-        <h1>What this app does with your data</h1>
-        <p className={styles.headerSub}>
-          There is no account and no server database. This page describes exactly what&apos;s
-          stored, what ever leaves this device, and to whom — no vague reassurance, the actual
-          mechanics.
-        </p>
+        <div className={styles.headerInner}>
+          <Link href="/settings" className={styles.backLink}>← Settings</Link>
+          <span className="eyebrow">Privacy</span>
+          <h1>What this app does with your data</h1>
+          <p className={styles.headerSub}>
+            There is no account and no server database. This page describes exactly what&apos;s
+            stored, what ever leaves this device, and to whom — no vague reassurance, the actual
+            mechanics.
+          </p>
+        </div>
       </div>
 
       <div className={styles.content}>

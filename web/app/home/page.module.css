@@ -14,7 +14,7 @@
 }
 
 .hero {
-  padding: var(--space-6) var(--space-5) var(--space-5);
+  width: 100%;
   background: radial-gradient(
     ellipse 900px 440px at 20% 0%,
     color-mix(in srgb, var(--signal) 14%, transparent) 0%,
@@ -22,6 +22,12 @@
     transparent 85%
   );
   position: relative;
+}
+
+.heroInner {
+  max-width: min(var(--content-max), 94vw);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
 }
 
 .heroTitle {
