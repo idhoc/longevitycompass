@@ -6,7 +6,12 @@
 }
 
 .header {
-  background: radial-gradient(ellipse 640px 260px at 15% 0%, color-mix(in srgb, var(--nutrition) 16%, transparent), transparent 70%);
+  background: radial-gradient(
+    ellipse 800px 380px at 15% 0%,
+    color-mix(in srgb, var(--nutrition) 16%, transparent) 0%,
+    color-mix(in srgb, var(--nutrition) 6%, transparent) 45%,
+    transparent 85%
+  );
   width: 100%;
   max-width: min(var(--content-medium), 94vw);
   padding: var(--space-7) var(--space-4) var(--space-5);

@@ -10,7 +10,12 @@
   align-items: center;
   text-align: center;
   padding: var(--space-6) var(--space-4) var(--space-5);
-  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--signal) 7%, transparent), transparent 70%);
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    color-mix(in srgb, var(--signal) 7%, transparent) 0%,
+    color-mix(in srgb, var(--signal) 3%, transparent) 40%,
+    transparent 85%
+  );
 }
 
 .heroTitle {
