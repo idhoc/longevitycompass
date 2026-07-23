@@ -23,6 +23,12 @@ export interface ParsedWorkout {
   date: string;
   type: string;
   minutes: number;
+  /** Apple's own computed energy burn for this workout — derived from
+   * motion, heart rate, and (when a route was recorded) pace, not our
+   * duration-based estimate. Real when present, absent otherwise. */
+  energyKcal?: number;
+  /** Real route/GPS distance for the workout, when Apple recorded one. */
+  distanceKm?: number;
 }
 
 export interface AppleHealthImportResult {
@@ -66,7 +72,7 @@ export async function parseAppleHealthExport(
 ): Promise<AppleHealthImportResult> {
   const rhrByDate = new Map<string, number[]>();
   const sleepRecords: { start: Date; end: Date; value: string }[] = [];
-  const workoutsRaw: { start: Date; type: string; minutes: number }[] = [];
+  const workoutsRaw: { start: Date; type: string; minutes: number; energyKcal?: number; distanceKm?: number }[] = [];
   let recordsScanned = 0;
   let carry = "";
   let offset = 0;
@@ -107,7 +113,34 @@ export async function parseAppleHealthExport(
         const durationUnit = attr(tag, "durationUnit") ?? "min";
         if (start && type && Number.isFinite(durationRaw) && durationRaw > 0) {
           const minutes = durationUnit === "sec" ? durationRaw / 60 : durationRaw;
-          workoutsRaw.push({ start, type: friendlyWorkoutType(type), minutes: Math.round(minutes) });
+
+          // Apple's own computed totals — from motion, heart rate, and GPS
+          // pace when a route was recorded — not a duration guess.
+          const energyRaw = Number(attr(tag, "totalEnergyBurned"));
+          const energyUnit = (attr(tag, "totalEnergyBurnedUnit") ?? "kcal").toLowerCase();
+          const energyKcal =
+            Number.isFinite(energyRaw) && energyRaw > 0
+              ? energyUnit.includes("kj")
+                ? energyRaw / 4.184
+                : energyRaw
+              : undefined;
+
+          const distanceRaw = Number(attr(tag, "totalDistance"));
+          const distanceUnit = (attr(tag, "totalDistanceUnit") ?? "km").toLowerCase();
+          const distanceKm =
+            Number.isFinite(distanceRaw) && distanceRaw > 0
+              ? distanceUnit.includes("mi")
+                ? distanceRaw * 1.60934
+                : distanceRaw
+              : undefined;
+
+          workoutsRaw.push({
+            start,
+            type: friendlyWorkoutType(type),
+            minutes: Math.round(minutes),
+            energyKcal: energyKcal != null ? Math.round(energyKcal) : undefined,
+            distanceKm: distanceKm != null ? Math.round(distanceKm * 100) / 100 : undefined,
+          });
         }
       }
     }
@@ -143,7 +176,7 @@ export async function parseAppleHealthExport(
   for (const w of workoutsRaw) {
     const key = dateKey(w.start);
     const list = workoutsByDate.get(key) ?? [];
-    list.push({ date: key, type: w.type, minutes: w.minutes });
+    list.push({ date: key, type: w.type, minutes: w.minutes, energyKcal: w.energyKcal, distanceKm: w.distanceKm });
     workoutsByDate.set(key, list);
   }
   const workouts = Array.from(workoutsByDate.values()).flat();
@@ -169,6 +202,8 @@ interface StoredWorkoutSession {
   routineId: string;
   title: string;
   durationMinutes?: number;
+  energyKcal?: number;
+  distanceKm?: number;
 }
 
 export const APPLE_HEALTH_WORKOUT_ROUTINE_ID = "apple-health-import";
@@ -231,6 +266,8 @@ export function mergeAppleHealthImport(result: AppleHealthImportResult): { sleep
         routineId: APPLE_HEALTH_WORKOUT_ROUTINE_ID,
         title: `${w.type} (Apple Health)`,
         durationMinutes: w.minutes,
+        energyKcal: w.energyKcal,
+        distanceKm: w.distanceKm,
       };
     });
   window.localStorage.setItem("lc_workout_sessions_v1", JSON.stringify([...existingWorkouts, ...newWorkouts]));

@@ -181,8 +181,14 @@ textarea.input {
 
 .mindModeGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6em;
+}
+
+@media (min-width: 640px) {
+  .mindModeGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .mindModeCard {
@@ -263,6 +269,23 @@ textarea.input {
   cursor: not-allowed;
 }
 
+
+.breathRing {
+  display: inline-flex;
+  padding: var(--space-4);
+  border-radius: 50%;
+  transition: box-shadow 4s ease-in-out;
+}
+
+.breathRing[data-phase="inhale"],
+.breathRing[data-phase="hold1"] {
+  box-shadow: 0 0 0 12px color-mix(in srgb, var(--mind) 14%, transparent);
+}
+
+.breathRing[data-phase="exhale"],
+.breathRing[data-phase="hold2"] {
+  box-shadow: 0 0 0 0 transparent;
+}
 
 .miniScene :global(canvas) {
   width: 100% !important;

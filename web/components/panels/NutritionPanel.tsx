@@ -17,6 +17,9 @@ interface MealFood {
 interface LoggedMeal {
   id: string;
   date: string;
+  /** Real timestamp of the log action — what actually powers the fasting
+   * timer below, not just a day-level date. */
+  loggedAt?: string;
   thumbnail: string;
   foods: MealFood[];
   totalCalories: number | null;
@@ -68,7 +71,7 @@ function sumCalories(foods: MealFood[]): number | null {
  * profile's real dietary restrictions surfaces first — the same idea
  * list for everyone otherwise reads as static and untailored. */
 function sortIdeasForProfile(ideas: MealIdea[], profile: UserProfile | null): MealIdea[] {
-  const restrictions = profile?.dietaryRestrictions.filter((r) => r !== "No restrictions") ?? [];
+  const restrictions = profile?.dietaryRestrictions?.filter((r) => r !== "No restrictions") ?? [];
   if (!restrictions.length) return ideas;
   return [...ideas].sort((a, b) => {
     const aFit = restrictions.filter((r) => a.dietTags.includes(r as MealIdea["dietTags"][number])).length;
@@ -293,6 +296,7 @@ export function NutritionPanel() {
       const entry: LoggedMeal = {
         id: `${Date.now()}`,
         date: todayKey(),
+        loggedAt: new Date().toISOString(),
         thumbnail: dataUrl,
         foods: meal.foods || [],
         totalCalories: meal.total_calories_estimate,
@@ -347,6 +351,7 @@ export function NutritionPanel() {
     const entry: LoggedMeal = {
       id: `${Date.now()}`,
       date: todayKey(),
+      loggedAt: new Date().toISOString(),
       thumbnail: "",
       foods: [{ name: idea.title, estimated_grams: null, estimated_calories: idea.kcal }],
       totalCalories: idea.kcal,

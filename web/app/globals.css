@@ -88,14 +88,14 @@
 
   /* -- space scale: a Fibonacci-derived progression rather than a
      4/8px grid — a deliberate nod to biological growth curves -- */
-  --space-1: 0.4rem;
-  --space-2: 0.65rem;
-  --space-3: 1rem;
-  --space-4: 1.6rem;
-  --space-5: 2.6rem;
-  --space-6: 4.2rem;
-  --space-7: 6.8rem;
-  --space-8: 11rem;
+  --space-1: 0.45rem;
+  --space-2: 0.75rem;
+  --space-3: 1.2rem;
+  --space-4: 2rem;
+  --space-5: 3.2rem;
+  --space-6: 5rem;
+  --space-7: 7.5rem;
+  --space-8: 12rem;
 
   --radius-sm: 12px;
   --radius-md: 18px;
@@ -139,8 +139,12 @@ a {
 h1, h2, h3 {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.005em;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+h1 {
+  font-weight: 800;
 }
 
 .hero-italic {

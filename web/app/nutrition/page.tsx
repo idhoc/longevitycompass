@@ -6,6 +6,7 @@ import { NutritionPanel } from "@/components/panels/NutritionPanel";
 import { MacroRings } from "@/components/MacroRings";
 import { GeneticInsightCard } from "@/components/GeneticInsightCard";
 import { Gauge } from "@/components/Gauge";
+import { FastingTimer } from "@/components/FastingTimer";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { macroTargetsFromProfile } from "@/lib/nutritionTargets";
 import { dateKeyOffset } from "@/lib/domainReach";
@@ -14,6 +15,7 @@ import styles from "./page.module.css";
 
 interface LoggedMeal {
   date: string;
+  loggedAt?: string;
   totalCalories: number | null;
   proteinG: number | null;
   carbsG: number | null;
@@ -40,6 +42,11 @@ export default function NutritionPage() {
     return { date, kcal: dayMeals.reduce((sum, m) => sum + (m.totalCalories || 0), 0) };
   });
   const maxDayKcal = Math.max(kcalTarget, ...last7.map((d) => d.kcal), 1);
+  const lastMealAt = meals
+    .map((m) => m.loggedAt)
+    .filter((v): v is string => !!v)
+    .sort()
+    .pop() ?? null;
 
   return (
     <div className={styles.page}>
@@ -79,6 +86,8 @@ export default function NutritionPage() {
             ))}
           </div>
         </div>
+
+        <FastingTimer lastMealAt={lastMealAt} />
 
         {todaysMeals.length > 0 && (
           <div className={styles.macroCard}>

@@ -84,9 +84,12 @@ export function AppleHealthImport() {
       {stage === "parsed" && result && (
         <p className={styles.sectionSub} style={{ margin: 0 }}>
           Found {result.sleepNights.length} night{result.sleepNights.length === 1 ? "" : "s"} of sleep,{" "}
-          {result.workouts.length} workout{result.workouts.length === 1 ? "" : "s"}, and{" "}
-          {result.restingHeartRates.length} day{result.restingHeartRates.length === 1 ? "" : "s"} of resting heart
-          rate, across {result.recordsScanned.toLocaleString()} records scanned. Importing fills in dates you
+          {result.workouts.length} workout{result.workouts.length === 1 ? "" : "s"}
+          {result.workouts.some((w) => w.energyKcal != null)
+            ? ` (${result.workouts.filter((w) => w.energyKcal != null).length} with Apple's own calorie-burn and distance data)`
+            : ""}
+          , and {result.restingHeartRates.length} day{result.restingHeartRates.length === 1 ? "" : "s"} of resting
+          heart rate, across {result.recordsScanned.toLocaleString()} records scanned. Importing fills in dates you
           haven&apos;t logged by hand — it never overwrites a manual entry.
         </p>
       )}

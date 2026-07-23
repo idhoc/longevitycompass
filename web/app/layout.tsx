@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { Fredoka, Manrope, IBM_Plex_Mono } from "next/font/google";
+import { Unbounded, Manrope, IBM_Plex_Mono } from "next/font/google";
 import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
-// Display: Fredoka — a rounded, friendly bold sans for headlines and
-// hero numbers. Deliberately soft-geometric (Headspace's own register)
-// instead of the techy Space Grotesk this project used before: this
-// redesign takes its whole visual cue from Headspace's warmth, and the
-// typeface has to carry that, not fight it.
-const fredoka = Fredoka({
+// Display: Unbounded — heavy, geometric, unapologetically loud. Fredoka
+// read as cute rather than confident; this is the opposite move: wide,
+// dense letterforms at 800 weight that dominate a headline instead of
+// blending into the page.
+const unbounded = Unbounded({
   variable: "--font-bitter",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "700", "800"],
 });
 
 // Body: Manrope — a clean, rounded modern sans for UI chrome, warmer
@@ -44,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fredoka.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${unbounded.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.

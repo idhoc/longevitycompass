@@ -8,7 +8,7 @@ import { SiteNav } from "@/components/SiteNav";
 import { HabitMomentumGauge } from "@/components/HabitMomentumGauge";
 import { TopicIcon, VITAL_ICONS, DOMAIN_ICONS } from "@/lib/icons";
 import { RoutineCompass } from "@/components/RoutineCompass";
-import { Gauge } from "@/components/Gauge";
+import { MomentumTrail } from "@/components/MomentumTrail";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { minutesBetween } from "@/lib/sleepEstimate";
@@ -161,6 +161,12 @@ export default function HomePage() {
     return dailyDomainReach(date, { sleepEntries, meals, sessions, mindEntries, meditationSessions });
   });
 
+  const momentumHistory = Array.from({ length: 14 }, (_, i) => {
+    const date = dateKeyOffset(13 - i);
+    const reach = dailyDomainReach(date, { sleepEntries, meals, sessions, mindEntries, meditationSessions });
+    return computeReadiness({ sleep: reach.sleep, nutrition: reach.nutrition, fitness: reach.fitness, mind: reach.mind }).score;
+  });
+
   const topInsight = crossDomainInsights({
     sleepEntries,
     sessions,
@@ -295,13 +301,7 @@ export default function HomePage() {
         variants={fadeUp}
         transition={{ duration: 0.4, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
       >
-        <Gauge
-          size={260}
-          value={hasReadinessData ? readiness.score : 0}
-          valueText={hasReadinessData ? `${readiness.score}%` : "—"}
-          label={hasReadinessData ? "Aging Pace" : "No data yet"}
-          color="var(--signal)"
-        />
+        <MomentumTrail history={momentumHistory} hasData={hasReadinessData} />
         <details className={styles.weekDetails}>
           <summary className={styles.weekSummary}>This week, by domain</summary>
           <RoutineCompass

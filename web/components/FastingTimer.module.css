@@ -1,0 +1,91 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.emptyText {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nutrition);
+}
+
+.clock {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: clamp(1.8rem, 8vw, 2.4rem);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-sunken);
+  overflow: hidden;
+  margin-top: 0.2em;
+}
+
+.fill {
+  height: 100%;
+  background: var(--nutrition);
+  border-radius: 999px;
+  transition: width 1s linear;
+}
+
+.fill[data-met="true"] {
+  background: var(--recovery-high);
+}
+
+.goalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6em;
+  margin-top: 0.3em;
+}
+
+.goalText {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.goalChips {
+  display: flex;
+  gap: 0.35em;
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 0.35em 0.7em;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--nutrition);
+}
+
+.chipActive {
+  border-color: var(--nutrition);
+  color: var(--ink);
+  background: var(--nutrition-wash);
+}

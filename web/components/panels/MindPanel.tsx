@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PenLine, Wind, Timer } from "lucide-react";
+import { PenLine, Wind, Timer, Waves } from "lucide-react";
 import { Orb } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
@@ -12,7 +12,13 @@ import {
   type MeditationFocus,
   type MeditationLength,
 } from "@/lib/meditations";
+import { playAmbientSound, type AmbientSoundType, type AmbientSoundHandle } from "@/lib/ambientSounds";
 import styles from "./panels.module.css";
+
+/** The named AI companion behind "Reflect" — Headspace has Ebb; this is
+ * ours. Purely a persona label for the existing /api/reflect-insight
+ * call, not a different model or feature. */
+const COMPANION_NAME = "Wren";
 
 interface MindEntry {
   date: string;
@@ -96,7 +102,15 @@ interface FocusSession {
   minutes: number;
 }
 
-type Mode = "reflect" | "meditate" | "break";
+type Mode = "reflect" | "meditate" | "break" | "sounds";
+
+const SOUND_OPTIONS: { key: AmbientSoundType; label: string }[] = [
+  { key: "white", label: "White noise" },
+  { key: "rain", label: "Rain" },
+  { key: "ocean", label: "Ocean" },
+];
+
+const SLEEP_TIMER_OPTIONS = [15, 30, 60] as const;
 
 const PROMPTS = [
   "What gave you a sense of purpose today?",
@@ -109,6 +123,21 @@ const PROMPTS = [
 ];
 
 const FOCUS_PRESETS = [25, 50] as const;
+
+type BreathPhase = "inhale" | "hold1" | "exhale" | "hold2";
+const BREATH_CYCLE: BreathPhase[] = ["inhale", "hold1", "exhale", "hold2"];
+const BREATH_LABEL: Record<BreathPhase, string> = {
+  inhale: "Breathe in",
+  hold1: "Hold",
+  exhale: "Breathe out",
+  hold2: "Hold",
+};
+const BREATH_SCALE: Record<BreathPhase, number> = {
+  inhale: 1.22,
+  hold1: 1.22,
+  exhale: 0.85,
+  hold2: 0.85,
+};
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -226,7 +255,7 @@ export function MindPanel() {
   useEffect(() => {
     const topic = new URLSearchParams(window.location.search).get("topic");
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (topic === "meditate" || topic === "break" || topic === "reflect") setMode(topic);
+    if (topic === "meditate" || topic === "break" || topic === "reflect" || topic === "sounds") setMode(topic);
   }, []);
 
   const [entries, setEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
@@ -249,13 +278,13 @@ export function MindPanel() {
   const [playing, setPlaying] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [usingBrowserVoice, setUsingBrowserVoice] = useState(false);
-  const [breathLabel, setBreathLabel] = useState<"in" | "out">("in");
+  const [breathPhase, setBreathPhase] = useState<BreathPhase>("inhale");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ambientRef = useRef<AmbientHandle | null>(null);
 
   useEffect(() => {
     if (!playing) return;
-    const t = setInterval(() => setBreathLabel((l) => (l === "in" ? "out" : "in")), 4000);
+    const t = setInterval(() => setBreathPhase((p) => BREATH_CYCLE[(BREATH_CYCLE.indexOf(p) + 1) % BREATH_CYCLE.length]), 4000);
     return () => clearInterval(t);
   }, [playing]);
 
@@ -269,6 +298,41 @@ export function MindPanel() {
   const [focusLen, setFocusLen] = useState<(typeof FOCUS_PRESETS)[number]>(25);
   const [pomodoroActive, setPomodoroActive] = useState(false);
   const [pomodoroKey, setPomodoroKey] = useState(0);
+
+  const [playingSound, setPlayingSound] = useState<AmbientSoundType | null>(null);
+  const [sleepTimerMinutes, setSleepTimerMinutes] = useState<(typeof SLEEP_TIMER_OPTIONS)[number] | null>(null);
+  const [sleepTimerRemaining, setSleepTimerRemaining] = useState<number | null>(null);
+  const soundHandleRef = useRef<AmbientSoundHandle | null>(null);
+
+  useEffect(() => {
+    return () => {
+      soundHandleRef.current?.stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sleepTimerRemaining == null) return;
+    if (sleepTimerRemaining <= 0) {
+      stopSound();
+      return;
+    }
+    const t = setTimeout(() => setSleepTimerRemaining((r) => (r != null ? r - 1 : r)), 1000);
+    return () => clearTimeout(t);
+  }, [sleepTimerRemaining]);
+
+  function startSound(type: AmbientSoundType) {
+    soundHandleRef.current?.stop();
+    soundHandleRef.current = playAmbientSound(type);
+    setPlayingSound(type);
+    setSleepTimerRemaining(sleepTimerMinutes != null ? sleepTimerMinutes * 60 : null);
+  }
+
+  function stopSound() {
+    soundHandleRef.current?.stop();
+    soundHandleRef.current = null;
+    setPlayingSound(null);
+    setSleepTimerRemaining(null);
+  }
 
   const today = todayKey();
   const todaysEntry = entries.find((e) => e.date === today);
@@ -334,7 +398,7 @@ export function MindPanel() {
     setSelectedFocus(focus);
     setLoadingAudio(true);
     setUsingBrowserVoice(false);
-    setBreathLabel("in");
+    setBreathPhase("inhale");
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     if (ambientOn) ambientRef.current = startAmbientTone();
 
@@ -448,6 +512,17 @@ export function MindPanel() {
               {todaysFocusBlocks.length > 0 ? `${todaysFocusBlocks.length} block${todaysFocusBlocks.length === 1 ? "" : "s"} today` : "Real pomodoro cycle"}
             </span>
           </button>
+          <button
+            type="button"
+            className={mode === "sounds" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
+            style={{ background: "var(--strain)" }}
+            onClick={() => setMode("sounds")}
+            aria-pressed={mode === "sounds"}
+          >
+            <Waves className={styles.mindModeIcon} aria-hidden="true" />
+            <span className={styles.mindModeTitle}>Sounds</span>
+            <span className={styles.mindModeStat}>{playingSound ? `Playing: ${playingSound}` : "White noise, rain, ocean"}</span>
+          </button>
         </div>
 
         {mode === "reflect" &&
@@ -518,6 +593,7 @@ export function MindPanel() {
               )}
               {reflectInsight ? (
                 <div className={styles.insight}>
+                  <span className={styles.panelLabel}>{COMPANION_NAME}</span>
                   <p className={styles.insightHeadline}>{reflectInsight.headline}</p>
                   <p className={styles.insightExplanation}>{reflectInsight.explanation}</p>
                 </div>
@@ -533,7 +609,7 @@ export function MindPanel() {
                       onClick={fetchReflectInsight}
                       disabled={loadingReflect}
                     >
-                      {loadingReflect ? "Thinking…" : "Reflect on this"}
+                      {loadingReflect ? `${COMPANION_NAME} is reading…` : `Ask ${COMPANION_NAME}`}
                     </button>
                   )}
                 </div>
@@ -566,18 +642,20 @@ export function MindPanel() {
             />
             {playing ? (
               <div style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    margin: "0 auto",
-                    width: "fit-content",
-                    transform: breathLabel === "in" ? "scale(1.12)" : "scale(0.9)",
-                    transition: "transform 4s ease-in-out",
-                  }}
-                >
-                  <Orb state="idle" size={160} color="var(--mind)" />
+                <div className={styles.breathRing} data-phase={breathPhase}>
+                  <div
+                    style={{
+                      margin: "0 auto",
+                      width: "fit-content",
+                      transform: `scale(${BREATH_SCALE[breathPhase]})`,
+                      transition: "transform 4s ease-in-out",
+                    }}
+                  >
+                    <Orb state="idle" size={160} color="var(--mind)" />
+                  </div>
                 </div>
                 <p className={styles.insightHeadline} style={{ marginTop: "0.8em" }}>
-                  Breathe {breathLabel}
+                  {BREATH_LABEL[breathPhase]}
                 </p>
                 <p className={styles.emptyText} style={{ margin: "0.4em auto 0" }}>
                   {usingBrowserVoice ? "Playing via your browser's built-in voice." : "Playing…"}
@@ -720,6 +798,72 @@ export function MindPanel() {
                 <div className={styles.panelFooter}>
                   <button type="button" className={styles.btn} onClick={() => setPomodoroActive(false)}>
                     End session
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {mode === "sounds" && (
+          <>
+            <p className={styles.emptyText} style={{ margin: 0 }}>
+              Real synthesized ambient audio, generated in your browser — no files to download,
+              loops until you stop it.
+            </p>
+            <div className={styles.tagRow}>
+              {SOUND_OPTIONS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={playingSound === s.key ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                  onClick={() => startSound(s.key)}
+                  aria-pressed={playingSound === s.key}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            {playingSound && (
+              <>
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Stop playing after</span>
+                  <div className={styles.tagRow}>
+                    {SLEEP_TIMER_OPTIONS.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={sleepTimerMinutes === m ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                        onClick={() => {
+                          setSleepTimerMinutes(m);
+                          setSleepTimerRemaining(m * 60);
+                        }}
+                        aria-pressed={sleepTimerMinutes === m}
+                      >
+                        {m} min
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={sleepTimerMinutes === null ? `${styles.tag} ${styles.tagActive}` : styles.tag}
+                      onClick={() => {
+                        setSleepTimerMinutes(null);
+                        setSleepTimerRemaining(null);
+                      }}
+                      aria-pressed={sleepTimerMinutes === null}
+                    >
+                      No limit
+                    </button>
+                  </div>
+                </div>
+                {sleepTimerRemaining != null && (
+                  <p className={`${styles.panelMeta} tabular`} style={{ margin: 0 }}>
+                    Stopping in {formatTime(sleepTimerRemaining)}
+                  </p>
+                )}
+                <div className={styles.panelFooter}>
+                  <button type="button" className={styles.btn} onClick={stopSound}>
+                    Stop
                   </button>
                 </div>
               </>

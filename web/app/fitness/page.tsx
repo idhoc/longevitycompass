@@ -28,6 +28,11 @@ interface WorkoutSession {
   date: string;
   routineId: string;
   title: string;
+  durationMinutes?: number;
+  /** Real energy burn from an Apple Health workout record — Apple's own
+   * computed value from motion/heart-rate/pace, not our duration guess. */
+  energyKcal?: number;
+  distanceKm?: number;
 }
 
 const EQUIPMENT_OPTIONS: { key: Equipment | "all"; label: string }[] = [
@@ -55,12 +60,16 @@ export default function FitnessLibraryPage() {
   const completionCount = (routineId: string) => sessions.filter((s) => s.routineId === routineId).length;
 
   const sessionMinutes = (s: WorkoutSession) => {
+    if (s.durationMinutes != null) return s.durationMinutes;
     const routine = getAnyWorkout(s.routineId);
     return routine ? estimateMinutes(routine.steps) : 15;
   };
   const last7Keys = new Set(Array.from({ length: 7 }, (_, i) => dateKeyOffset(i)));
   const sessionsThisWeek = sessions.filter((s) => last7Keys.has(s.date));
   const minutesThisWeek = sessionsThisWeek.reduce((sum, s) => sum + sessionMinutes(s), 0);
+  const kcalThisWeek = sessionsThisWeek.reduce((sum, s) => sum + (s.energyKcal ?? 0), 0);
+  const hasRealKcal = sessionsThisWeek.some((s) => s.energyKcal != null);
+  const distanceThisWeek = sessionsThisWeek.reduce((sum, s) => sum + (s.distanceKm ?? 0), 0);
   const streak = computeStreak(sessions);
 
   return (
@@ -81,7 +90,7 @@ export default function FitnessLibraryPage() {
         </Link>
       </div>
 
-      <div className={styles.statsStrip}>
+      <div className={styles.statsStrip} style={hasRealKcal ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : undefined}>
         <div className={styles.statCell}>
           <span className={styles.statValue}>{sessionsThisWeek.length}</span>
           <span className={styles.statLabel}>Sessions this week</span>
@@ -90,11 +99,25 @@ export default function FitnessLibraryPage() {
           <span className={styles.statValue}>{minutesThisWeek}</span>
           <span className={styles.statLabel}>Minutes this week</span>
         </div>
+        {hasRealKcal && (
+          <div className={styles.statCell}>
+            <span className={styles.statValue}>{Math.round(kcalThisWeek)}</span>
+            <span className={styles.statLabel}>
+              Active kcal{distanceThisWeek > 0 ? ` · ${distanceThisWeek.toFixed(1)} km` : ""}
+            </span>
+          </div>
+        )}
         <div className={styles.statCell}>
           <span className={styles.statValue}>{streak}</span>
           <span className={styles.statLabel}>Day streak</span>
         </div>
       </div>
+      {hasRealKcal && (
+        <p style={{ padding: "0 var(--space-6) var(--space-4)", fontSize: "var(--text-xs)", color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
+          Active kcal and distance are Apple Health&apos;s own computed values for imported workouts — from
+          motion, heart rate, and GPS pace, not a duration estimate.
+        </p>
+      )}
 
       <div style={{ padding: "0 var(--space-6) var(--space-5)" }}>
         <GeneticInsightCard rsids={["rs1815739"]} color="var(--fitness)" />
