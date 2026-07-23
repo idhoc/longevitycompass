@@ -7,7 +7,7 @@
 
 .header {
   background: radial-gradient(
-    ellipse 800px 380px at 15% 0%,
+    ellipse 800px 380px at 15% -120px,
     color-mix(in srgb, var(--nutrition) 16%, transparent) 0%,
     color-mix(in srgb, var(--nutrition) 6%, transparent) 45%,
     transparent 85%

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import { Compass } from "lucide-react";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { t } from "@/lib/i18n";
 import { NAV_ICONS } from "@/lib/icons";
@@ -32,7 +33,8 @@ export function SiteNav() {
     <header className={styles.navBorder}>
       <div className={styles.nav}>
         <Link href="/home" className={styles.mark}>
-          LC<span className={styles.markDot}>·</span>01
+          <Compass className={styles.markIcon} size={20} strokeWidth={1.75} color="var(--signal)" aria-hidden="true" />
+          <span className={styles.markText}>Longevity Compass</span>
         </Link>
         <nav className={styles.links}>
           {LINKS.map((l) => {
