@@ -6,7 +6,20 @@
 
 .header {
   background: radial-gradient(ellipse 640px 260px at 15% 0%, color-mix(in srgb, var(--fitness) 16%, transparent), transparent 70%);
+  width: 100%;
+}
+
+.headerInner {
+  max-width: min(var(--content-max), 94vw);
+  margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-5);
+}
+
+.container {
+  width: 100%;
+  max-width: min(var(--content-max), 94vw);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
 }
 
 .header h1 {
@@ -70,7 +83,6 @@
 }
 
 .sectionLabel {
-  padding: 0 var(--space-6);
   margin-bottom: var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -80,10 +92,16 @@
 }
 
 .grid {
-  padding: 0 var(--space-6) var(--space-7);
+  padding-bottom: var(--space-7);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+@media (min-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .card {
@@ -163,7 +181,7 @@
 }
 
 @media (max-width: 520px) {
-  .header, .grid {
+  .headerInner, .container {
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
@@ -173,7 +191,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5em;
-  padding: 0 var(--space-6) var(--space-4);
+  padding-bottom: var(--space-4);
 }
 
 .tag {
@@ -201,7 +219,7 @@
 }
 
 .librarySection {
-  padding: 0 var(--space-6) var(--space-7);
+  padding-bottom: var(--space-7);
 }
 
 .libraryToggle {

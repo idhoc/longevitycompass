@@ -29,33 +29,35 @@ export function SiteNav() {
   const lang = profile?.language;
 
   return (
-    <header className={styles.nav}>
-      <Link href="/home" className={styles.mark}>
-        LC<span className={styles.markDot}>·</span>01
-      </Link>
-      <nav className={styles.links}>
-        {LINKS.map((l) => {
-          const isActive = pathname === l.href || pathname?.startsWith(`${l.href}/`);
-          const Icon = NAV_ICONS[l.href];
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={isActive ? `${styles.link} ${styles.linkActive}` : styles.link}
-            >
-              <Icon className={styles.linkIcon} aria-hidden="true" />
-              {t(lang, l.label)}
-              {isActive && (
-                <motion.span
-                  layoutId="nav-underline"
-                  className={styles.underline}
-                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+    <header className={styles.navBorder}>
+      <div className={styles.nav}>
+        <Link href="/home" className={styles.mark}>
+          LC<span className={styles.markDot}>·</span>01
+        </Link>
+        <nav className={styles.links}>
+          {LINKS.map((l) => {
+            const isActive = pathname === l.href || pathname?.startsWith(`${l.href}/`);
+            const Icon = NAV_ICONS[l.href];
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={isActive ? `${styles.link} ${styles.linkActive}` : styles.link}
+              >
+                <Icon className={styles.linkIcon} aria-hidden="true" />
+                {t(lang, l.label)}
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-underline"
+                    className={styles.underline}
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </header>
   );
 }

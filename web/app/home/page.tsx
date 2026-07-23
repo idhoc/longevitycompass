@@ -248,6 +248,7 @@ export default function HomePage() {
       <SiteNav />
       {tourHydrated && tourPending && <ProductTour steps={tourSteps} onDone={finishTour} />}
 
+      <div className={styles.container}>
       <motion.div data-tour="hero" className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
         <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
         <h1 className={styles.heroTitle}>
@@ -442,6 +443,7 @@ export default function HomePage() {
           </p>
         )}
       </motion.div>
+      </div>
     </div>
   );
 }

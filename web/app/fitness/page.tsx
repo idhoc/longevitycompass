@@ -77,19 +77,22 @@ export default function FitnessLibraryPage() {
       <SiteNav />
 
       <div className={styles.header}>
-        <Link href="/home" className={styles.backLink}>← Home</Link>
-        <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness · Movement &amp; Resilience</span>
-        <h1>Pick a session</h1>
-        <p className={styles.headerSub}>
-          Step-by-step, paced by a timer or a tempo cue, with illustrated form instead of video.
-          Every exercise explains why it&apos;s there, and finishing one marks today done on your
-          weekly tracker.
-        </p>
-        <Link href="/fitness/build" className={styles.buildCta}>
-          Build your own routine →
-        </Link>
+        <div className={styles.headerInner}>
+          <Link href="/home" className={styles.backLink}>← Home</Link>
+          <span className="eyebrow" style={{ color: "var(--fitness)" }}>Fitness · Movement &amp; Resilience</span>
+          <h1>Pick a session</h1>
+          <p className={styles.headerSub}>
+            Step-by-step, paced by a timer or a tempo cue, with illustrated form instead of video.
+            Every exercise explains why it&apos;s there, and finishing one marks today done on your
+            weekly tracker.
+          </p>
+          <Link href="/fitness/build" className={styles.buildCta}>
+            Build your own routine →
+          </Link>
+        </div>
       </div>
 
+      <div className={styles.container}>
       <div className={styles.statsStrip} style={hasRealKcal ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : undefined}>
         <div className={styles.statCell}>
           <span className={styles.statValue}>{sessionsThisWeek.length}</span>
@@ -113,13 +116,13 @@ export default function FitnessLibraryPage() {
         </div>
       </div>
       {hasRealKcal && (
-        <p style={{ padding: "0 var(--space-6) var(--space-4)", fontSize: "var(--text-xs)", color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
+        <p style={{ padding: "0 0 var(--space-4)", fontSize: "var(--text-xs)", color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
           Active kcal and distance are Apple Health&apos;s own computed values for imported workouts — from
           motion, heart rate, and GPS pace, not a duration estimate.
         </p>
       )}
 
-      <div style={{ padding: "0 var(--space-6) var(--space-5)" }}>
+      <div style={{ padding: "0 0 var(--space-5)" }}>
         <GeneticInsightCard rsids={["rs1815739"]} color="var(--fitness)" />
       </div>
 
@@ -231,6 +234,7 @@ export default function FitnessLibraryPage() {
             })}
           </>
         )}
+      </div>
       </div>
     </div>
   );

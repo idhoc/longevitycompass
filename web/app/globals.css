@@ -102,6 +102,14 @@
   --radius-lg: 26px;
   --radius-pill: 999px;
   --max-measure: 62ch;
+
+  /* -- content width: a real desktop measure, not a phone screen
+     stretched with margin — pages should use the window they're given.
+     --content-max is for grid/dashboard pages that can add columns;
+     --content-medium is for single-column card stacks, wide enough to
+     stop feeling cramped without stretching one card edge to edge. -- */
+  --content-max: 1240px;
+  --content-medium: 960px;
 }
 
 * {
@@ -138,18 +146,19 @@ a {
 
 h1, h2, h3 {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   line-height: 1.1;
 }
 
 h1 {
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .hero-italic {
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .srOnly {

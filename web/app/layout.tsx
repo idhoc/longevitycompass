@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Unbounded, Manrope, IBM_Plex_Mono } from "next/font/google";
+import { Fraunces, Manrope, IBM_Plex_Mono } from "next/font/google";
 import { PageTransition } from "@/components/PageTransition";
 import "./globals.css";
 
-// Display: Unbounded — heavy, geometric, unapologetically loud. Fredoka
-// read as cute rather than confident; this is the opposite move: wide,
-// dense letterforms at 800 weight that dominate a headline instead of
-// blending into the page.
-const unbounded = Unbounded({
+// Display: Fraunces — a soft, warm serif with a deliberate "wonk" to its
+// curves instead of a mechanically even one. Set light (never above 500)
+// so it reads as thin and drawn rather than stamped, with a true italic
+// cut for the handful of places that want an extra flourish.
+const fraunces = Fraunces({
   variable: "--font-bitter",
   subsets: ["latin"],
-  weight: ["500", "700", "800"],
+  weight: ["300", "400", "500", "600"],
+  style: ["normal", "italic"],
 });
 
 // Body: Manrope — a clean, rounded modern sans for UI chrome, warmer
@@ -43,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${unbounded.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
       // The boot script below sets data-theme on this element before React
       // hydrates, on purpose (that's what avoids the flash) — React would
       // otherwise flag that as a hydration mismatch even though it's correct.

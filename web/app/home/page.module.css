@@ -2,9 +2,15 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  max-width: 760px;
-  margin: 0 auto;
+}
+
+/* Everything below the nav shares one measure, so the page reads as a
+   real desktop layout instead of a phone column stranded in the middle
+   of the window — the nav itself stays full-bleed above this. */
+.container {
   width: 100%;
+  max-width: min(var(--content-max), 94vw);
+  margin: 0 auto;
 }
 
 .hero {
@@ -16,9 +22,10 @@
 .heroTitle {
   margin-top: 0.2em;
   font-size: clamp(2.6rem, 9vw, var(--text-3xl));
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 0.98;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
 }
 
 .headerSub {
@@ -86,18 +93,12 @@
 }
 
 .topicsStrip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: var(--space-3);
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  padding-bottom: 0.4em;
-  -webkit-overflow-scrolling: touch;
 }
 
 .topicCard {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  width: 190px;
   min-height: 180px;
   display: flex;
   flex-direction: column;
@@ -138,12 +139,20 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-4);
+  max-width: 640px;
   margin: 0 var(--space-5) var(--space-5);
   padding: var(--space-5) var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--paper-raised);
   box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 760px) {
+  .vitalsCard {
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .weekDetails {
@@ -246,6 +255,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+@media (min-width: 760px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .tile {
