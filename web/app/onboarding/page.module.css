@@ -36,6 +36,62 @@
   color: var(--ink);
 }
 
+/* -- step indicator: sections you click through, not one long scroll -- */
+.stepDots {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  gap: 0.5em;
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.stepDot {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: var(--line-strong);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.stepDot:hover {
+  background: var(--ink-faint);
+}
+
+.stepDotActive {
+  background: var(--signal);
+}
+
+.stepDotDone {
+  background: color-mix(in srgb, var(--signal) 45%, var(--line-strong));
+}
+
+.stepLabel {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.6em var(--space-4) 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.stepNav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+.stepNav .btnPrimary {
+  margin-left: auto;
+}
+
 /* -- the questionnaire itself -- */
 .form {
   width: 100%;
@@ -158,47 +214,144 @@ textarea.input {
   background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
 }
 
-/* -- goal compass -- */
-.compassWrap {
+/* -- goal picker: tap-to-rank cards -- */
+.goalGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.goalCard {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
+  align-items: flex-start;
+  gap: 0.3em;
+  text-align: left;
+  padding: var(--space-3);
+  min-height: 128px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--line-strong);
+  background: var(--paper-raised);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
-.compassSvg {
-  cursor: grab;
-  touch-action: none;
+.goalCard:hover {
+  transform: translateY(-2px);
 }
 
-.compassSvg:active {
-  cursor: grabbing;
+.goalCardActive {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 12%, var(--paper-raised));
 }
 
-.compassButtons {
+.goalRank {
+  position: absolute;
+  top: 0.6em;
+  right: 0.6em;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--signal);
+  color: var(--paper-raised);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 0.5em;
 }
 
-.compassButton {
+.goalIcon {
+  font-size: 1.6rem;
+}
+
+.goalLabel {
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+
+.goalHint {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+@media (max-width: 420px) {
+  .goalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- tag composer: chips instead of a bare text box -- */
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
   font-size: var(--text-sm);
   font-weight: 500;
-  padding: 0.7em 1.1em;
+  padding: 0.5em 0.5em 0.5em 1.1em;
   min-height: 44px;
   border-radius: 999px;
-  border: 2px solid var(--line-strong);
-  color: var(--ink-soft);
-  cursor: pointer;
-  background: var(--paper-raised);
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  border: 2px solid var(--signal);
+  background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
+  color: var(--ink);
 }
 
-.compassButtonActive {
+.tagChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tagChipRemove:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.tagAddChip {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 0.65em 1.1em;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 2px dashed var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  background: transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.tagAddChip:hover {
   border-color: var(--signal);
   color: var(--ink);
-  background: color-mix(in srgb, var(--signal) 14%, var(--paper-raised));
+}
+
+.tagInput {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 0.6em 1em;
+  min-height: 44px;
+  min-width: 180px;
+  border-radius: 999px;
+  border: 2px solid var(--signal);
+  background: var(--paper-raised);
+  color: var(--ink);
+}
+
+.tagInput:focus {
+  outline: none;
 }
 
 /* -- sliders (sleep hours, stress) -- */
