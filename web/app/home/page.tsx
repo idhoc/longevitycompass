@@ -39,6 +39,13 @@ import { crossDomainInsights } from "@/lib/insights";
 import { t } from "@/lib/i18n";
 import { ProductTour } from "@/components/ProductTour";
 import { buildTourSteps } from "@/lib/tourSteps";
+import {
+  DEFAULT_DASHBOARD_LAYOUT,
+  normalizeDashboardLayout,
+  type DashboardLayout,
+  type DashboardSectionId,
+} from "@/lib/dashboardLayout";
+import type { ReactNode } from "react";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -101,6 +108,7 @@ export default function HomePage() {
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
   const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
   const [meditationSessions] = useLocalStorageState<{ date: string }[]>("lc_meditation_sessions_v1", []);
+  const [dashboardLayout] = useLocalStorageState<DashboardLayout>("lc_dashboard_layout_v1", DEFAULT_DASHBOARD_LAYOUT);
 
   useEffect(() => {
     if (profileHydrated && skippedHydrated && !profile?.completedAt && !skipped) {
@@ -202,43 +210,18 @@ export default function HomePage() {
           ? { label: "Reflect or breathe", href: "/mind", Icon: DOMAIN_ICONS.mind, color: "var(--mind)" }
           : null;
 
-  return (
-    <div className={styles.page}>
-      <SiteNav />
-      {tourHydrated && tourPending && (
-        <ProductTour steps={tourSteps} index={tourIndex} onIndexChange={setTourIndex} onDone={finishTour} />
-      )}
+  const easing: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-      <motion.div data-tour="hero" className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
-        <div className={styles.heroInner}>
-          <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
-          <h1 className={styles.heroTitle}>
-            {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
-          </h1>
-          <p className={styles.headerSub}>
-            {hasReadinessData
-              ? `${readiness.focus} is the biggest lever right now.`
-              : "Log your first check-in below to see where to focus."}
-          </p>
-          {nextAction ? (
-            <Link href={nextAction.href} className={styles.nextActionBtn} style={{ background: nextAction.color }}>
-              <nextAction.Icon className={styles.nextActionIcon} aria-hidden="true" />
-              {nextAction.label}
-            </Link>
-          ) : (
-            <p className={styles.nextActionDone}>All four logged today — nice work.</p>
-          )}
-        </div>
-      </motion.div>
-
-      <div className={styles.container}>
+  const sectionRenderers: Record<DashboardSectionId, (delay: number) => ReactNode | null> = {
+    topics: (delay) => (
       <motion.div
+        key="topics"
         data-tour="topics"
         className={styles.topicsSection}
         initial="hidden"
         animate="show"
         variants={fadeUp}
-        transition={{ duration: 0.4, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.4, delay, ease: easing }}
       >
         <div className={styles.topicsHead}>
           <h2 className={styles.topicsTitle}>{t(profile?.language, "Topics")}</h2>
@@ -256,14 +239,16 @@ export default function HomePage() {
           ))}
         </div>
       </motion.div>
-
+    ),
+    vitals: (delay) => (
       <motion.div
+        key="vitals"
         data-tour="vitals"
         className={styles.vitalsCard}
         initial="hidden"
         animate="show"
         variants={fadeUp}
-        transition={{ duration: 0.4, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.4, delay, ease: easing }}
       >
         <MomentumTrail history={momentumHistory} hasData={hasReadinessData} />
         <details className={styles.weekDetails}>
@@ -318,26 +303,29 @@ export default function HomePage() {
           </p>
         )}
       </motion.div>
-
-      {topInsight && (
+    ),
+    insight: (delay) =>
+      topInsight ? (
         <motion.div
+          key="insight"
           data-tour="insight"
           className={styles.insightSection}
           initial="hidden"
           animate="show"
           variants={fadeUp}
-          transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.4, delay, ease: easing }}
         >
           <InsightsPanel insights={[topInsight]} loggedNights={sleepEntries.length} />
         </motion.div>
-      )}
-
+      ) : null,
+    domains: (delay) => (
       <motion.div
+        key="domains"
         className={styles.grid}
         initial="hidden"
         animate="show"
         variants={fadeUp}
-        transition={{ duration: 0.4, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.4, delay, ease: easing }}
       >
         <Link href="/recovery" data-tour="tileRecovery" className={`${styles.tile} ${styles.tileRecovery}`}>
           <span className={styles.tileIconBadge}>
@@ -381,14 +369,16 @@ export default function HomePage() {
           <p className={styles.tileSub}>Reflect, meditate, or take a break</p>
         </Link>
       </motion.div>
-
+    ),
+    healthspan: (delay) => (
       <motion.div
+        key="healthspan"
         data-tour="healthspan"
         className={styles.healthspan}
         initial="hidden"
         animate="show"
         variants={fadeUp}
-        transition={{ duration: 0.4, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.4, delay, ease: easing }}
       >
         <span className={styles.tileLabel}>{t(profile?.language, "Healthspan")}</span>
         {healthspanUnlocked ? (
@@ -406,7 +396,45 @@ export default function HomePage() {
           </p>
         )}
       </motion.div>
-      </div>
+    ),
+  };
+
+  const dashboardLayoutNormalized = normalizeDashboardLayout(dashboardLayout);
+  const sections = dashboardLayoutNormalized.order
+    .filter((id) => !dashboardLayoutNormalized.hidden.includes(id))
+    .map((id, i) => sectionRenderers[id](0.08 * (i + 1)))
+    .filter(Boolean);
+
+  return (
+    <div className={styles.page}>
+      <SiteNav />
+      {tourHydrated && tourPending && (
+        <ProductTour steps={tourSteps} index={tourIndex} onIndexChange={setTourIndex} onDone={finishTour} />
+      )}
+
+      <motion.div data-tour="hero" className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+        <div className={styles.heroInner}>
+          <span className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
+          <h1 className={styles.heroTitle}>
+            {t(profile?.language, greetingWord())}{profile?.name ? `, ${profile.name}` : ""}.
+          </h1>
+          <p className={styles.headerSub}>
+            {hasReadinessData
+              ? `${readiness.focus} is the biggest lever right now.`
+              : "Log your first check-in below to see where to focus."}
+          </p>
+          {nextAction ? (
+            <Link href={nextAction.href} className={styles.nextActionBtn} style={{ background: nextAction.color }}>
+              <nextAction.Icon className={styles.nextActionIcon} aria-hidden="true" />
+              {nextAction.label}
+            </Link>
+          ) : (
+            <p className={styles.nextActionDone}>All four logged today — nice work.</p>
+          )}
+        </div>
+      </motion.div>
+
+      <div className={styles.container}>{sections}</div>
     </div>
   );
 }

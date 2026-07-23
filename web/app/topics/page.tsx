@@ -1,23 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
-import { domainOrderFromProfile, domainPlanFromProfile, type UserProfile } from "@/lib/profile";
+import { domainOrderFromProfile, domainPlanFromProfile, type UserProfile, type DomainKey } from "@/lib/profile";
 import { topicGroupsFromOrder } from "@/lib/topics";
-import { GENETICS_STORAGE_KEY, type GeneticProfile } from "@/lib/genetics23andme";
 import { TopicIcon } from "@/lib/icons";
-import { Dna, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import styles from "./page.module.css";
 
 export default function TopicsPage() {
   const [profile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
-  const [genetics] = useLocalStorageState<GeneticProfile | null>(GENETICS_STORAGE_KEY, null);
 
   const order = domainOrderFromProfile(profile);
   const groups = topicGroupsFromOrder(order, profile);
   const plan = domainPlanFromProfile(profile);
   const hasPriority = !!profile?.primaryGoals.length;
+
+  const [activeDomain, setActiveDomain] = useState<DomainKey>(order[0]);
+  const activeGroup = groups.find((g) => g.domain === activeDomain) ?? groups[0];
 
   return (
     <div className={styles.page}>
@@ -33,49 +35,47 @@ export default function TopicsPage() {
         </p>
       </div>
 
-      <div className={styles.groups}>
+      <div className={styles.tabBar} role="tablist">
         {groups.map((group) => (
-          <section key={group.domain} className={styles.group} aria-labelledby={`topics-${group.domain}`}>
-            <div className={styles.groupHead} style={{ borderLeftColor: group.color }}>
-              <h2 id={`topics-${group.domain}`} className={styles.groupTitle}>
-                {group.label}
-              </h2>
-              <p className={styles.groupPlan}>{plan[group.domain]}</p>
-            </div>
-
-            <div className={styles.grid}>
-              {group.topics.map((topic) => (
-                <Link key={topic.id} href={topic.href} className={styles.card}>
-                  <span className={styles.cardIconBadge} style={{ background: group.color }}>
-                    <TopicIcon name={topic.icon} className={styles.cardIcon} aria-hidden="true" />
-                  </span>
-                  <span className={styles.cardBody}>
-                    <span className={styles.cardTitle}>{topic.title}</span>
-                    <p className={styles.cardDesc}>{topic.description}</p>
-                    <span className={styles.cardFeature} style={{ color: group.color }}>{topic.feature}</span>
-                  </span>
-                  <ChevronRight className={styles.cardChevron} aria-hidden="true" />
-                </Link>
-              ))}
-
-              {!genetics && (group.domain === "nutrition" || group.domain === "fitness") && (
-                <Link href="/settings" className={`${styles.card} ${styles.cardGhost}`}>
-                  <span className={styles.cardIconBadge} style={{ background: group.color }}>
-                    <Dna className={styles.cardIcon} aria-hidden="true" />
-                  </span>
-                  <span className={styles.cardBody}>
-                    <span className={styles.cardTitle}>Add 23andMe data</span>
-                    <p className={styles.cardDesc}>
-                      Optional — import your raw data in Settings to unlock genetic context right
-                      here in {group.label.toLowerCase()}.
-                    </p>
-                  </span>
-                  <ChevronRight className={styles.cardChevron} aria-hidden="true" />
-                </Link>
-              )}
-            </div>
-          </section>
+          <button
+            key={group.domain}
+            type="button"
+            role="tab"
+            aria-selected={activeGroup.domain === group.domain}
+            className={activeGroup.domain === group.domain ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            style={activeGroup.domain === group.domain ? { borderColor: group.color, color: "var(--ink)" } : undefined}
+            onClick={() => setActiveDomain(group.domain)}
+          >
+            {group.label}
+          </button>
         ))}
+      </div>
+
+      <div className={styles.panel}>
+        <section key={activeGroup.domain} className={styles.group} aria-labelledby={`topics-${activeGroup.domain}`}>
+          <div className={styles.groupHead} style={{ borderLeftColor: activeGroup.color }}>
+            <h2 id={`topics-${activeGroup.domain}`} className={styles.groupTitle}>
+              {activeGroup.label}
+            </h2>
+            <p className={styles.groupPlan}>{plan[activeGroup.domain]}</p>
+          </div>
+
+          <div className={styles.grid}>
+            {activeGroup.topics.map((topic) => (
+              <Link key={topic.id} href={topic.href} className={styles.card}>
+                <span className={styles.cardIconBadge} style={{ background: activeGroup.color }}>
+                  <TopicIcon name={topic.icon} className={styles.cardIcon} aria-hidden="true" />
+                </span>
+                <span className={styles.cardBody}>
+                  <span className={styles.cardTitle}>{topic.title}</span>
+                  <p className={styles.cardDesc}>{topic.description}</p>
+                  <span className={styles.cardFeature} style={{ color: activeGroup.color }}>{topic.feature}</span>
+                </span>
+                <ChevronRight className={styles.cardChevron} aria-hidden="true" />
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

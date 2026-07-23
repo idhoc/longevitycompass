@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Reorder, useDragControls } from "framer-motion";
+import { GripVertical, RotateCcw } from "lucide-react";
 import { SiteNav } from "@/components/SiteNav";
 import { AppleHealthImport } from "@/components/AppleHealthImport";
 import { GeneticsImport } from "@/components/GeneticsImport";
@@ -10,6 +12,13 @@ import { useLocalStorageState } from "@/lib/useLocalStorageState";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { clearLoggedData, clearEverything, exportAllData } from "@/lib/resetData";
 import { t } from "@/lib/i18n";
+import {
+  DASHBOARD_SECTIONS,
+  DEFAULT_DASHBOARD_LAYOUT,
+  normalizeDashboardLayout,
+  type DashboardLayout,
+  type DashboardSectionId,
+} from "@/lib/dashboardLayout";
 import {
   EMPTY_PROFILE,
   GOAL_OPTIONS,
@@ -37,6 +46,7 @@ const TABS = [
   { key: "profile", label: "Profile" },
   { key: "coach", label: "Coach voice" },
   { key: "appearance", label: "Appearance" },
+  { key: "dashboard", label: "Dashboard" },
   { key: "connected", label: "Connected data" },
   { key: "privacy", label: "Privacy & data" },
   { key: "about", label: "About" },
@@ -48,6 +58,10 @@ export default function SettingsPage() {
   const [profile, setProfile, hydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [, setTourPending] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
   const [, setTourIndex] = useLocalStorageState<number>("lc_tour_index_v1", 0);
+  const [dashboardLayout, setDashboardLayout] = useLocalStorageState<DashboardLayout>(
+    "lc_dashboard_layout_v1",
+    DEFAULT_DASHBOARD_LAYOUT
+  );
   const [theme, setTheme] = useState<Theme>("light");
   const [confirming, setConfirming] = useState<ConfirmState>("none");
   const [exportedNote, setExportedNote] = useState<string | null>(null);
@@ -106,6 +120,23 @@ export default function SettingsPage() {
     setTourIndex(0);
     setTourPending(true);
     router.push("/home");
+  }
+
+  const normalizedLayout = normalizeDashboardLayout(dashboardLayout);
+
+  function reorderSections(order: DashboardSectionId[]) {
+    setDashboardLayout({ ...normalizedLayout, order });
+  }
+
+  function toggleSectionVisibility(id: DashboardSectionId) {
+    const hidden = normalizedLayout.hidden.includes(id)
+      ? normalizedLayout.hidden.filter((h) => h !== id)
+      : [...normalizedLayout.hidden, id];
+    setDashboardLayout({ ...normalizedLayout, hidden });
+  }
+
+  function resetLayout() {
+    setDashboardLayout(DEFAULT_DASHBOARD_LAYOUT);
   }
 
   if (!hydrated) return null;
@@ -439,6 +470,42 @@ export default function SettingsPage() {
         </div>
         )}
 
+        {activeTab === "dashboard" && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>{t(p.language, "Dashboard")}</h2>
+          <p className={styles.sectionSub}>
+            Drag to reorder, or hide anything you don&apos;t want to see — Home renders in exactly
+            this order, skipping whatever&apos;s hidden. Your greeting and next-action prompt at
+            the top always stay, since that&apos;s how you get back into logging.
+          </p>
+          <Reorder.Group
+            axis="y"
+            values={normalizedLayout.order}
+            onReorder={reorderSections}
+            className={styles.dashboardList}
+          >
+            {normalizedLayout.order.map((id) => {
+              const meta = DASHBOARD_SECTIONS.find((s) => s.id === id)!;
+              const isHidden = normalizedLayout.hidden.includes(id);
+              return (
+                <DashboardSectionRow
+                  key={id}
+                  id={id}
+                  label={meta.label}
+                  description={meta.description}
+                  hidden={isHidden}
+                  onToggle={() => toggleSectionVisibility(id)}
+                />
+              );
+            })}
+          </Reorder.Group>
+          <button type="button" className={styles.btn} onClick={resetLayout} style={{ alignSelf: "flex-start" }}>
+            <RotateCcw size={13} style={{ marginRight: "0.4em", verticalAlign: -2 }} aria-hidden="true" />
+            Reset to default order
+          </button>
+        </div>
+        )}
+
         {activeTab === "connected" && (
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>{t(p.language, "Connected data")}</h2>
@@ -581,5 +648,52 @@ export default function SettingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function DashboardSectionRow({
+  id,
+  label,
+  description,
+  hidden,
+  onToggle,
+}: {
+  id: DashboardSectionId;
+  label: string;
+  description: string;
+  hidden: boolean;
+  onToggle: () => void;
+}) {
+  const dragControls = useDragControls();
+  return (
+    <Reorder.Item
+      value={id}
+      dragListener={false}
+      dragControls={dragControls}
+      className={styles.dashboardItem}
+      data-hidden={hidden}
+    >
+      <span
+        className={styles.dragHandle}
+        onPointerDown={(e) => dragControls.start(e)}
+        role="button"
+        aria-label={`Drag to reorder ${label}`}
+        tabIndex={-1}
+      >
+        <GripVertical size={16} aria-hidden="true" />
+      </span>
+      <span className={styles.dashboardItemBody}>
+        <span className={styles.dashboardItemLabel}>{label}</span>
+        <p className={styles.dashboardItemDesc}>{description}</p>
+      </span>
+      <button
+        type="button"
+        className={hidden ? styles.visibilityToggle : `${styles.visibilityToggle} ${styles.visibilityToggleOn}`}
+        onClick={onToggle}
+        aria-pressed={!hidden}
+      >
+        {hidden ? "Hidden" : "Visible"}
+      </button>
+    </Reorder.Item>
   );
 }

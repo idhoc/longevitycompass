@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { SleepPanel } from "@/components/panels/SleepPanel";
@@ -54,7 +55,15 @@ const STATUS_COLOR: Record<VitalStatus, string> = {
   "no-data": "var(--ink-faint)",
 };
 
+const TABS = [
+  { key: "checkin", label: "Check-in" },
+  { key: "vitals", label: "Vitals" },
+  { key: "insights", label: "Insights" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function RecoveryPage() {
+  const [activeTab, setActiveTab] = useState<TabKey>("checkin");
   const [sleepEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
   const [sessions] = useLocalStorageState<WorkoutSession[]>("lc_workout_sessions_v1", []);
   const [mindEntries] = useLocalStorageState<MindEntry[]>("lc_mind_entries_v1", []);
@@ -123,14 +132,30 @@ export default function RecoveryPage() {
         </div>
       </div>
 
+      <div className={styles.tabBar} role="tablist">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={activeTab === tab.key ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className={styles.content}>
+        {activeTab === "checkin" && (
         <section className={styles.section}>
-          <span className={styles.sectionLabel}>Check-in</span>
           <SleepPanel />
         </section>
+        )}
 
+        {activeTab === "vitals" && (
         <section className={styles.section}>
-          <span className={styles.sectionLabel}>Vitals</span>
           <div className={styles.vitalCard}>
             <div className={styles.vitalHead}>
               <span className={styles.vitalLabel}>Resting heart rate</span>
@@ -184,11 +209,13 @@ export default function RecoveryPage() {
             </p>
           </div>
         </section>
+        )}
 
+        {activeTab === "insights" && (
         <section className={styles.section}>
-          <span className={styles.sectionLabel}>Insights</span>
           <InsightsPanel insights={insights} loggedNights={sleepEntries.length} />
         </section>
+        )}
       </div>
     </div>
   );

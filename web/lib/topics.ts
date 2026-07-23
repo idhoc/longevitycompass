@@ -22,15 +22,6 @@ const DOMAIN_TOPICS: Record<DomainKey, Topic[]> = {
       icon: "moon",
     },
     {
-      id: "apple-watch-import",
-      domain: "sleep",
-      title: "Apple Watch / Health import",
-      description: "Pull real sleep and resting heart rate straight from your Health app export.",
-      href: "/settings",
-      feature: "Unique feature: parses your real export.xml, entirely on this device",
-      icon: "watch",
-    },
-    {
       id: "vitals",
       domain: "sleep",
       title: "Vitals",

@@ -45,29 +45,90 @@
   color: var(--recovery-low);
 }
 
-.bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.3em;
-  height: 60px;
+.trail {
   width: 100%;
+  height: 96px;
   margin-top: var(--space-2);
+  overflow: visible;
 }
 
-.barCol {
-  flex: 1;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
+.trailPath {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 5;
+  stroke-linecap: round;
+  opacity: 0.7;
 }
 
-.bar {
+.node {
+  fill: var(--line-strong);
+  transition: r 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.todayGroup {
+  transform-origin: center;
+}
+
+.todayHalo {
+  fill: color-mix(in srgb, var(--signal) 22%, transparent);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+.todayNode {
+  fill: var(--signal);
+  stroke: var(--paper-raised);
+  stroke-width: 2;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.5; }
+}
+
+.explainToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-top: 0.2em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.explainToggle:hover {
+  color: var(--ink-soft);
+}
+
+.chevron {
+  width: 13px;
+  height: 13px;
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.explainer {
   width: 100%;
-  border-radius: 4px 4px 0 0;
-  background: var(--line-strong);
-  transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 0.3em;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--paper-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
 }
 
-.bar[data-today="true"] {
-  background: var(--signal);
+.explainer p {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todayHalo {
+    animation: none;
+  }
 }
