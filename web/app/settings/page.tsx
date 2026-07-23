@@ -47,6 +47,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [profile, setProfile, hydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [, setTourPending] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
+  const [, setTourIndex] = useLocalStorageState<number>("lc_tour_index_v1", 0);
   const [theme, setTheme] = useState<Theme>("light");
   const [confirming, setConfirming] = useState<ConfirmState>("none");
   const [exportedNote, setExportedNote] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function SettingsPage() {
   }
 
   function replayTour() {
+    setTourIndex(0);
     setTourPending(true);
     router.push("/home");
   }

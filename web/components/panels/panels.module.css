@@ -311,6 +311,172 @@ textarea.input {
   line-height: 1.55;
 }
 
+/* -- Wren: a real back-and-forth chat, not a one-shot card -- */
+.wrenChat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--line-strong);
+  padding-top: var(--space-3);
+}
+
+.wrenHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.wrenVoiceToggle {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.wrenVoiceToggle:hover {
+  border-color: var(--mind);
+  color: var(--ink);
+}
+
+.wrenVoiceToggleActive {
+  border-color: var(--mind);
+  color: var(--mind);
+  background: var(--mind-wash);
+}
+
+.wrenLog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 0.2em;
+}
+
+.wrenEntry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+.wrenEntryMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+}
+
+.wrenEntryWho {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+.wrenEntryWhoWren {
+  color: var(--mind);
+}
+
+.wrenEntryTime {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-faint);
+}
+
+.wrenEntryText {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.wrenEscalation {
+  padding: var(--space-3);
+  border-left: 2px solid var(--caution);
+  background: var(--caution-wash);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.wrenComposer {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.wrenMicButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.wrenMicButton:hover {
+  border-color: var(--mind);
+  color: var(--mind);
+}
+
+.wrenMicButtonActive {
+  border-color: var(--fitness);
+  color: var(--fitness);
+  background: var(--fitness-wash);
+  animation: wrenMicPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes wrenMicPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--fitness-wash); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+
+.wrenDisclaimer {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.typing {
+  display: flex;
+  gap: 0.3em;
+  padding: 0.3em 0;
+}
+
+.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  animation: typingBounce 1.1s ease-in-out infinite;
+}
+
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
 /* -- meal log cards -- */
 .mealGrid {
   display: flex;

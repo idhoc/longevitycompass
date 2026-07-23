@@ -130,6 +130,7 @@ export default function OnboardingPage() {
   const [, setProfile] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [, setSkipped] = useLocalStorageState<boolean>("lc_onboarding_skipped_v1", false);
   const [, setTourPending] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
+  const [, setTourIndex] = useLocalStorageState<number>("lc_tour_index_v1", 0);
   const [draft, setDraft] = useState<UserProfile>(EMPTY_PROFILE);
   const [step, setStep] = useState(0);
   const lastStep = STEP_TITLES.length - 1;
@@ -170,6 +171,7 @@ export default function OnboardingPage() {
       disclaimerAcknowledged: true,
       completedAt: new Date().toISOString(),
     });
+    setTourIndex(0);
     setTourPending(true);
     router.push("/home");
   }

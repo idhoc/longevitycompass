@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PenLine, Wind, Timer, Waves } from "lucide-react";
 import { Orb } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { useSpeechRecognition } from "@/lib/useSpeechRecognition";
 import { dateKeyOffset, computeStreak } from "@/lib/domainReach";
 import {
   MEDITATION_CATEGORIES,
@@ -16,8 +17,10 @@ import { playAmbientSound, type AmbientSoundType, type AmbientSoundHandle } from
 import styles from "./panels.module.css";
 
 /** The named AI companion behind "Reflect" — Headspace has Ebb; this is
- * ours. Purely a persona label for the existing /api/reflect-insight
- * call, not a different model or feature. */
+ * ours. A real back-and-forth conversation via /api/wren-chat, not a
+ * one-shot insight — Wren is a guidance-counselor-style companion, never
+ * a therapist, and says so plainly if the conversation needs more than
+ * this app can offer. */
 const COMPANION_NAME = "Wren";
 
 interface MindEntry {
@@ -26,9 +29,15 @@ interface MindEntry {
   note: string;
 }
 
-interface ReflectInsight {
-  headline: string;
-  explanation: string;
+interface WrenTurn {
+  who: "you" | "wren";
+  text: string;
+  time: string;
+  escalation?: boolean;
+}
+
+function timeNow() {
+  return new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 const MOODS = [
@@ -262,9 +271,12 @@ export function MindPanel() {
   const [mood, setMood] = useState(3);
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState(false);
-  const [reflectInsight, setReflectInsight] = useState<ReflectInsight | null>(null);
-  const [loadingReflect, setLoadingReflect] = useState(false);
-  const [reflectError, setReflectError] = useState<string | null>(null);
+  const [wrenHistory, setWrenHistory] = useLocalStorageState<WrenTurn[]>("lc_wren_chat_v1", []);
+  const [wrenBusy, setWrenBusy] = useState(false);
+  const [wrenDraft, setWrenDraft] = useState("");
+  const [wrenVoiceOn, setWrenVoiceOn] = useState(false);
+  const wrenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const wrenLogRef = useRef<HTMLDivElement | null>(null);
 
   const [meditationSessions, setMeditationSessions] = useLocalStorageState<MeditationSession[]>(
     "lc_meditation_sessions_v1",
@@ -350,8 +362,6 @@ export function MindPanel() {
   function save() {
     setEntries((prev) => [...prev.filter((e) => e.date !== today), { date: today, mood, note }]);
     setEditing(false);
-    setReflectInsight(null);
-    setReflectError(null);
   }
 
   function startEdit() {
@@ -362,34 +372,84 @@ export function MindPanel() {
     setEditing(true);
   }
 
-  async function fetchReflectInsight() {
-    if (!todaysEntry?.note.trim()) return;
-    setLoadingReflect(true);
-    setReflectError(null);
+  async function speakWren(text: string) {
+    if (!wrenVoiceOn) return;
     try {
-      const recentHistory = entries
-        .filter((e) => e.date !== today)
-        .slice(-5)
-        .map((e) => ({ mood: MOOD_LABEL[e.mood] ?? String(e.mood), note: e.note }));
-      const res = await fetch("/api/reflect-insight", {
+      const res = await fetch("/api/meditation-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, speed: 1.0 }),
+      });
+      if (res.status === 200 && wrenAudioRef.current) {
+        const blob = await res.blob();
+        wrenAudioRef.current.src = URL.createObjectURL(blob);
+        await wrenAudioRef.current.play();
+      }
+    } catch {
+      // silent fallback — the written reply already stands on its own
+    }
+  }
+
+  async function sendToWren(userText: string | null) {
+    const isKickoff = userText === null;
+    if (!isKickoff) {
+      const trimmed = (userText || "").trim();
+      if (!trimmed || wrenBusy) return;
+      setWrenHistory((h) => [...h, { who: "you" as const, text: trimmed, time: timeNow() }].slice(-200));
+      setWrenDraft("");
+    }
+    setWrenBusy(true);
+
+    const history = wrenHistory.map((t) => ({ role: t.who === "you" ? ("user" as const) : ("wren" as const), content: t.text }));
+    const recentNotes = entries
+      .filter((e) => e.date !== today)
+      .slice(-5)
+      .map((e) => `${MOOD_LABEL[e.mood] ?? e.mood}${e.note ? ` ("${e.note}")` : ""}`)
+      .join("; ");
+    const context = [
+      todaysEntry
+        ? `Today's mood: ${MOOD_LABEL[todaysEntry.mood] ?? todaysEntry.mood}.${todaysEntry.note ? ` Today's note: "${todaysEntry.note}".` : ""}`
+        : "No mood logged today yet.",
+      recentNotes ? `Recent days, for pattern context only: ${recentNotes}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    try {
+      const res = await fetch("/api/wren-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt,
-          mood: MOOD_LABEL[todaysEntry.mood] ?? String(todaysEntry.mood),
-          note: todaysEntry.note,
-          recentHistory,
+          message: isKickoff
+            ? todaysEntry?.note.trim()
+              ? "Open our conversation about today — reflect back something specific from what I wrote, in one short sentence, then ask one open question."
+              : "Open our conversation in one short warm sentence based on my mood rating today, then ask one open question."
+            : userText,
+          history,
+          context,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
-      setReflectInsight(data.insight);
-    } catch (err) {
-      setReflectError(err instanceof Error ? err.message : "Couldn't reflect on this right now.");
+      const reply: string = data.reply || "";
+      setWrenHistory((h) =>
+        [...h, { who: "wren" as const, text: reply, time: timeNow(), escalation: !!data.escalation }].slice(-200)
+      );
+      if (reply) void speakWren(reply);
+    } catch {
+      setWrenHistory((h) =>
+        [...h, { who: "wren" as const, text: "That didn't go through — try again in a moment.", time: timeNow() }].slice(-200)
+      );
     } finally {
-      setLoadingReflect(false);
+      setWrenBusy(false);
     }
   }
+
+  const wrenSpeech = useSpeechRecognition((transcript) => void sendToWren(transcript));
+
+  useEffect(() => {
+    wrenLogRef.current?.scrollTo({ top: wrenLogRef.current.scrollHeight, behavior: "smooth" });
+  }, [wrenHistory]);
 
   async function playMeditation(focus: MeditationFocus) {
     const variant = getVariant(focus, length);
@@ -479,6 +539,7 @@ export function MindPanel() {
         <div className={styles.mindModeGrid} role="group" aria-label="Mind mode">
           <button
             type="button"
+            data-tour="wren"
             className={mode === "reflect" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
             style={{ background: "var(--mind)" }}
             onClick={() => setMode("reflect")}
@@ -490,6 +551,7 @@ export function MindPanel() {
           </button>
           <button
             type="button"
+            data-tour="mindMeditate"
             className={mode === "meditate" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
             style={{ background: "var(--signal)" }}
             onClick={() => setMode("meditate")}
@@ -501,6 +563,7 @@ export function MindPanel() {
           </button>
           <button
             type="button"
+            data-tour="mindFocus"
             className={mode === "break" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
             style={{ background: "var(--caution)" }}
             onClick={() => setMode("break")}
@@ -514,6 +577,7 @@ export function MindPanel() {
           </button>
           <button
             type="button"
+            data-tour="mindSounds"
             className={mode === "sounds" ? `${styles.mindModeCard} ${styles.mindModeCardActive}` : styles.mindModeCard}
             style={{ background: "var(--strain)" }}
             onClick={() => setMode("sounds")}
@@ -591,33 +655,106 @@ export function MindPanel() {
               {todaysEntry?.note && (
                 <p className={styles.emptyText} style={{ margin: 0 }}>&ldquo;{todaysEntry.note}&rdquo;</p>
               )}
-              {reflectInsight ? (
-                <div className={styles.insight}>
-                  <span className={styles.panelLabel}>{COMPANION_NAME}</span>
-                  <p className={styles.insightHeadline}>{reflectInsight.headline}</p>
-                  <p className={styles.insightExplanation}>{reflectInsight.explanation}</p>
-                </div>
-              ) : (
-                <div className={styles.panelFooter}>
-                  <button type="button" className={styles.btn} onClick={startEdit}>
-                    Update today
+              <div className={styles.panelFooter}>
+                <button type="button" className={styles.btn} onClick={startEdit}>
+                  Update today
+                </button>
+                {wrenHistory.length === 0 && todaysEntry?.note.trim() && (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnPrimary}`}
+                    onClick={() => void sendToWren(null)}
+                    disabled={wrenBusy}
+                  >
+                    {wrenBusy ? `${COMPANION_NAME} is thinking…` : `Talk to ${COMPANION_NAME}`}
                   </button>
-                  {todaysEntry?.note.trim() && (
+                )}
+              </div>
+
+              {wrenHistory.length > 0 && (
+                <div className={styles.wrenChat}>
+                  <div className={styles.wrenHead}>
+                    <span className={styles.panelLabel}>{COMPANION_NAME}</span>
                     <button
                       type="button"
-                      className={`${styles.btn} ${styles.btnPrimary}`}
-                      onClick={fetchReflectInsight}
-                      disabled={loadingReflect}
+                      className={wrenVoiceOn ? `${styles.wrenVoiceToggle} ${styles.wrenVoiceToggleActive}` : styles.wrenVoiceToggle}
+                      onClick={() => setWrenVoiceOn((v) => !v)}
+                      aria-pressed={wrenVoiceOn}
                     >
-                      {loadingReflect ? `${COMPANION_NAME} is reading…` : `Ask ${COMPANION_NAME}`}
+                      {wrenVoiceOn ? "Spoken replies: on" : "Spoken replies: off"}
                     </button>
-                  )}
+                  </div>
+                  <audio ref={wrenAudioRef} style={{ display: "none" }} />
+                  <div className={styles.wrenLog} ref={wrenLogRef}>
+                    {wrenHistory.map((turn, i) => (
+                      <div className={styles.wrenEntry} key={i}>
+                        <div className={styles.wrenEntryMeta}>
+                          <span
+                            className={
+                              turn.who === "wren"
+                                ? `${styles.wrenEntryWho} ${styles.wrenEntryWhoWren}`
+                                : styles.wrenEntryWho
+                            }
+                          >
+                            {turn.who === "wren" ? COMPANION_NAME.toUpperCase() : "YOU"}
+                          </span>
+                          <span className={`${styles.wrenEntryTime} tabular`}>{turn.time}</span>
+                        </div>
+                        <p className={turn.escalation ? `${styles.wrenEntryText} ${styles.wrenEscalation}` : styles.wrenEntryText}>
+                          {turn.text}
+                        </p>
+                      </div>
+                    ))}
+                    {wrenBusy && (
+                      <div className={styles.wrenEntry}>
+                        <div className={styles.wrenEntryMeta}>
+                          <span className={`${styles.wrenEntryWho} ${styles.wrenEntryWhoWren}`}>
+                            {COMPANION_NAME.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className={styles.typing} aria-label={`${COMPANION_NAME} is thinking`}>
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <form
+                    className={styles.wrenComposer}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void sendToWren(wrenDraft);
+                    }}
+                  >
+                    {wrenSpeech.supported && (
+                      <button
+                        type="button"
+                        className={wrenSpeech.listening ? `${styles.wrenMicButton} ${styles.wrenMicButtonActive}` : styles.wrenMicButton}
+                        onClick={wrenSpeech.toggle}
+                        disabled={wrenBusy}
+                        aria-pressed={wrenSpeech.listening}
+                        aria-label={wrenSpeech.listening ? "Stop listening" : `Talk out loud to ${COMPANION_NAME}`}
+                      >
+                        ●
+                      </button>
+                    )}
+                    <input
+                      className={styles.input}
+                      value={wrenDraft}
+                      onChange={(e) => setWrenDraft(e.target.value)}
+                      placeholder={wrenSpeech.listening ? "Listening…" : "Say what's on your mind…"}
+                      disabled={wrenBusy || wrenSpeech.listening}
+                    />
+                    <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={wrenBusy || !wrenDraft.trim()}>
+                      Send
+                    </button>
+                  </form>
+                  <p className={styles.wrenDisclaimer}>
+                    {COMPANION_NAME} is a supportive companion, not a therapist — for anything heavier than a daily
+                    reflection, a licensed professional or a crisis line is the better fit than this app.
+                  </p>
                 </div>
-              )}
-              {reflectError && (
-                <p className={styles.emptyText} role="alert">
-                  {reflectError}
-                </p>
               )}
             </>
           ))}

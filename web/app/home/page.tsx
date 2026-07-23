@@ -37,7 +37,8 @@ import { domainOrderFromProfile, type UserProfile } from "@/lib/profile";
 import { featuredTopics, domainColor } from "@/lib/topics";
 import { crossDomainInsights } from "@/lib/insights";
 import { t } from "@/lib/i18n";
-import { ProductTour, type TourStep } from "@/components/ProductTour";
+import { ProductTour } from "@/components/ProductTour";
+import { buildTourSteps } from "@/lib/tourSteps";
 import styles from "./page.module.css";
 
 interface SleepEntry {
@@ -88,6 +89,8 @@ export default function HomePage() {
   const [profile, , profileHydrated] = useLocalStorageState<UserProfile | null>("lc_profile_v1", null);
   const [skipped, , skippedHydrated] = useLocalStorageState<boolean>("lc_onboarding_skipped_v1", false);
   const [tourPending, setTourPending, tourHydrated] = useLocalStorageState<boolean>("lc_tour_pending_v1", false);
+  const [tourIndex, setTourIndex] = useLocalStorageState<number>("lc_tour_index_v1", 0);
+  const [, setTourHasInsight] = useLocalStorageState<boolean>("lc_tour_has_insight_v1", false);
 
   const [sleepEntries] = useLocalStorageState<SleepEntry[]>("lc_sleep_entries_v1", []);
   const [meals] = useLocalStorageState<LoggedMeal[]>("lc_meals_v1", []);
@@ -176,60 +179,16 @@ export default function HomePage() {
   const topics = featuredTopics(domainOrderFromProfile(profile), profile);
   const sleepLogStreak = computeStreak(sleepEntries);
 
-  const tourSteps: TourStep[] = [
-    {
-      target: "hero",
-      title: "Your day at a glance",
-      body: "A quick greeting and, once you've logged something in any of the four areas, a note on which one is worth your attention first today.",
-    },
-    {
-      target: "topics",
-      title: "Topics",
-      body: "Short explainers for anything the app can help with — sleep tracking, guided workouts, meal photos, and more. Tap one to read what it actually does before you use it.",
-    },
-    {
-      target: "vitals",
-      title: "Your Compass",
-      body: "Each ring is one of the four areas — sleep, nutrition, fitness, mind. Each wedge is a day, with today on top. The four numbers below it are today's real values: sleep duration, resting heart rate, recovery, and training load.",
-    },
-    ...(topInsight
-      ? [
-          {
-            target: "insight",
-            title: "Cross-domain insights",
-            body: "When you've logged enough nights and sessions, this surfaces real patterns found in your own data — like a link between late caffeine and worse sleep — not a generic tip.",
-          },
-        ]
-      : []),
-    {
-      target: "tileRecovery",
-      title: "Recovery",
-      body: "Log last night's sleep here — bedtime, wake time, quality, what got in the way. That single check-in is what powers the Compass and the vitals above.",
-    },
-    {
-      target: "tileNutrition",
-      title: "Nutrition",
-      body: "Photograph a meal instead of describing it. You get an editable calorie and macro breakdown you can correct if it's off, plus a running total for today.",
-    },
-    {
-      target: "tileFitness",
-      title: "Fitness",
-      body: "Guided, timer-paced sessions with a reason given for every exercise, plus a builder if you'd rather make your own routine from the full library.",
-    },
-    {
-      target: "tileMind",
-      title: "Mind",
-      body: "A short daily reflection, a guided breathing session, or a focus timer — whichever fits the moment. This is also where your reflection streak lives.",
-    },
-    {
-      target: "healthspan",
-      title: "Habit Momentum",
-      body: "Unlocks after 5 logged days: a consistency trend across all four areas, not a medical or biological-age measurement — just a mirror for your own patterns over time.",
-    },
-  ];
+  useEffect(() => {
+    setTourHasInsight(!!topInsight);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!topInsight]);
+
+  const tourSteps = buildTourSteps(!!topInsight);
 
   function finishTour() {
     setTourPending(false);
+    setTourIndex(0);
   }
 
   const mindLoggedToday = [...mindEntries, ...meditationSessions].some((e) => e.date === todayKey());
@@ -246,7 +205,9 @@ export default function HomePage() {
   return (
     <div className={styles.page}>
       <SiteNav />
-      {tourHydrated && tourPending && <ProductTour steps={tourSteps} onDone={finishTour} />}
+      {tourHydrated && tourPending && (
+        <ProductTour steps={tourSteps} index={tourIndex} onIndexChange={setTourIndex} onDone={finishTour} />
+      )}
 
       <motion.div data-tour="hero" className={styles.hero} initial="hidden" animate="show" variants={fadeUp} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
         <div className={styles.heroInner}>

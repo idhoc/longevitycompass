@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SiteNav } from "@/components/SiteNav";
 import { Orb, type OrbState } from "@/components/Orb";
 import { useLocalStorageState } from "@/lib/useLocalStorageState";
+import { useSpeechRecognition } from "@/lib/useSpeechRecognition";
 import { minutesBetween } from "@/lib/sleepEstimate";
 import { weekKey, computeStreak } from "@/lib/domainReach";
 import { computeSleepPerformance, computeRecovery, recoveryBand, RECOVERY_COLOR } from "@/lib/recoveryScores";
@@ -43,20 +44,6 @@ interface MindEntry {
   note: string;
 }
 
-interface SpeechRecognitionLike extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-}
-interface SpeechRecognitionResultEventLike {
-  results: ArrayLike<ArrayLike<{ transcript: string }>>;
-}
-
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -89,12 +76,9 @@ export default function CoachPage() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
-  const [micSupported, setMicSupported] = useState(false);
-  const [listening, setListening] = useState(false);
   const startedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const p = profile ?? EMPTY_PROFILE;
 
@@ -262,47 +246,16 @@ export default function CoachPage() {
     }
   }
 
-  // Feature-detect the Web Speech API once, client-side only — Safari
-  // desktop and Firefox don't support it, so the mic button simply
-  // doesn't render there rather than pretending to work.
-  useEffect(() => {
-    const Ctor =
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
-    if (!Ctor) return;
-    const recognition = new Ctor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) void sendToCoach(transcript);
-    };
-    recognition.onerror = () => {
-      setListening(false);
-      setOrbState("idle");
-    };
-    recognition.onend = () => {
-      setListening(false);
-    };
-    recognitionRef.current = recognition;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMicSupported(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const speech = useSpeechRecognition((transcript) => void sendToCoach(transcript));
+  // The Orb shows "listening" for as long as recognition is actually
+  // active, however it stopped (user toggled it, browser ended it, an
+  // error fired) — derived straight from the hook's own state instead of
+  // a separate effect trying to keep a second copy in sync.
+  const displayOrbState: OrbState = speech.listening ? "listening" : orbState;
 
   function toggleMic() {
-    const recognition = recognitionRef.current;
-    if (!recognition || busy) return;
-    if (listening) {
-      recognition.stop();
-      setListening(false);
-      setOrbState("idle");
-    } else {
-      setListening(true);
-      setOrbState("listening");
-      recognition.start();
-    }
+    if (busy) return;
+    speech.toggle();
   }
 
   // Only ever auto-opens the conversation once, on a genuinely empty
@@ -330,7 +283,7 @@ export default function CoachPage() {
 
       <div className={styles.hero}>
         <audio ref={audioRef} onEnded={() => setOrbState("idle")} style={{ display: "none" }} />
-        <Orb state={orbState} size={200} />
+        <Orb state={displayOrbState} size={200} />
         <span className="eyebrow" style={{ marginTop: "1.2em" }}>
           {sessionGreeting()}
         </span>
@@ -386,14 +339,14 @@ export default function CoachPage() {
             void sendToCoach(draft);
           }}
         >
-          {micSupported && (
+          {speech.supported && (
             <button
               type="button"
-              className={listening ? `${styles.micButton} ${styles.micButtonActive}` : styles.micButton}
+              className={speech.listening ? `${styles.micButton} ${styles.micButtonActive}` : styles.micButton}
               onClick={toggleMic}
               disabled={busy}
-              aria-pressed={listening}
-              aria-label={listening ? "Stop listening" : "Talk to your coach"}
+              aria-pressed={speech.listening}
+              aria-label={speech.listening ? "Stop listening" : "Talk to your coach"}
             >
               ●
             </button>
@@ -402,8 +355,8 @@ export default function CoachPage() {
             className={styles.input}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={listening ? "Listening…" : "Say what's actually going on…"}
-            disabled={busy || listening}
+            placeholder={speech.listening ? "Listening…" : "Say what's actually going on…"}
+            disabled={busy || speech.listening}
           />
           <button type="submit" className={styles.sendButton} disabled={busy || !draft.trim()}>
             Send

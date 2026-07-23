@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./ProductTour.module.css";
+import type { TourStep } from "@/lib/tourSteps";
 
-export interface TourStep {
-  /** Matches a data-tour="..." attribute on the real element being explained. */
-  target: string;
-  title: string;
-  body: string;
-}
+export type { TourStep };
 
 interface Rect {
   top: number;
@@ -18,17 +15,42 @@ interface Rect {
 }
 
 /**
- * A real guided walkthrough of the actual dashboard: it finds the real
- * DOM element for each step (via data-tour), draws a highlight ring
- * around it, and explains that specific element — never the same text
- * twice, unlike the old onboarding "tap around" preview this replaces.
+ * A real guided walkthrough of the actual app: it finds the real DOM
+ * element for each step (via data-tour), draws a highlight ring around
+ * it, and explains that specific element. Steps can live on different
+ * pages — when the current step's href doesn't match where we are, this
+ * navigates there and picks the tour back up once the new page mounts,
+ * so the tour isn't stuck describing the dashboard from a distance.
+ * Index is controlled by the caller (and persisted) so it survives that
+ * page navigation instead of resetting to step 0.
  */
-export function ProductTour({ steps, onDone }: { steps: TourStep[]; onDone: () => void }) {
-  const [index, setIndex] = useState(0);
+export function ProductTour({
+  steps,
+  index,
+  onIndexChange,
+  onDone,
+}: {
+  steps: TourStep[];
+  index: number;
+  onIndexChange: (index: number) => void;
+  onDone: () => void;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [rect, setRect] = useState<Rect | null>(null);
-  const step = steps[index];
+  const clampedIndex = Math.min(Math.max(index, 0), steps.length - 1);
+  const step = steps[clampedIndex];
+  const onRightPage = !!step && step.href === pathname;
 
   useEffect(() => {
+    if (step && !onRightPage) router.push(step.href);
+  }, [step, onRightPage, router]);
+
+  useEffect(() => {
+    // Nothing to measure while mid-navigation to a different step's page —
+    // the component renders null in that case anyway, so a stale rect
+    // here is never actually drawn.
+    if (!step || !onRightPage) return;
     function measure() {
       const el = document.querySelector(`[data-tour="${step.target}"]`);
       if (!el) {
@@ -49,9 +71,13 @@ export function ProductTour({ steps, onDone }: { steps: TourStep[]; onDone: () =
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [step]);
+  }, [step, onRightPage]);
 
-  const isLast = index === steps.length - 1;
+  // Nothing to show while a step's page doesn't match yet (mid-navigation)
+  // or the step list is empty.
+  if (!step || !onRightPage) return null;
+
+  const isLast = clampedIndex === steps.length - 1;
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Guided tour">
@@ -68,7 +94,7 @@ export function ProductTour({ steps, onDone }: { steps: TourStep[]; onDone: () =
       )}
       <div className={styles.callout}>
         <p className={styles.progress}>
-          Step {index + 1} of {steps.length}
+          Step {clampedIndex + 1} of {steps.length}
         </p>
         <h3 className={styles.title}>{step.title}</h3>
         <p className={styles.body}>{step.body}</p>
@@ -77,15 +103,15 @@ export function ProductTour({ steps, onDone }: { steps: TourStep[]; onDone: () =
             Skip tour
           </button>
           <div className={styles.navBtns}>
-            {index > 0 && (
-              <button type="button" className={styles.backBtn} onClick={() => setIndex((i) => i - 1)}>
+            {clampedIndex > 0 && (
+              <button type="button" className={styles.backBtn} onClick={() => onIndexChange(clampedIndex - 1)}>
                 Back
               </button>
             )}
             <button
               type="button"
               className={styles.nextBtn}
-              onClick={() => (isLast ? onDone() : setIndex((i) => i + 1))}
+              onClick={() => (isLast ? onDone() : onIndexChange(clampedIndex + 1))}
             >
               {isLast ? "Done" : "Next"}
             </button>
